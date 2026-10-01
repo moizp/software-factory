@@ -1,0 +1,24 @@
+{
+  "name": "software-factory",
+  "version": "1.0.0",
+  "description": "Multi-agent software factory orchestration engine",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node",
+    "factory:start": "ts-node .factory/cli.ts start",
+    "factory:status": "ts-node .factory/cli.ts status",
+    "factory:list": "ts-node .factory/cli.ts list",
+    "factory:watch": "ts-node .factory/cli.ts watch",
+    "factory:retry": "ts-node .factory/cli.ts retry",
+    "orchestrator:test": "ts-node .factory/test.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
