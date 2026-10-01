@@ -4,78 +4,119 @@ A reusable, graph-engineered multi-agent workflow for building software projects
 
 ## Quick Start
 
+### Option 1: Autonomous Workflow (GitHub Integrated)
+
 ```bash
 # 1. Clone/use this template
 git clone <this-repo> my-project
 cd my-project
 
-# 2. Configure your project
-cp project.config.json.example project.config.json
-# Edit project.config.json with your specifics
-
-# 3. Set up credentials
+# 2. Set up credentials
 cp scripts/credentials.sh.template scripts/credentials.sh
 # Edit scripts/credentials.sh with real API keys
 source scripts/credentials.sh
 
-# 4. Run the factory
-claude "Execute factory workflow"
+# 3. Create a GitHub issue with your project brief
+# Label it with "ready-to-build"
+
+# 4. Workflow starts automatically!
+# Track progress in the companion PR
 ```
 
-## What It Does
+### Option 2: Manual Orchestration
 
-The factory is a **multi-agent workflow** that transforms a project brief into production-ready code:
+```bash
+# 1. Configure your project
+cp project.config.json.example project.config.json
+# Edit project.config.json with your specifics
+
+# 2. Run orchestrator manually
+npm install
+npm run factory:start "Build a user authentication system" 123
+
+# 3. Monitor progress
+npm run factory:watch wf-1704067200000-abc123def
+
+# 4. Check status
+npm run factory:list
+```
+
+## Autonomous Workflow
+
+The factory now includes a **fully autonomous orchestrator** that manages the entire workflow from issue to production code:
 
 ```
-Project Brief
+[Issue Created + "ready-to-build" Label]
     ↓
-[ANALYZER] ────→ Detects tech stack, features, MCP needs
+[GitHub Actions Trigger]
     ↓
-[MCP CONFIGURATOR] ────→ Auto-wires GitHub, Stripe, DB, etc
+[Factory Orchestrator] (fully autonomous)
+    ├─ [Sequential] Product Manager
+    ├─ [Sequential] Analyzer
+    ├─ [Sequential] Architect
+    ├─ [Parallel] Backend/Frontend/Infrastructure Builders
+    ├─ [Parallel] Backend/Frontend/Infrastructure Testers
+    ├─ [Sequential] E2E Tester
+    ├─ [Sequential] Reviewer
+    └─ [Sequential] Customer Support
     ↓
-[ARCHITECT] ────→ Creates system design & API contracts
-    ↓
-[BUILDERS] ────→ Backend | Frontend | Infrastructure (parallel)
-    ↓
-[REVIEWER] ────→ Tests, security, quality gates
-    ↓
-Production Code + Deployed
+[Production Code + PR + Documentation]
 ```
+
+**Key Features:**
+- ✅ **Fully Autonomous** — No human intervention needed after labeling issue
+- ✅ **State Persistence** — Track workflows, retry from failures
+- ✅ **Parallel Execution** — Builders and testers run simultaneously
+- ✅ **Validation Gates** — Each phase must pass before proceeding
+- ✅ **Real-Time Monitoring** — CLI tools to watch progress
+- ✅ **Full Documentation** — Auto-generated deployment guides
+
+**See:** `docs/ORCHESTRATION.md` for complete workflow details
 
 ## Project Structure
 
 ```
 software-factory/
 ├── README.md                    # This file
+├── package.json                 # Node.js dependencies
+├── tsconfig.json               # TypeScript configuration
 ├── project.config.json          # Your project specification
 │
+├── .factory/                    # Orchestration engine
+│   ├── state.ts               # Workflow state management
+│   ├── orchestrator.ts        # Multi-agent orchestrator
+│   ├── cli.ts                 # Command-line interface
+│   ├── test.ts                # Test suite
+│   ├── README.md              # Orchestrator documentation
+│   └── workflows/             # Workflow state files (gitignored)
+│
+├── .github/
+│   └── workflows/
+│       └── factory-start.yml   # GitHub Actions trigger
+│
 ├── .claude/
-│   ├── CLAUDE.md               # Factory main instructions
-│   ├── settings.json           # Claude Code config
+│   ├── CLAUDE.md              # Factory main instructions
+│   ├── settings.json          # Claude Code config
 │   │
 │   ├── agents/
-│   │   ├── analyzer.md         # Feature/tech detection
-│   │   ├── mcp-configurator.md # Server auto-setup
-│   │   ├── architect.md        # Design & contracts
-│   │   ├── builder.md          # Code generation
-│   │   └── reviewer.md         # QA & security gates
+│   │   ├── product-manager.md # Requirements refinement
+│   │   ├── analyzer.md        # Feature/tech detection
+│   │   ├── architect.md       # Design & contracts
+│   │   ├── builder.md         # Code generation
+│   │   └── reviewer.md        # QA & security gates
 │   │
 │   └── skills/
-│       ├── mcp-setup.md        # MCP automation
-│       ├── mcp-github.md       # GitHub integration
-│       ├── mcp-database.md     # DB operations
-│       ├── mcp-stripe.md       # Payments setup
+│       ├── mcp-setup.md       # MCP automation
 │       ├── backend-patterns.md # Node/Python/Go starters
 │       ├── frontend-patterns.md# React/Vue starters
-│       ├── infra-patterns.md   # Docker/K8s/Deploy
 │       └── testing-suite.md    # Test scaffolds
 │
 ├── scripts/
-│   ├── setup-mcp.sh            # Auto MCP installation
-│   ├── validate-mcp.sh         # MCP health check
-│   └── credentials.sh.template # Secret template (gitignore this)
+│   ├── credentials.sh.template # Secret template (gitignore this)
+│   └── validate-mcp.sh         # MCP health check
 │
 └── docs/
+    ├── ORCHESTRATION.md        # Complete orchestration guide
     └── mcp-setup-guide.md      # Detailed MCP reference
 ```
 
@@ -231,33 +272,41 @@ Edit `.claude/CLAUDE.md` to add:
 
 ## Running the Factory
 
-### Full Workflow
+### Autonomous Mode (Recommended)
+
+```bash
+# 1. Create a GitHub issue with your project brief
+# 2. Add the "ready-to-build" label
+# 3. Orchestrator runs automatically!
+# 4. Monitor in the companion PR
+
+# Optional: Check status via CLI
+npm run factory:status wf-1704067200000-abc123def
+npm run factory:list
+npm run factory:watch wf-1704067200000-abc123def
+```
+
+### Manual Mode
+
+```bash
+# Start a workflow
+npm run factory:start "Build user authentication" 123
+
+# Monitor progress
+npm run factory:watch wf-1704067200000-abc123def
+
+# Retry from failure
+npm run factory:retry wf-1704067200000-abc123def
+
+# List all workflows
+npm run factory:list
+```
+
+### Legacy: Step-by-Step via Claude Code
 
 ```bash
 source scripts/credentials.sh
 claude "Execute the complete factory workflow"
-```
-
-### Step-by-Step
-
-```bash
-# Analyze project needs
-claude "Run analyzer agent only"
-
-# Set up MCP servers
-claude "Run mcp-configurator agent"
-
-# Generate architecture
-claude "Run architect agent"
-
-# Build backend
-claude "Run backend-builder agent"
-
-# Build frontend (in parallel)
-claude "Run frontend-builder agent"
-
-# Review & validate
-claude "Run reviewer agent"
 ```
 
 ### Validate MCP Setup
@@ -352,11 +401,17 @@ Return ONLY this JSON:
 
 Then reference in `.claude/CLAUDE.md` workflow.
 
-## Support & Docs
+## Documentation
+
+- **Orchestration Guide** — `docs/ORCHESTRATION.md` — Complete workflow documentation
+- **Orchestrator README** — `.factory/README.md` — Architecture and components
+- **Agent Responsibilities** — `.claude/CLAUDE.md` — Factory workflow and agents
+- **MCP Setup** — `docs/mcp-setup-guide.md` — MCP server configuration
+
+## External Resources
 
 - **Claude Code** — https://docs.anthropic.com/claude-code
 - **MCP Docs** — https://modelcontextprotocol.io
-- **Graph Engineering** — See docs/graph-engineering-guide.md
 
 ## License
 
