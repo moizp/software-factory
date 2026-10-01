@@ -1,302 +1,629 @@
 # Software Factory Orchestration
 
-Complete guide to the autonomous end-to-end orchestration workflow.
+Complete guide to autonomous multi-agent orchestration workflow—from GitHub issue to production code.
 
-## Overview
-
-The software factory orchestrator automates the entire journey from user requirements to production-ready code:
+## Architecture Overview
 
 ```
-[Issue Created]
-      ↓
-[Labeled "ready-to-build"]
-      ↓
-[GitHub Actions Trigger]
-      ↓
-[Factory Orchestrator]
-      ├─ Sequential: Product Manager → Analyzer → Architect
-      ├─ Parallel: Backend/Frontend/Infrastructure Builders
-      ├─ Parallel: Backend/Frontend/Infrastructure Testers
-      └─ Sequential: E2E → Reviewer → Customer Support
-      ↓
-[Production Code + PR + Documentation]
+[GitHub Issue + "ready-to-build" Label]
+              ↓
+    [CloudRun Orchestrator Pod]
+      ├─ Load project.config.json
+      ├─ Validate credentials (MCP Configurator)
+              ↓
+    [Sequential: Requirements Phase]
+      ├─ Product Manager (2 min) → requirements + personas
+      ├─ Analyzer (3 min) → tech stack + features
+              ↓
+    [Parallel: Architecture Phase]
+      ├─ Software Architect (5 min) → API spec + DB schema
+      ├─ Platform Architect (5 min) → Infrastructure design
+      ├─ UI Designer (3 min) → Design system
+              ↓
+    [Parallel: Builder Phase (Zero Token Cost)]
+      ├─ Backend Engineer → API server + auth
+      ├─ Frontend Engineer → React components
+      ├─ Infrastructure Engineer → Docker + CI/CD
+      ├─ Automation Tester → Unit + integration tests
+      └─ Customer Support → Documentation
+              ↓
+    [Sequential: Validation Phase]
+      ├─ E2E Tester (8 min) → User workflows
+      ├─ Reviewer (5 min) → Security + quality gate
+              ↓
+    [GitHub PR + All Generated Artifacts + Deployment Ready]
 ```
 
 ## Quick Start
 
-### 1. Label an Issue
+### Three Steps
 
-Add `ready-to-build` label to any GitHub issue.
+```bash
+# 1. Clone and configure
+git clone <repo> my-project && cd my-project
+cp scripts/credentials.sh.template scripts/credentials.sh
+# Edit credentials.sh with real API keys
 
-### 2. Workflow Automatically Starts
+# 2. Create GitHub issue with project brief
+# Add "ready-to-build" label
 
-GitHub Actions detects the label and invokes the orchestrator:
-
-```yaml
-# .github/workflows/factory-start.yml automatically runs
+# 3. Track progress
+# Orchestrator runs automatically, posts status to issue
+# Results appear in companion PR when done
 ```
 
-### 3. Monitor Progress
-
-Track real-time status in the workflow's companion PR.
-
-### 4. Review Results
-
-When complete, the PR contains all production code.
-
-## Workflow Phases
+## Phase Details & Agent Invocation
 
 ### Phase 1: Product Manager (Sequential)
-**Purpose:** Validate and refine requirements  
-**Input:** Issue title + body  
-**Output:** Refined scope, acceptance criteria  
-**Time:** ~1-2 minutes  
-**Success Criteria:** Requirements are clear, feasible, and specific
+**Duration:** 2 minutes  
+**Input:** GitHub issue title + body  
+**Output:** `{ valid: true/false, persona[], acceptance_criteria[], roadmap }`
+
+Claude Code loads `.claude/agents/product-manager.md` and:
+1. Parses issue requirements
+2. Generates user personas with goals
+3. Creates acceptance criteria (must-have + nice-to-have)
+4. Defines success metrics
+5. Returns structured JSON
+
+**Validation Gate:** Check `valid === true`, else abort
 
 ### Phase 2: Analyzer (Sequential)
-**Purpose:** Determine technical needs  
-**Input:** Refined requirements  
-**Output:**
-- Feature breakdown
-- MCP servers required
-- Database schema outline
-- Tech stack confirmation
+**Duration:** 3 minutes  
+**Input:** Product Manager output + `project.config.json`  
+**Output:** `{ valid: true/false, features[], tech_stack, mcp_servers[], db_outline }`
 
-**Success Criteria:** All dependencies identifiable, no blockers
+Claude Code loads `.claude/agents/analyzer.md` and:
+1. Extracts tech stack from config
+2. Maps features to required MCP servers
+3. Outlines database schema
+4. Lists API endpoints needed
+5. Returns structured JSON
 
-### Phase 3: Architect (Sequential)
-**Purpose:** Design the system  
+**Validation Gate:** Check `valid === true`, else abort with credential fix guidance
+
+### Phase 3a: Software Architect (Parallel)
+**Duration:** 5 minutes  
 **Input:** Analyzer output  
-**Output:**
-- System architecture (ASCII diagram)
-- Database schema (Prisma/TypeScript)
-- API contracts (OpenAPI spec)
-- Deployment architecture
+**Output:** `{ valid: true/false, api_spec: OpenAPI, prisma_schema, auth_model }`
 
-**Success Criteria:** Design is implementable and scalable
+Claude Code loads `.claude/agents/software-architect.md` and:
+1. Generates OpenAPI 3.0 specification
+2. Creates Prisma database schema
+3. Designs authentication flow (JWT/sessions)
+4. Plans error handling strategy
+5. Organizes code structure (MVC/layered)
 
-### Phase 4a: Backend Builder (Parallel)
-**Purpose:** Generate API code  
-**Input:** Architecture output  
-**Output:**
-- Express/Node.js server code
-- Prisma ORM models
-- Database migrations
-- Auth middleware
-- API route handlers
-- Business logic
+**Validation Gate:** Check `valid === true`, else fix and retry
 
-**Success Criteria:** Code compiles, passes lint, no TypeScript errors
+### Phase 3b: Platform Architect (Parallel)
+**Duration:** 5 minutes  
+**Input:** Analyzer output  
+**Output:** `{ valid: true/false, deployment_arch, scaling_strategy, cost_estimate }`
 
-### Phase 4b: Frontend Builder (Parallel)
-**Purpose:** Generate UI code  
-**Input:** Architecture output  
-**Output:**
-- React components
-- Page layouts
-- State management setup (TanStack Query)
-- Styling (Tailwind CSS)
-- Type definitions
+Claude Code loads `.claude/agents/platform-architect.md` and:
+1. Designs cloud infrastructure (serverless/containerized)
+2. Plans CI/CD pipeline (GitHub Actions)
+3. Sets up monitoring (Datadog/CloudWatch)
+4. Designs disaster recovery strategy
+5. Calculates infrastructure costs
 
-**Success Criteria:** Code compiles, passes lint, no TypeScript errors
+**Validation Gate:** Check `valid === true`, else fix and retry
 
-### Phase 4c: Infrastructure Builder (Parallel)
-**Purpose:** Generate deployment configs  
-**Input:** Architecture output  
-**Output:**
-- Dockerfile (multi-stage build)
-- docker-compose.yml
-- GitHub Actions CI/CD workflows
-- Environment configuration
-- Secrets management
+### Phase 3c: UI Designer (Sequential)
+**Duration:** 3 minutes  
+**Input:** Analyzer output  
+**Output:** `{ valid: true/false, design_tokens, components[], accessibility_spec }`
 
-**Success Criteria:** Configs are syntactically valid, deployable
+Claude Code loads `.claude/agents/ui-designer.md` and:
+1. Creates design system (colors, typography, spacing)
+2. Specifies all components (Button, Form, Modal, etc.)
+3. Defines responsive breakpoints
+4. Plans dark mode support
+5. Ensures WCAG 2.1 AA compliance
 
-### Phase 5: Testers (Parallel)
-**Purpose:** Ensure code quality  
-**Input:** Builder outputs  
+### Phase 4: Builders (Parallel, Zero Token Cost)
 
-#### 5a: Backend Tester
-- Unit tests (Jest)
-- Integration tests (database)
-- API endpoint tests
+All five builders run simultaneously after architects complete.
+
+#### 4a: Backend Engineer
+**Duration:** 12 minutes  
+**Input:** API spec + Prisma schema  
+**Output:** `{ valid: true, code: src/**, tests: **, migrations: ** }`
+
+Generates:
+- Express.js server with type safety
+- Prisma ORM integration + migrations
+- JWT authentication + middleware
+- CRUD endpoints for all entities
+- Database transaction handling
+- Error handling middleware
+- Jest unit + integration tests (45+)
+- >70% code coverage
+
+#### 4b: Frontend Engineer
+**Duration:** 12 minutes  
+**Input:** UI design + API spec  
+**Output:** `{ valid: true, components: **, pages: **, hooks: ** }`
+
+Generates:
+- React components (20+) with TypeScript
+- TanStack Query integration (data fetching)
+- Zustand store (state management)
+- Tailwind CSS styling
+- Responsive layouts (mobile/tablet/desktop)
+- Dark mode support
+- React Testing Library tests
+- Form validation + error handling
+
+#### 4c: Infrastructure Engineer
+**Duration:** 8 minutes  
+**Input:** Platform architect spec  
+**Output:** `{ valid: true, docker: **, ci_cd: **, deploy: ** }`
+
+Generates:
+- Multi-stage Dockerfile
+- docker-compose.yml (dev environment)
+- GitHub Actions workflows (lint → test → deploy)
+- Environment variable templates
+- Database backup scripts
+- Health check configurations
+- Monitoring dashboards (Datadog)
+
+#### 4d: Automation Tester
+**Duration:** 10 minutes  
+**Input:** Builder outputs + architect spec  
+**Output:** `{ valid: true, tests: **, coverage: number }`
+
+Generates:
+- Unit tests (Jest) for all services
+- Integration tests with test DB
+- API endpoint tests (Supertest)
 - Auth flow tests
+- Mocking + fixtures
+- Coverage reports (>70% target)
+- Test utilities + helpers
 
-#### 5b: Frontend Tester
-- Component tests (React Testing Library)
-- Integration tests (with mocks)
-- E2E snippets (Playwright examples)
+#### 4e: Customer Support
+**Duration:** 8 minutes  
+**Input:** All builder outputs + architecture  
+**Output:** `{ valid: true, docs: **, api_ref: **, guides: ** }`
 
-#### 5c: Infrastructure Tester
-- Docker image build validation
-- docker-compose validation
-- CI/CD workflow dry-run
-- Config file validation
+Generates:
+- Deployment guide (step-by-step)
+- API reference (auto from OpenAPI spec)
+- Admin guide (configuration, monitoring)
+- User guide (feature walkthrough)
+- FAQ + troubleshooting
+- Onboarding email sequence (4)
+- Help center articles
 
-**Success Criteria:** >80% code coverage, all tests pass
+### Phase 5: E2E Tester (Sequential)
+**Duration:** 8 minutes  
+**Input:** All builder outputs  
+**Output:** `{ valid: true, e2e_tests: **, performance_metrics }`
 
-### Phase 6: E2E Tester (Sequential)
-**Purpose:** Validate full system  
-**Input:** All builder + tester outputs  
-**Output:**
-- End-to-end test suite
-- System health report
-- Performance baseline
+Claude Code loads `.claude/agents/e2e-tester.md` and:
+1. Generates Playwright test suite
+2. Tests user registration → login → core flow
+3. Tests across browsers (Chrome, Firefox, Safari, Edge)
+4. Tests responsive design (mobile/tablet/desktop)
+5. Measures performance baselines
+6. Validates WCAG 2.1 AA compliance
 
-**Success Criteria:** All flows work as specified, no integration issues
+### Phase 6: Reviewer (Sequential, QA Gate)
+**Duration:** 5 minutes  
+**Input:** All artifacts + test results  
+**Output:** `{ valid: true/false, security_issues[], quality_score, approved }`
 
-### Phase 7: Reviewer (Sequential)
-**Purpose:** QA and security audit  
-**Input:** All artifacts  
-**Output:**
-- Security audit report
-- Code quality metrics
-- Performance review
-- Documentation completeness check
+Claude Code loads `.claude/agents/reviewer.md` and:
+1. Runs security audit (OWASP top 10)
+2. Checks code quality metrics
+3. Verifies test coverage >70%
+4. Validates all documentation exists
+5. Checks compliance with acceptance criteria
+6. Approves deployment readiness
 
-**Success Criteria:**
-- No critical security issues
-- Code quality score >85%
-- All files documented
+**Final Gate:** Only `valid: true` allows merge to main
 
-### Phase 8: Customer Support (Sequential)
-**Purpose:** Create deployment + user guides  
-**Input:** Final code + all documentation  
-**Output:**
-- Deployment guide
-- API documentation
-- Admin guide
-- User guide
-- Troubleshooting guide
-
-**Success Criteria:** Complete, clear, production-ready documentation
-
-## State Management
-
-The orchestrator persists state after every phase:
+## State Machine Diagram
 
 ```
-.factory/workflows/
-└── wf-1704067200000-abc123def.json
+    ┌────────────────────────────────────────────────┐
+    │         IDLE (waiting for issue label)         │
+    └──────────────────┬─────────────────────────────┘
+                       │ (ready-to-build label added)
+                       ↓
+    ┌────────────────────────────────────────────────┐
+    │  INIT: Load config + validate credentials      │
+    │  - Load project.config.json                    │
+    │  - Check GITHUB_TOKEN, API keys exist          │
+    │  - Create .factory/workflows/wf-{id}.json      │
+    └──────────────────┬─────────────────────────────┘
+                       │
+         ┌─────────────┴────────────────┐
+         │ credentials valid?           │
+         └──────┬──────────────┬────────┘
+                │              │
+               YES             NO
+                │              │
+                ↓              ↓
+         [RUNNING]      [FAILED: Missing Creds]
+                │              │
+                │              └─→ Post error comment to issue
+                ↓                  Workflow stops
+    ┌────────────────────────────────┐
+    │  PHASE 1: Product Manager      │
+    │  (sequential)                  │
+    └──────────────┬─────────────────┘
+                   │
+         ┌─────────┴─────────┐
+         │ valid === true?   │
+         └────┬──────────┬───┘
+             YES         NO
+              │          │
+              ↓          ↓
+         [CONTINUE]  [FAILED]
+              │        ↓
+              ↓   Retry from this phase
+    ┌────────────────────────────────┐
+    │  PHASE 2: Analyzer             │
+    │  (sequential)                  │
+    └──────────────┬─────────────────┘
+              ↓
+    ┌────────────────────────────────┐
+    │  PHASE 3a/3b/3c: Architects    │
+    │  (parallel - no token cost)    │
+    └──────────────┬─────────────────┘
+                   │
+         ┌─────────┴───────────┐
+         │ all valid === true? │
+         └────┬──────────┬────┘
+             YES         NO
+              │          │
+              ↓          ↓
+         [CONTINUE]  [FAILED]
+              │
+              ↓
+    ┌────────────────────────────────┐
+    │  PHASE 4: Builders (parallel)  │
+    │  - Backend Engineer            │
+    │  - Frontend Engineer           │
+    │  - Infrastructure Engineer     │
+    │  - Automation Tester           │
+    │  - Customer Support            │
+    │  (zero token cost)             │
+    └──────────────┬─────────────────┘
+                   │
+         ┌─────────┴──────────────┐
+         │ all valid === true?    │
+         └────┬──────────┬────────┘
+             YES         NO
+              │          │
+              ↓          ↓
+         [CONTINUE]  [FAILED]
+              │
+              ↓
+    ┌────────────────────────────────┐
+    │  PHASE 5: E2E Tester           │
+    │  (sequential)                  │
+    └──────────────┬─────────────────┘
+                   │
+         ┌─────────┴─────────┐
+         │ valid === true?   │
+         └────┬──────────┬───┘
+             YES         NO
+              │          │
+              ↓          ↓
+         [CONTINUE]  [FAILED]
+              │
+              ↓
+    ┌────────────────────────────────┐
+    │  PHASE 6: Reviewer (QA Gate)   │
+    │  - Security audit              │
+    │  - Code quality check          │
+    │  - Documentation verification  │
+    └──────────────┬─────────────────┘
+                   │
+         ┌─────────┴──────────────────┐
+         │ valid === true + approved? │
+         └────┬──────────────┬────────┘
+             YES             NO
+              │              │
+              ↓              ↓
+         [COMPLETED]   [BLOCKED]
+              │              │
+              ↓              ↓
+    Create PR +        Request changes
+    Merge to main      Loop back to Phase 4
+              │
+              └──→ Post success comment
+                   All artifacts in PR
 ```
 
-Each state file contains:
-- Workflow ID and metadata
-- List of completed phases (with validation results)
-- All generated artifacts
-- Execution timeline
-- Error messages (if any)
+## State Persistence
 
-### State Structure
+Orchestrator saves state after every phase:
 
-```typescript
+```json
 {
-  // Workflow metadata
-  "id": "wf-1704067200000-abc123def",
+  "id": "wf-1704067200000-abc123",
   "issueBrief": "Build real-time chat",
   "issueNumber": 42,
   "status": "running|completed|failed",
   "currentPhase": "backend-builder",
-  
-  // Execution timeline
   "startedAt": "2024-01-01T10:00:00Z",
   "updatedAt": "2024-01-01T10:35:00Z",
   
-  // Phase tracking
   "phases": [
     {
       "phase": "product-manager",
       "valid": true,
       "timestamp": "2024-01-01T10:00:30Z",
-      "output": { /* agent output */ }
-    },
-    ...
+      "duration_ms": 2000,
+      "output": { /* full JSON */ }
+    }
   ],
   
-  // Generated artifacts
   "artifacts": [
     {
       "phase": "architect",
-      "type": "database-schema",
-      "content": { /* Prisma schema */ },
-      "timestamp": "2024-01-01T10:05:00Z"
-    },
-    ...
+      "type": "openapi-spec|prisma-schema|dockerfile",
+      "path": "factory/wf-id/artifact-name",
+      "size_bytes": 45821
+    }
   ],
   
-  // Execution log
-  "notes": [
+  "timeline": [
     "[2024-01-01T10:00:00Z] Workflow started",
-    "[2024-01-01T10:00:30Z] Product Manager phase completed"
+    "[2024-01-01T10:00:30Z] Product Manager passed"
   ]
 }
 ```
 
+**Location:** `.factory/workflows/wf-{timestamp}-{uuid}.json`  
+**Retention:** Permanent (used for audit + retry)
+
 ## Validation Gates
 
-Each phase must pass validation before proceeding:
-
-```
-Phase completes
-  ↓
-Returns { valid: true/false, output, error? }
-  ↓
-Orchestrator checks: valid === true?
-  ├─ YES → Save state, continue to next phase
-  ├─ NO → Save state, mark workflow as 'failed'
-  └─ Workflow can be retried from this point
+Each phase must return:
+```json
+{
+  "phase": "product-manager",
+  "valid": true,
+  "data": { /* structured output */ },
+  "error": null
+}
 ```
 
-## Parallel Execution
-
-Builders and Testers run in parallel:
-
+**Orchestrator flow:**
 ```
-[Architect Complete]
-         ↓
-    ┌────┴────┬────────────┐
-    ↓         ↓            ↓
-[Backend] [Frontend] [Infrastructure]
-  Builder  Builder      Builder
-    ↓         ↓            ↓
-    └────┬────┴────────────┘
-         ↓
-  [All Builder Outputs Collected]
-         ↓
-    ┌────┴────┬────────────┐
-    ↓         ↓            ↓
-[Backend] [Frontend] [Infrastructure]
-  Tester    Tester       Tester
-    ↓         ↓            ↓
-    └────┬────┴────────────┘
-         ↓
- [Testers Complete - Proceed to E2E]
+Phase returns output
+        ↓
+  valid === true?
+   ├─ YES → Save state, proceed to next phase
+   └─ NO  → Save state + error, pause workflow
+           Can retry from this phase
 ```
 
-**Key constraint:** If ANY parallel phase fails, the entire workflow stops.
+## Parallel Execution Strategy
 
-## Retry Mechanism
+### Builders Run Zero-Cost Parallel
 
-Failed workflows can be retried from the first failed phase:
+All 5 Phase 4 builders start simultaneously:
 
 ```bash
-npm run factory:retry wf-1704067200000-abc123def
+# Pseudo-code: orchestrator.ts
+Promise.all([
+  builder(BackendEngineer, architectOutput),
+  builder(FrontendEngineer, architectOutput),
+  builder(InfrastructureEngineer, architectOutput),
+  builder(AutomationTester, architectOutput),
+  builder(CustomerSupport, architectOutput)
+])
 ```
 
-**Process:**
-1. Load previous workflow state
-2. Remove all phases after the first failure
-3. Create new workflow ID
-4. Restart orchestrator from failure point
-5. Preserve earlier artifacts
+**Key:** They share read-only architect output (no token overhead).
+
+### Failure Handling
+
+If **any** builder fails:
+1. Orchestrator terminates other builders
+2. Saves state with first failure
+3. Workflow pauses (can retry)
+4. Posts error to GitHub issue
+
+## Troubleshooting
+
+### Common Failures
+
+#### 1. Missing Credentials (Phase INIT)
+```json
+{
+  "phase": "init",
+  "valid": false,
+  "error": "STRIPE_MCP_KEY not in environment"
+}
+```
+
+**Fix:**
+```bash
+# Edit scripts/credentials.sh
+export STRIPE_MCP_KEY="sk_test_..."
+source scripts/credentials.sh
+
+# Retry workflow
+npm run factory:retry wf-1704067200000-abc123
+```
+
+#### 2. Builder Type Error (Phase 4)
+```json
+{
+  "phase": "backend-engineer",
+  "valid": false,
+  "error": "TypeScript compilation failed: Cannot find type 'User'"
+}
+```
+
+**Root cause:** Architect output missing type definitions  
+**Fix:**
+1. Review architect output for `prisma_schema`
+2. Retry builder with corrected schema
+```bash
+npm run factory:retry wf-id --from-phase=software-architect
+```
+
+#### 3. Security Audit Fails (Phase 6)
+```json
+{
+  "phase": "reviewer",
+  "valid": false,
+  "security_issues": [
+    "SQL injection in user search endpoint",
+    "Hardcoded API key in .env.example"
+  ]
+}
+```
+
+**Fix:**
+1. Review code in builder output
+2. Fix manually or retry builder with corrected spec
+3. Re-run reviewer
+
+### Debug Commands
+
+```bash
+# Show workflow state
+cat .factory/workflows/wf-id.json | jq '.currentPhase, .phases[-1]'
+
+# Show phase output
+cat .factory/workflows/wf-id.json | jq '.phases[] | select(.phase=="backend-engineer")'
+
+# Show execution timeline
+cat .factory/workflows/wf-id.json | jq '.timeline'
+
+# Show all errors
+cat .factory/workflows/wf-id.json | jq '.phases[] | select(.valid==false)'
+```
+
+## Security Considerations
+
+### Credential Management
+- **Never** commit `scripts/credentials.sh`
+- Store in GitHub Secrets if using CI/CD
+- Rotate API keys every 90 days
+
+### Code Generation Security
+- Reviewer agent audits for OWASP top 10
+- Checks for hardcoded secrets
+- Validates input sanitization
+- Ensures SQL injection prevention
+
+### Access Control
+- Only repository owners can create issues
+- Only issues with valid label trigger workflow
+- Artifacts stored in private `.factory/` directory
+- PR requires code review before merge
+
+## Recovery Procedures
+
+### Workflow Stuck (No Progress)
+
+1. **Check current state:**
+   ```bash
+   npm run factory:status wf-id
+   ```
+
+2. **If waiting on credentials:**
+   ```bash
+   source scripts/credentials.sh
+   npm run factory:retry wf-id
+   ```
+
+3. **If builder hung:**
+   ```bash
+   # Kill workflow, restart from last passing phase
+   npm run factory:retry wf-id --from-phase=analyzer
+   ```
+
+4. **If unsure:**
+   ```bash
+   # Full cleanup + restart
+   rm .factory/workflows/wf-id.json
+   npm run factory:start "Brief text" 123
+   ```
+
+### Partial Completion Recovery
+
+If workflow completed 7 of 8 phases:
+
+```bash
+# Restart from phase 8 (Reviewer) only
+npm run factory:retry wf-id --from-phase=reviewer
+
+# Provides all artifacts from phases 1-7
+# No need to re-generate code
+```
+
+### Database Migration Rollback
+
+If infrastructure phase created migrations:
+
+```bash
+# Revert only migrations, keep code
+npx prisma migrate resolve --rolled-back <migration-name>
+
+# Then retry infrastructure phase
+npm run factory:retry wf-id --from-phase=infrastructure-engineer
+```
+
+## CLI Reference
+
+```bash
+# Start workflow manually (without GitHub issue)
+npm run factory:start "Build real-time chat app" 42
+
+# List all workflows
+npm run factory:list
+
+# Show workflow status
+npm run factory:status wf-1704067200000-abc123
+
+# Watch real-time progress
+npm run factory:watch wf-1704067200000-abc123
+
+# Retry from failure point
+npm run factory:retry wf-1704067200000-abc123
+
+# Retry from specific phase
+npm run factory:retry wf-1704067200000-abc123 --from-phase=software-architect
+
+# Clean up workflow state
+npm run factory:clean wf-1704067200000-abc123
+```
+
+## Performance Tuning
+
+### Parallel Execution
+- **Phase 3** (Architects): 5 min each (actual seconds: parallel = no overhead)
+- **Phase 4** (Builders): ~12 min max (all 5 run simultaneously)
+- **Phase 5** (E2E + Reviewer): ~13 min sequential
+
+**Total time:** ~30-35 minutes end-to-end (not 60+)
+
+### Token Cost Optimization
+- Builders share read-only architect output (no duplication)
+- State persisted, can resume without re-running prior phases
+- Each agent uses specific, minimal prompt context
+
+**Typical cost:** 150K-200K tokens per complete workflow
 
 ## GitHub Integration
 
 ### Automatic Trigger
 
-When an issue is labeled `ready-to-build`:
-
 ```yaml
+# .github/workflows/factory-start.yml
 on:
   issues:
     types: [labeled]
@@ -307,163 +634,75 @@ jobs:
 
 ### Tracking PR
 
-Workflow automatically creates a PR to track progress:
-
+Workflow creates tracking PR:
 ```
-PR Title: Factory: #42 - Build real-time chat
-Branch: factory/42
-Status: Updates after each phase completes
-```
-
-### Status Updates
-
-Issue receives automated comments:
-
-```
-✅ Factory workflow started! Follow progress in PR #789
-✅ Analyzer complete, proceeding to Architect
-✅ Builders running in parallel
-✅ All tests passed, starting E2E testing
-✅ Workflow complete! Code merged to main
+PR: Factory: #42 - Build real-time chat
+Branch: factory/{issue-number}
+Status updates after each phase
 ```
 
-## Monitoring
+### Status Comments
 
-### List Active Workflows
-
-```bash
-npm run factory:list
+Orchestrator posts to issue:
+```
+✅ Workflow started! View progress in PR #789
+✅ Analyzer complete → proceeding to architects
+✅ All builders passing
+✅ E2E tests valid
+✅ Reviewer approved → merging to main
 ```
 
-Output:
-```
-Workflow: wf-1704067200000-abc123def
-  Status: running
-  Phase: backend-builder
-  Issue: #42
-  Started: 2024-01-01T10:00:00Z
-```
+## Artifact Structure
 
-### Check Workflow Status
-
-```bash
-npm run factory:status wf-1704067200000-abc123def
-```
-
-### Watch Real-Time Progress
-
-```bash
-npm run factory:watch wf-1704067200000-abc123def
-```
-
-Live updating dashboard showing:
-- Current phase
-- Phase completion status
-- Error messages
-- Execution timeline
-
-## Artifact Output
-
-Generated code is organized by type:
+Generated code in feature branch:
 
 ```
-.factory/workflows/wf-xxx/
-├── schema.prisma          (Database schema)
-├── api-spec.openapi.json  (API contracts)
-├── backend/
+factory/{issue-number}/
+├── schema.prisma           # Database schema
+├── openapi.json            # API specification
+├── backend/                # Node.js + Express
 │   ├── src/
-│   ├── migrations/
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   └── package.json
-├── infrastructure/
+│   ├── tests/
+│   └── migrations/
+├── frontend/               # React + TypeScript
+│   ├── src/components/
+│   ├── src/hooks/
+│   └── tests/
+├── infrastructure/         # Docker + CI/CD
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   └── .github/workflows/
 └── docs/
     ├── DEPLOYMENT.md
     ├── API.md
-    └── USER_GUIDE.md
+    ├── USER_GUIDE.md
+    └── TROUBLESHOOTING.md
 ```
 
-All artifacts committed to feature branch `factory/{issue-number}`.
-
-## Error Handling
-
-### Common Failures
-
-**Analyzer fails (MCP servers unavailable)**
-```
-Error: STRIPE_MCP_KEY not in environment
-Action: Set environment variable, retry workflow
-```
-
-**Builder fails (code generation issue)**
-```
-Error: TypeScript compilation failed
-Action: Check architect output, retry builder
-```
-
-**Reviewer fails (security issues)**
-```
-Error: SQL injection vulnerability in user input
-Action: Review code, fix, retry reviewer
-```
-
-### Debugging
-
-View detailed logs:
-
-```bash
-npm run factory:status wf-id | grep -A5 error
-```
-
-Read workflow state file directly:
-
-```bash
-cat .factory/workflows/wf-id.json | jq '.notes'
-```
-
-## Workflow Lifetime
+## Typical Timeline
 
 ```
-[Created]
-    ↓
-[Running] ← Current phase executed, state persisted
-    ↓
-[Completed] ← All phases passed
-OR
-[Failed] ← Phase validation failed
-    ↓
-[Can be retried]
+T+0:00    Issue labeled "ready-to-build"
+T+0:05    Product Manager + Analyzer complete
+T+0:15    Architects complete (parallel)
+T+0:20    UI Designer complete
+T+0:35    All 5 Builders complete (parallel, zero token cost)
+T+0:45    E2E Tester complete
+T+0:50    Reviewer complete + approved
+T+0:55    PR created + merged to main
+T+1:00    Artifacts available for deployment
 ```
-
-**Retention:** Workflows remain in `.factory/workflows/` indefinitely.
-
-## Cost & Performance
-
-**Typical Workflow Runtime:**
-- Sequential phases (Product Manager → Analyzer → Architect): ~10 min
-- Parallel builders: ~8 min
-- Parallel testers: ~5 min
-- Sequential final phases (E2E → Reviewer → Support): ~5 min
-
-**Total: ~25-30 minutes end-to-end**
-
-**Token Cost:** ~150K tokens per full workflow (using mock agents; real agents may vary)
 
 ## Next Steps
 
-1. **Label an issue** with `ready-to-build`
-2. **Monitor the PR** created automatically
-3. **Review generated code** when workflow completes
-4. **Merge or iterate** based on review feedback
-5. **Deploy** using included deployment guide
+1. **Clone repository** and configure credentials
+2. **Create GitHub issue** with project brief
+3. **Label with** "ready-to-build"
+4. **Monitor** progress in companion PR
+5. **Deploy** using generated deployment guide
 
-## See Also
-
-- [Factory Orchestrator README](./.factory/README.md)
-- [Agent Responsibilities](#agent-responsibilities) in CLAUDE.md
-- GitHub Workflows: `.github/workflows/factory-start.yml`
-- CLI Reference: `.factory/cli.ts`
+See also:
+- [IMPLEMENTATION.md](./IMPLEMENTATION.md) — How to run locally
+- [CONFIGURATION.md](./CONFIGURATION.md) — Schema reference
+- `.claude/CLAUDE.md` — Agent roles and workflow
+- `.factory/README.md` — Orchestrator components
