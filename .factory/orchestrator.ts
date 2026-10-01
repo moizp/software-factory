@@ -10,6 +10,11 @@ import {
 import { GitHubAPI } from './github-integration';
 import { SlackNotifier, GitHubStatusUpdater, NotificationConfig } from './notifications';
 import { RollbackManager } from './rollback';
+import { CleanupManager } from './cleanup';
+import { RecoveryManager } from './recovery';
+import { AnalyticsCollector } from './analytics';
+import { Logger } from './logger';
+import { MetricsCollector } from './metrics';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,6 +56,11 @@ export class FactoryOrchestrator {
   private githubStatusUpdater: GitHubStatusUpdater | null;
   private rollbackManager: RollbackManager;
   private currentCommit: string = '';
+  private cleanupManager: CleanupManager;
+  private recoveryManager: RecoveryManager;
+  private analyticsCollector: AnalyticsCollector;
+  private logger: Logger;
+  private metricsCollector: MetricsCollector;
 
   constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>, notificationConfig?: NotificationConfig) {
     this.invokeAgent = invokeAgent;
@@ -77,6 +87,13 @@ export class FactoryOrchestrator {
 
     // Initialize rollback manager
     this.rollbackManager = new RollbackManager();
+
+    // Initialize new managers
+    this.cleanupManager = new CleanupManager();
+    this.recoveryManager = new RecoveryManager();
+    this.analyticsCollector = new AnalyticsCollector();
+    this.logger = new Logger(undefined, verbose ? 'DEBUG' : 'INFO');
+    this.metricsCollector = new MetricsCollector();
   }
 
   private log(message: string): void {
@@ -385,6 +402,7 @@ export class FactoryOrchestrator {
     if (!validation.valid) {
       const errorMsg = `Setup validation failed: ${validation.errors.join('; ')}`;
       this.log(errorMsg);
+      this.logger.error('Setup validation failed', errorMsg);
 
       let state = createWorkflowState(issueBrief, issueNumber, config);
       state.status = 'failed';
@@ -397,12 +415,21 @@ export class FactoryOrchestrator {
     if (validation.warnings.length > 0) {
       validation.warnings.forEach(warning => {
         this.log(`Warning: ${warning}`);
+        this.logger.warn(warning);
       });
+    }
+
+    // Attempt recovery of incomplete workflows
+    this.logger.info('Checking for incomplete workflows...');
+    const recovery = await this.recoveryManager.recoverState();
+    if (recovery.recovered > 0) {
+      this.logger.info(`Recovered ${recovery.recovered} workflows`);
     }
 
     let state = createWorkflowState(issueBrief, issueNumber, config);
     state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
     saveWorkflowState(state);
+    this.logger.info('Workflow created', { workflowId: state.id, brief: issueBrief.substring(0, 100) });
 
     // Capture current commit
     try {
@@ -694,8 +721,29 @@ export class FactoryOrchestrator {
     state = addNote(state, 'Workflow completed successfully');
     saveWorkflowState(state);
 
+    // Record metrics
+    await this.metricsCollector.recordWorkflow(state);
+    this.logger.info('Workflow metrics recorded', { workflowId: state.id, status: state.status });
+
+    // Report analytics
+    const report = await this.analyticsCollector.generateReport();
+    this.logger.info('Analytics report generated', {
+      totalWorkflows: report.totalWorkflows,
+      completedWorkflows: report.completedWorkflows,
+      failedWorkflows: report.failedWorkflows,
+      averageDuration: report.averageDuration
+    });
+
     // Cleanup old snapshots
     this.rollbackManager.cleanupOldSnapshots(state.id, 5);
+
+    // Enforce retention policy
+    const retentionResult = await this.cleanupManager.enforceRetention();
+    this.logger.info('Retention policy enforced', {
+      archived: retentionResult.archived,
+      compressed: retentionResult.compressed,
+      errors: retentionResult.errors.length
+    });
 
     // Auto-merge PR on success
     if (this.githubAPI && this.prNumber) {
@@ -704,9 +752,11 @@ export class FactoryOrchestrator {
         state = addNote(state, `PR #${this.prNumber} auto-merged`);
       } catch (error) {
         this.log(`Failed to auto-merge PR: ${error}`);
+        this.logger.warn('Failed to auto-merge PR', String(error));
       }
     }
 
+    this.logger.info('Workflow execution complete', { workflowId: state.id });
     return state;
   }
 
