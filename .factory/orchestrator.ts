@@ -8,6 +8,8 @@ import {
   addNote
 } from './state';
 import { GitHubAPI } from './github-integration';
+import { SlackNotifier, GitHubStatusUpdater, NotificationConfig } from './notifications';
+import { RollbackManager } from './rollback';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -45,8 +47,12 @@ export class FactoryOrchestrator {
   private githubAPI: GitHubAPI | null;
   private prNumber: number | null = null;
   private retryConfig: RetryConfig;
+  private slackNotifier: SlackNotifier | null;
+  private githubStatusUpdater: GitHubStatusUpdater | null;
+  private rollbackManager: RollbackManager;
+  private currentCommit: string = '';
 
-  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>) {
+  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>, notificationConfig?: NotificationConfig) {
     this.invokeAgent = invokeAgent;
     this.verbose = verbose;
     try {
@@ -59,6 +65,18 @@ export class FactoryOrchestrator {
       backoffMs: 1000,
       ...retryConfig
     };
+
+    // Initialize notifications
+    this.slackNotifier = notificationConfig?.slackWebhookUrl
+      ? new SlackNotifier(notificationConfig.slackWebhookUrl)
+      : null;
+
+    this.githubStatusUpdater = notificationConfig?.githubOwner && notificationConfig?.githubRepo && notificationConfig?.githubToken
+      ? new GitHubStatusUpdater(notificationConfig.githubOwner, notificationConfig.githubRepo, notificationConfig.githubToken)
+      : null;
+
+    // Initialize rollback manager
+    this.rollbackManager = new RollbackManager();
   }
 
   private log(message: string): void {
@@ -177,6 +195,31 @@ export class FactoryOrchestrator {
   ): Promise<WorkflowState> {
     this.log(`Starting phase: ${phase}`);
 
+    // Notify phase start
+    if (this.slackNotifier) {
+      try {
+        await this.slackNotifier.notifyPhaseStart(state, phase);
+      } catch (error) {
+        this.log(`Failed to notify phase start: ${error}`);
+      }
+    }
+
+    // Update GitHub status to pending
+    if (this.githubStatusUpdater && this.currentCommit) {
+      try {
+        await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'pending');
+      } catch (error) {
+        this.log(`Failed to update GitHub status: ${error}`);
+      }
+    }
+
+    // Save snapshot before phase execution
+    try {
+      await this.rollbackManager.saveSnapshot(state, phase);
+    } catch (error) {
+      this.log(`Failed to save snapshot: ${error}`);
+    }
+
     try {
       const response = await this.retryWithBackoff(
         () => this.invokeAgent(state, agentName, input),
@@ -204,15 +247,73 @@ export class FactoryOrchestrator {
       if (!response.valid) {
         this.log(`Phase ${phase} failed validation`);
         updatedState = addNote(updatedState, `Phase ${phase} failed: ${response.error}`);
+
+        // Notify failure
+        if (this.slackNotifier) {
+          try {
+            await this.slackNotifier.notifyFailure(updatedState, phase, response.error || 'Unknown error');
+          } catch (error) {
+            this.log(`Failed to notify failure: ${error}`);
+          }
+        }
+
+        // Update GitHub status to failure
+        if (this.githubStatusUpdater && this.currentCommit) {
+          try {
+            await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
+          } catch (error) {
+            this.log(`Failed to update GitHub status: ${error}`);
+          }
+        }
+
         return updatedState;
       }
 
       this.log(`Phase ${phase} completed successfully`);
+
+      // Update GitHub status to success
+      if (this.githubStatusUpdater && this.currentCommit) {
+        try {
+          await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'success');
+        } catch (error) {
+          this.log(`Failed to update GitHub status: ${error}`);
+        }
+      }
+
+      // Notify phase complete
+      if (this.slackNotifier) {
+        try {
+          await this.slackNotifier.notifyPhaseComplete(updatedState, phase);
+        } catch (error) {
+          this.log(`Failed to notify phase complete: ${error}`);
+        }
+      }
+
       return updatedState;
     } catch (error) {
       this.log(`Phase ${phase} threw error: ${error}`);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      return updatePhase(state, phase, false, undefined, errorMsg);
+      const failedState = updatePhase(state, phase, false, undefined, errorMsg);
+
+      // Notify failure
+      if (this.slackNotifier) {
+        try {
+          await this.slackNotifier.notifyFailure(failedState, phase, errorMsg);
+        } catch (err) {
+          this.log(`Failed to notify failure: ${err}`);
+        }
+      }
+
+      // Update GitHub status to failure
+      if (this.githubStatusUpdater && this.currentCommit) {
+        try {
+          await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
+        } catch (err) {
+          this.log(`Failed to update GitHub status: ${err}`);
+        }
+      }
+
+      return failedState;
     }
   }
 
@@ -302,6 +403,13 @@ export class FactoryOrchestrator {
     let state = createWorkflowState(issueBrief, issueNumber, config);
     state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
     saveWorkflowState(state);
+
+    // Capture current commit
+    try {
+      this.currentCommit = await this.rollbackManager.getCurrentCommit();
+    } catch (error) {
+      this.log(`Failed to get current commit: ${error}`);
+    }
 
     // Create GitHub PR for workflow
     if (this.githubAPI && process.env.GITHUB_OWNER && process.env.GITHUB_REPO) {
@@ -585,6 +693,9 @@ export class FactoryOrchestrator {
     state.currentPhase = 'completed';
     state = addNote(state, 'Workflow completed successfully');
     saveWorkflowState(state);
+
+    // Cleanup old snapshots
+    this.rollbackManager.cleanupOldSnapshots(state.id, 5);
 
     // Auto-merge PR on success
     if (this.githubAPI && this.prNumber) {
