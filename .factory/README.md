@@ -18,6 +18,35 @@ User Issue (GitHub)
     └─ [Sequential] Customer Support
 ```
 
+## New Features
+
+### Failure Notifications (`notifications.ts`)
+
+Automatic notifications on workflow failures and phase completion:
+
+- **Slack Integration:** Posts workflow failure alerts to Slack
+- **GitHub Status Updates:** Sets commit status for each phase
+- **Phase Tracking:** Notifies on phase start, completion, and failure
+
+**Environment variables:**
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+GITHUB_OWNER=your-org
+GITHUB_REPO=your-repo
+GITHUB_TOKEN=ghp_xxxxx
+```
+
+### Rollback Manager (`rollback.ts`)
+
+Automatic snapshot and rollback capabilities:
+
+- **Snapshots:** Saves workflow state before each phase execution
+- **Git State:** Captures current git commit and branch
+- **Rollback:** Restore git state to previous snapshot on critical failures
+- **Cleanup:** Automatically removes old snapshots (keeps last 5)
+
+Snapshots stored in `.factory/snapshots/`
+
 ## Components
 
 ### State Management (`state.ts`)
@@ -46,7 +75,7 @@ WorkflowState {
 
 ### Orchestrator Engine (`orchestrator.ts`)
 
-Executes the multi-phase workflow:
+Executes the multi-phase workflow with integrated notifications and rollback:
 
 ```typescript
 class FactoryOrchestrator {
@@ -60,11 +89,31 @@ class FactoryOrchestrator {
 
 **Execution flow:**
 
-1. **Sequential phases** run one at a time
-2. **Parallel phases** run simultaneously
-3. **Validation gates** stop execution if a phase fails
-4. **State persistence** after every phase
-5. **Artifact collection** from each agent
+1. **Snapshot** - Save workflow state and git commit
+2. **Sequential phases** run one at a time
+3. **Parallel phases** run simultaneously
+4. **Notifications** - Post to Slack and GitHub on start/failure/success
+5. **Validation gates** stop execution if a phase fails
+6. **State persistence** after every phase
+7. **Artifact collection** from each agent
+8. **Cleanup** - Remove old snapshots on completion
+
+**Initialization with notifications:**
+
+```typescript
+const orchestrator = new FactoryOrchestrator(
+  invokeAgent,
+  verbose,
+  githubToken,
+  retryConfig,
+  {
+    slackWebhookUrl: process.env.SLACK_WEBHOOK_URL,
+    githubOwner: process.env.GITHUB_OWNER,
+    githubRepo: process.env.GITHUB_REPO,
+    githubToken: process.env.GITHUB_TOKEN
+  }
+);
+```
 
 ### CLI Tool (`cli.ts`)
 
@@ -238,10 +287,60 @@ GitHub Actions trigger (`factory-start.yml`):
 
 ## Configuration
 
+### Environment Variables
+
+Orchestrator reads from environment variables:
+
+**GitHub Integration:**
+```bash
+GITHUB_OWNER=your-github-org
+GITHUB_REPO=your-repository
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
+```
+
+**Slack Notifications:**
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Configuration Files
+
 Orchestrator reads from:
 - `project.config.json` - Project settings
 - `.factory/workflows/` - Workflow state files
+- `.factory/snapshots/` - Workflow snapshots for rollback
 - Environment variables - API keys, credentials
+
+### Setting Up Environment Variables
+
+1. **Slack Webhook:**
+   - Go to https://api.slack.com/apps
+   - Create a new app or select existing
+   - Enable Incoming Webhooks
+   - Create new webhook URL
+   - Set `SLACK_WEBHOOK_URL` environment variable
+
+2. **GitHub Token:**
+   - Go to https://github.com/settings/tokens
+   - Create new Personal Access Token
+   - Grant `repo` and `workflow` scopes
+   - Set `GITHUB_TOKEN` environment variable
+
+3. **Load Variables:**
+   ```bash
+   export GITHUB_OWNER=your-org
+   export GITHUB_REPO=your-repo
+   export GITHUB_TOKEN=ghp_xxxxx
+   export SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+   ```
+
+   Or create `.factory/.env`:
+   ```
+   GITHUB_OWNER=your-org
+   GITHUB_REPO=your-repo
+   GITHUB_TOKEN=ghp_xxxxx
+   SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+   ```
 
 ## Troubleshooting
 
