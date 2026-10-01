@@ -2,12 +2,14 @@
 
 A reusable, graph-engineered multi-agent workflow that transforms project briefs into production-ready code with zero manual intervention.
 
+⚠️ **Current Status:** This factory works for **local development and demonstrations**. GitHub Actions autonomous deployment is **not yet supported** — see [Limitations](#limitations) below.
+
 **🚀 Key Features:**
-- Fully autonomous 12-agent workflow
+- Fully autonomous 12-agent workflow (local)
 - Parallel builders & testers (zero token overhead)
 - Validation gates at each phase
 - State persistence & retry capability
-- GitHub Actions integration
+- GitHub Actions integration framework
 - Complete documentation generation
 
 ---
@@ -33,6 +35,44 @@ Orchestrator detects the label and starts automatically.
 ### 3. Track Progress
 
 Monitor the companion PR that gets created automatically. When done, all generated code is ready to merge.
+
+---
+
+## Limitations
+
+### Current Environment Constraints
+
+This factory **works for local development** but cannot yet run autonomously in GitHub Actions due to:
+
+1. **Claude CLI Not Available** — GitHub Actions runners don't have `claude` command installed
+2. **No Authentication** — Claude API credentials not available in Actions environment
+3. **MCP Servers Offline** — GitHub, Postgres, Stripe, Slack, Supabase MCPs not wired to Actions
+4. **Missing Credentials** — Service secrets (STRIPE_MCP_KEY, DB_PASSWORD, etc.) not configured
+5. **No Code Artifact Storage** — Generated code has nowhere to persist post-workflow
+6. **No Review Gate** — PR auto-merges without human oversight
+7. **No Retry Loop** — Failures don't notify team or allow re-triggering
+8. **Sequential Instead of Parallel** — Actions runs builders serially (not truly parallel)
+9. **No Artifact Handoff** — Builder outputs not persisted between phases
+10. **30-Second Timeout Risk** — Complex agents may exceed default timeout
+
+**See [TODO.md](./TODO.md#-critical-blockers-production-readiness) for full blocking issues.**
+
+### What Works Today
+
+✅ **Local Development**
+- Run orchestrator locally with `npm run factory:start`
+- All agents available, MCP servers wired
+- Full 12-agent workflow end-to-end
+
+✅ **Proof of Concept**
+- Test agent patterns and orchestration
+- Verify output quality
+- Design system patterns
+
+✅ **Foundation**
+- Production-ready architecture
+- Extensible agent framework
+- State persistence & retry logic
 
 ---
 
@@ -249,40 +289,47 @@ export SLACK_BOT_TOKEN="xoxb-xxxxxxxxxxxx"
 
 ## Running the Factory
 
-### Option A: Via GitHub (Recommended)
+### Option A: Local (Recommended - Works Today)
 
 ```bash
-# 1. Configure credentials
+# 1. Install Claude Code CLI
+#    https://claude.ai/code
+
+# 2. Configure credentials
+cp scripts/credentials.sh.template scripts/credentials.sh
+# Edit with real API keys
 source scripts/credentials.sh
 
-# 2. Create a GitHub issue with project brief
-# 3. Add "ready-to-build" label
-# 4. Orchestrator runs automatically!
-# 5. Monitor progress in companion PR
-```
+# 3. Validate setup
+npm run validate:setup
+./scripts/validate-mcp.sh
 
-### Option B: Local CLI
-
-```bash
-source scripts/credentials.sh
-
-# Start workflow manually
+# 4. Start workflow
 npm run factory:start "Build real-time chat app" 42
 
-# Monitor progress
-npm run factory:watch wf-1704067200000-abc123
-
-# Check status
-npm run factory:status wf-1704067200000-abc123
-
-# Retry from failure
-npm run factory:retry wf-1704067200000-abc123
-
-# List all workflows
-npm run factory:list
+# 5. Monitor progress
+npm run factory:watch wf-id
 ```
 
-### Option C: Single Agent (Debugging)
+### Option B: Via GitHub (Future - Not Yet Supported)
+
+```bash
+# 1. Configure GitHub Secrets
+#    - CLAUDE_API_KEY
+#    - STRIPE_MCP_KEY
+#    - DB_PASSWORD
+#    - SLACK_BOT_TOKEN
+#    - SUPABASE_KEY
+
+# 2. Create GitHub issue with project brief
+# 3. Add "ready-to-build" label
+# 4. Orchestrator runs automatically (when blockers resolved)
+# 5. Monitor progress in companion PR
+
+# ⚠️ See Limitations section — GitHub Actions support coming soon
+```
+
+### Option C: Single Agent (Debugging - Local Only)
 
 ```bash
 # Run just the Product Manager

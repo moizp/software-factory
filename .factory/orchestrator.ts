@@ -463,8 +463,7 @@ export class FactoryOrchestrator {
 
     if (!validation.valid) {
       const errorMsg = `Setup validation failed: ${validation.errors.join('; ')}`;
-      this.log(errorMsg);
-      this.logger.error('Setup validation failed', errorMsg);
+      this.logger.error(errorMsg);
 
       let state = createWorkflowState(issueBrief, issueNumber, config);
       state.status = 'failed';
@@ -813,8 +812,7 @@ export class FactoryOrchestrator {
         await this.githubAPI.autoMergePR(this.prNumber);
         state = addNote(state, `PR #${this.prNumber} auto-merged`);
       } catch (error) {
-        this.logger.error(`Failed to auto-merge PR: ${error}`);
-        this.logger.warn('Failed to auto-merge PR', String(error));
+        this.logger.warn(`Failed to auto-merge PR: ${error}`);
       }
     }
 
