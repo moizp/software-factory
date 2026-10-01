@@ -12,6 +12,7 @@
     "factory:list": "ts-node .factory/cli.ts list",
     "factory:watch": "ts-node .factory/cli.ts watch",
     "factory:retry": "ts-node .factory/cli.ts retry",
+    "orchestrator:run": "ts-node .factory/run-workflow.ts",
     "orchestrator:test": "ts-node .factory/test.ts"
   },
   "dependencies": {
