@@ -1,5 +1,39 @@
 # Software Factory TODO
 
+## 🔴 CRITICAL: Real Agent Invoker Not Connected
+
+**Status:** Orchestrator built but factory is not actually invoking real agents
+
+- [ ] Fix `cli.ts` line 65 — Import and use `invokeClaudeAgent` instead of `mockAgentInvoker`
+  - [ ] Test single agent invocation
+  - Estimate: 1 hour
+
+- [ ] Fix `run-workflow.ts` line 42 — Use real invoker
+  - [ ] Verify GitHub Actions workflow actually runs agents
+  - Estimate: 1 hour
+
+- [ ] Complete `claude-bridge.ts`
+  - [ ] Fix `invokeClaudeAgentViaApi()` (currently just throws error)
+  - [ ] Validate `invokeClaudeAgentViaCli()` actually works with claude CLI
+  - [ ] Add proper error handling for timeout/failures
+  - [ ] Test JSON extraction robustness
+  - Estimate: 3 hours
+
+- [ ] Integrate logger into orchestrator
+  - [ ] Replace `this.log()` with `this.logger.info/debug/error()`
+  - Estimate: 1 hour
+
+- [ ] Add agent validation
+  - [ ] Verify agents return valid JSON before processing
+  - [ ] Add schema validation for agent responses
+  - Estimate: 2 hours
+
+- [ ] Remove or deprecate `mockAgentInvoker`
+  - [ ] Delete mock implementation after real invoker works
+  - Estimate: 30 min
+
+**Total: 8.5 hours** — BLOCKS ALL PRODUCTION USE
+
 ## 🚨 Critical Blockers (Must Fix Before Production)
 
 ### Claude Code Integration
