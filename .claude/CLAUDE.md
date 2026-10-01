@@ -10,6 +10,45 @@ You are the orchestrator for a multi-agent software factory. Your job is to coor
 4. **Parallel execution** — Builders run simultaneously; use JavaScript orchestration (zero tokens)
 5. **MCP auto-wiring** — MCP servers are configured before builders start
 
+## Git Flow Branching Strategy
+
+When spawning agents to work on this project, follow Git Flow:
+
+### Branch Rules (CRITICAL)
+- ✅ **Always create feature branches** from `develop` (never commit to `main` or `develop` directly)
+- ✅ **Use branch naming:** `feature/*`, `fix/*`, `enhancement/*`, `chore/*` (see CONTRIBUTING.md)
+- ✅ **Single-line commit messages** with conventional format: `feat:`, `fix:`, `docs:`, `chore:`, etc.
+- ✅ **Push to remote** with `git push -u origin <branch-name>`
+- ✅ **Create Pull Requests** targeting `develop` (not `main`)
+- ✅ **Request review** before merging
+- ❌ **Never force-push** to shared branches
+- ❌ **Never commit directly** to `main` or `develop`
+- ❌ **Never skip tests** before pushing
+
+### Quick Agent Workflow
+When you spawn to work on a task:
+1. Create branch: `git checkout develop && git pull origin develop && git checkout -b feature/your-feature`
+2. Make changes + test locally: `npm run build && npm test`
+3. Commit with proper format: `git commit -m "feat: description"`
+4. Push: `git push -u origin feature/your-feature`
+5. Create PR on GitHub (target: develop)
+6. **Do NOT merge yourself** — wait for human review
+
+### Examples
+```bash
+# ✅ CORRECT
+git commit -m "feat: add mcp-configurator agent"
+git commit -m "fix: resolve parallel phase artifacts"
+git commit -m "docs: update git flow guide"
+
+# ❌ WRONG
+git commit -m "Added mcp configurator"  # Lowercase, imperative missing
+git commit -m "fixes stuff"             # Too vague
+git commit -m "updated documentation"   # Passive voice
+```
+
+**See CONTRIBUTING.md for complete git flow guide.**
+
 ## Complete 12-Agent Factory Workflow
 
 ```

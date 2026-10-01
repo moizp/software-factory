@@ -529,12 +529,56 @@ See **[ORCHESTRATION.md](./docs/ORCHESTRATION.md)** for:
 
 ---
 
+## Development Workflow
+
+This project follows **Git Flow** branching model:
+
+```
+main (production) ← release branches only
+  ↑
+develop (integration) ← all feature branches
+  ↑
+  ├─ feature/* (new features)
+  ├─ fix/* (bug fixes)
+  ├─ enhancement/* (improvements)
+  └─ chore/* (refactoring, deps)
+```
+
+### Quick Start for Contributors
+
+```bash
+# 1. Create a feature branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b feature/your-feature-name
+
+# 2. Make changes and commit
+git add .
+git commit -m "feat: your feature description"
+git push -u origin feature/your-feature-name
+
+# 3. Create a Pull Request
+# - Target: develop (not main!)
+# - Request review
+# - Address feedback
+
+# 4. After approval, merge to develop
+git checkout develop
+git merge --no-ff feature/your-feature-name
+git push origin develop
+```
+
+**See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete git flow guide, branch naming conventions, and workflows.**
+
+---
+
 ## Next Steps
 
 1. **Read** [ORCHESTRATION.md](./docs/ORCHESTRATION.md) for complete workflow details
 2. **Follow** [IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) to run locally
 3. **Review** [CONFIGURATION.md](./docs/CONFIGURATION.md) for schema reference
-4. **Edit** `.claude/CLAUDE.md` for your custom workflow
+4. **Contribute** — See [CONTRIBUTING.md](./CONTRIBUTING.md) for git flow guidelines
+5. **Edit** `.claude/CLAUDE.md` for your custom workflow
 
 ---
 
