@@ -41,6 +41,22 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
     "project_name": "MySaaS",
     "project_type": "saas",
     "description": "...",
+    "product_requirements": {
+      "vision": "Multi-tenant SaaS platform for X use case",
+      "target_users": "Small teams and enterprises",
+      "core_value_proposition": "...",
+      "success_metrics": [
+        "User retention > 80%",
+        "API response time < 100ms",
+        "99.9% uptime"
+      ],
+      "acceptance_criteria": [
+        "Users can register and login",
+        "Users can create and manage workspaces",
+        "Payment processing completes < 5 seconds",
+        "Real-time sync latency < 1 second"
+      ]
+    },
     "tech_stack": {
       "backend": {
         "language": "typescript",

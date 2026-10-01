@@ -90,5 +90,62 @@
     "ci_cd": "github-actions",
     "environments": ["dev", "staging", "production"],
     "monitoring": "datadog"
+  },
+
+  "product": {
+    "vision": "Multi-tenant SaaS platform for X use case",
+    "tagline": "[Short compelling description]",
+    "target_users": "Small teams and enterprises",
+    "market_segment": "B2B SaaS",
+    "success_metrics": [
+      "1000 active users in month 1",
+      "50% feature adoption",
+      "$10K MRR by month 3",
+      "Net retention > 90%"
+    ]
+  },
+
+  "design": {
+    "design_system": "Custom (Tailwind CSS)",
+    "accessibility_target": "WCAG 2.1 AA",
+    "responsive_breakpoints": ["mobile: <640px", "tablet: 640-1024px", "desktop: >1024px"],
+    "dark_mode": true
+  },
+
+  "testing": {
+    "unit_coverage_target": 70,
+    "integration_coverage_target": "critical paths",
+    "e2e_scenarios": [
+      "User registration and login",
+      "Core feature workflow",
+      "Payment processing",
+      "Mobile user journey"
+    ],
+    "browsers_to_test": ["Chrome", "Firefox", "Safari", "Edge"],
+    "devices_to_test": ["Desktop", "Tablet", "Mobile"]
+  },
+
+  "deployment_config": {
+    "auto_scaling": {
+      "enabled": true,
+      "min_instances": 1,
+      "max_instances": 5,
+      "cpu_threshold_percent": 70
+    },
+    "multi_region": false,
+    "backup_strategy": "Daily automated backups, 7-day retention",
+    "disaster_recovery": {
+      "rto_minutes": 30,
+      "rpo_hours": 1
+    }
+  },
+
+  "support": {
+    "documentation_format": "Markdown + HTML",
+    "help_center_enabled": true,
+    "faq_count_target": 20,
+    "api_documentation": "OpenAPI 3.0",
+    "onboarding_emails": 4,
+    "support_channels": ["email", "help_center", "community_forum"]
   }
 }

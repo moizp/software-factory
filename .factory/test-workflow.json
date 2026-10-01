@@ -1,0 +1,268 @@
+{
+  "workflow": "12-agent-factory-test",
+  "version": "1.0.0",
+  "timestamp": "2024-01-15T10:00:00Z",
+  "project": {
+    "name": "MySaaS",
+    "type": "saas",
+    "brief": "Multi-tenant SaaS application with payments and real-time features"
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "agent": "product-manager",
+      "input": {
+        "brief": "Build invoicing SaaS for freelancers",
+        "market": "Freelancers 1-50 people"
+      },
+      "expected_output": {
+        "phase": "product-manager",
+        "valid": true,
+        "product": {
+          "vision": "fastest invoicing SaaS",
+          "personas": ["Sarah (Freelancer)"],
+          "features": {
+            "must_have": 3,
+            "nice_to_have": 2
+          }
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": 2,
+      "agent": "analyzer",
+      "input": {
+        "config": "project.config.json",
+        "product_output": "from stage 1"
+      },
+      "expected_output": {
+        "phase": "analyzer",
+        "valid": true,
+        "analysis": {
+          "tech_stack": {
+            "backend": "typescript",
+            "frontend": "react"
+          },
+          "mcp_servers_required": ["github", "stripe"]
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": 3,
+      "agent": "mcp-configurator",
+      "input": {
+        "analyzer_output": "from stage 2",
+        "credentials": "from scripts/credentials.sh"
+      },
+      "expected_output": {
+        "phase": "mcp-configurator",
+        "valid": true,
+        "servers": [
+          {"name": "github", "status": "ready"},
+          {"name": "stripe", "status": "ready"}
+        ]
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "4a",
+      "agent": "software-architect",
+      "parallel": true,
+      "input": {
+        "analyzer_output": "from stage 2",
+        "mcp_output": "from stage 3"
+      },
+      "expected_output": {
+        "phase": "software-architect",
+        "valid": true,
+        "api_specification": {
+          "endpoints": 11,
+          "auth": "JWT"
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "4b",
+      "agent": "platform-architect",
+      "parallel": true,
+      "input": {
+        "analyzer_output": "from stage 2",
+        "expected_scale": "1000 users"
+      },
+      "expected_output": {
+        "phase": "platform-architect",
+        "valid": true,
+        "infrastructure": {
+          "cloud_provider": "render",
+          "deployment_model": "containerized"
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": 5,
+      "agent": "ui-designer",
+      "input": {
+        "product_output": "from stage 1",
+        "architect_output": "from stage 4a"
+      },
+      "expected_output": {
+        "phase": "ui-designer",
+        "valid": true,
+        "design_system": {
+          "colors": 5,
+          "components": 10
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "6a",
+      "agent": "backend-engineer",
+      "parallel": true,
+      "input": {
+        "architect_output": "from stage 4a",
+        "platform_output": "from stage 4b"
+      },
+      "expected_output": {
+        "phase": "backend-engineer",
+        "role": "backend",
+        "valid": true,
+        "generated_files": 19,
+        "deployed_code": {
+          "repository": "https://github.com/user/my-saas-backend"
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "6b",
+      "agent": "frontend-engineer",
+      "parallel": true,
+      "input": {
+        "ui_output": "from stage 5",
+        "architect_output": "from stage 4a"
+      },
+      "expected_output": {
+        "phase": "frontend-engineer",
+        "role": "frontend",
+        "valid": true,
+        "generated_files": 20,
+        "deployed_code": {
+          "repository": "https://github.com/user/my-saas-frontend"
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "6c",
+      "agent": "infrastructure-engineer",
+      "parallel": true,
+      "input": {
+        "backend_output": "from stage 6a",
+        "platform_output": "from stage 4b"
+      },
+      "expected_output": {
+        "phase": "infrastructure-engineer",
+        "role": "infrastructure",
+        "valid": true,
+        "generated_files": 10,
+        "ci_cd_pipelines": 3
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "6d",
+      "agent": "automation-tester",
+      "parallel": true,
+      "input": {
+        "architect_output": "from stage 4a",
+        "backend_output": "from stage 6a"
+      },
+      "expected_output": {
+        "phase": "automation-tester",
+        "valid": true,
+        "test_report": {
+          "total_tests": 44,
+          "passed": 44,
+          "coverage": 91
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": "6e",
+      "agent": "customer-support",
+      "parallel": true,
+      "input": {
+        "architect_output": "from stage 4a",
+        "backend_output": "from stage 6a",
+        "product_output": "from stage 1"
+      },
+      "expected_output": {
+        "phase": "customer-support",
+        "valid": true,
+        "documentation": {
+          "user_guides": 3,
+          "api_endpoints": 11
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": 7,
+      "agent": "e2e-tester",
+      "input": {
+        "frontend_output": "from stage 6b",
+        "backend_output": "from stage 6a"
+      },
+      "expected_output": {
+        "phase": "e2e-tester",
+        "valid": true,
+        "test_results": {
+          "total_workflows": 4,
+          "passed": 4,
+          "browser_coverage": 4
+        }
+      },
+      "gate": "valid=true"
+    },
+    {
+      "stage": 8,
+      "agent": "reviewer",
+      "input": {
+        "backend_output": "from stage 6a",
+        "frontend_output": "from stage 6b",
+        "infrastructure_output": "from stage 6c",
+        "automation_output": "from stage 6d",
+        "e2e_output": "from stage 7",
+        "support_output": "from stage 6e"
+      },
+      "expected_output": {
+        "phase": "reviewer",
+        "valid": true,
+        "review": {
+          "code_quality": {"status": "passing"},
+          "tests": {"status": "verified"},
+          "security": {"status": "passing"},
+          "documentation": {"status": "complete"}
+        },
+        "approved_for_deployment": true
+      },
+      "gate": "valid=true → DONE"
+    }
+  ],
+  "success_criteria": [
+    "All 12 agents execute without errors",
+    "All gates pass (valid=true)",
+    "Final reviewer approves deployment",
+    "Test coverage > 70%",
+    "All acceptance criteria met"
+  ],
+  "estimated_duration": "5-10 minutes for complete workflow",
+  "parallel_stages": ["4a-4b", "6a-6e"],
+  "sequential_gates": [1, 2, 3, "4", 5, "6", 7, 8]
+}
