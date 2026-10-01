@@ -1,0 +1,79 @@
+name: Factory Start
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  factory-orchestration:
+    if: contains(github.event.issue.labels.*.name, 'ready-to-build')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create tracking PR
+        id: create-pr
+        run: |
+          PR_BODY="## Factory Workflow Tracking
+
+          Issue: #${{ github.event.issue.number }}
+          Brief: ${{ github.event.issue.title }}
+
+          This PR tracks the automated build workflow for the issue above.
+
+          ### Status: Starting
+          - Product Manager: ⏳ Pending
+          - Analyzer: ⏳ Pending
+          - Architect: ⏳ Pending
+          - Backend Builder: ⏳ Pending
+          - Frontend Builder: ⏳ Pending
+          - Infrastructure Builder: ⏳ Pending
+          - Backend Tester: ⏳ Pending
+          - Frontend Tester: ⏳ Pending
+          - Infrastructure Tester: ⏳ Pending
+          - E2E Tester: ⏳ Pending
+          - Reviewer: ⏳ Pending
+          - Customer Support: ⏳ Pending"
+
+          PR_RESPONSE=$(gh pr create \
+            --title "Factory: #${{ github.event.issue.number }} - ${{ github.event.issue.title }}" \
+            --body "$PR_BODY" \
+            --head "factory/${{ github.event.issue.number }}" \
+            --base main \
+            --repo ${{ github.repository }} 2>/dev/null || echo "PR_EXISTS")
+
+          if [ "$PR_RESPONSE" != "PR_EXISTS" ]; then
+            echo "pr_number=$(echo "$PR_RESPONSE" | grep -oP '(?<=#)\d+' | head -1)" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=$(gh pr list --head "factory/${{ github.event.issue.number }}" --json number -q '.[0].number')" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start orchestrator
+        run: npm run factory:start "${{ github.event.issue.title }}" ${{ github.event.issue.number }}
+
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Factory workflow started! Follow progress in PR #${{ steps.create-pr.outputs.pr_number }}'
+            })
