@@ -7,6 +7,8 @@ import {
   addArtifact,
   addNote
 } from './state';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface AgentResponse {
   phase: Phase;
@@ -25,19 +27,138 @@ type AgentInvoker = (
   input: Record<string, unknown>
 ) => Promise<AgentResponse>;
 
+interface RetryConfig {
+  maxRetries: number;
+  backoffMs: number;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
 export class FactoryOrchestrator {
   private invokeAgent: AgentInvoker;
   private verbose: boolean;
+  private retryConfig: RetryConfig;
 
-  constructor(invokeAgent: AgentInvoker, verbose: boolean = false) {
+  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, retryConfig?: Partial<RetryConfig>) {
     this.invokeAgent = invokeAgent;
     this.verbose = verbose;
+    this.retryConfig = {
+      maxRetries: 3,
+      backoffMs: 1000,
+      ...retryConfig
+    };
   }
 
   private log(message: string): void {
     if (this.verbose) {
       console.log(`[Orchestrator] ${message}`);
     }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private isTransientError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    return message.includes('timeout') ||
+           message.includes('econnrefused') ||
+           message.includes('enotfound') ||
+           message.includes('network');
+  }
+
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        this.log(`Attempting ${operationName} (attempt ${attempt}/${this.retryConfig.maxRetries})`);
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (!this.isTransientError(lastError)) {
+          throw lastError;
+        }
+
+        if (attempt < this.retryConfig.maxRetries) {
+          const backoffMs = this.retryConfig.backoffMs * Math.pow(2, attempt - 1);
+          this.log(`Transient error in ${operationName}: ${lastError.message}. Retrying in ${backoffMs}ms...`);
+          await this.sleep(backoffMs);
+        }
+      }
+    }
+
+    throw lastError || new Error(`${operationName} failed after ${this.retryConfig.maxRetries} retries`);
+  }
+
+  private validateSetup(): ValidationResult {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Check required agent files
+    const requiredAgents = [
+      'product-manager',
+      'analyzer',
+      'mcp-configurator',
+      'software-architect',
+      'platform-architect',
+      'ui-designer',
+      'backend-engineer',
+      'frontend-engineer',
+      'infrastructure-engineer',
+      'automation-tester',
+      'e2e-tester',
+      'customer-support',
+      'reviewer'
+    ];
+
+    for (const agent of requiredAgents) {
+      const agentPath = path.join(process.cwd(), '.claude', 'agents', `${agent}.md`);
+      if (!fs.existsSync(agentPath)) {
+        errors.push(`Missing agent file: ${agentPath}`);
+      } else {
+        try {
+          fs.accessSync(agentPath, fs.constants.R_OK);
+        } catch {
+          errors.push(`Agent file not readable: ${agentPath}`);
+        }
+      }
+    }
+
+    // Check project.config.json
+    const configPath = path.join(process.cwd(), 'project.config.json');
+    if (!fs.existsSync(configPath)) {
+      errors.push('Missing project.config.json');
+    } else {
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (!config.mcp_servers) {
+          warnings.push('project.config.json missing mcp_servers configuration');
+        }
+      } catch (error) {
+        errors.push('project.config.json contains invalid JSON');
+      }
+    }
+
+    // Check CLAUDE.md
+    const claudeMdPath = path.join(process.cwd(), '.claude', 'CLAUDE.md');
+    if (!fs.existsSync(claudeMdPath)) {
+      warnings.push('Missing .claude/CLAUDE.md orchestration guide');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
   }
 
   async executeSequentialPhase(
@@ -49,7 +170,10 @@ export class FactoryOrchestrator {
     this.log(`Starting phase: ${phase}`);
 
     try {
-      const response = await this.invokeAgent(state, agentName, input);
+      const response = await this.retryWithBackoff(
+        () => this.invokeAgent(state, agentName, input),
+        `phase ${phase}`
+      );
 
       let updatedState = updatePhase(
         state,
@@ -146,6 +270,27 @@ export class FactoryOrchestrator {
     issueNumber?: number,
     config?: Record<string, unknown>
   ): Promise<WorkflowState> {
+    // Pre-flight validation
+    const validation = this.validateSetup();
+
+    if (!validation.valid) {
+      const errorMsg = `Setup validation failed: ${validation.errors.join('; ')}`;
+      this.log(errorMsg);
+
+      let state = createWorkflowState(issueBrief, issueNumber, config);
+      state.status = 'failed';
+      state = addNote(state, errorMsg);
+      saveWorkflowState(state);
+
+      throw new Error(errorMsg);
+    }
+
+    if (validation.warnings.length > 0) {
+      validation.warnings.forEach(warning => {
+        this.log(`Warning: ${warning}`);
+      });
+    }
+
     let state = createWorkflowState(issueBrief, issueNumber, config);
     state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
     saveWorkflowState(state);
