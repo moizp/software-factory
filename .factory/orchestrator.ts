@@ -46,6 +46,53 @@ interface ValidationResult {
   warnings: string[];
 }
 
+class AgentResponseValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AgentResponseValidationError';
+  }
+}
+
+function validateAgentResponse(response: AgentResponse, expectedPhase: string): void {
+  const errors: string[] = [];
+
+  // Check phase matches
+  if (response.phase !== expectedPhase) {
+    errors.push(`Phase mismatch: expected "${expectedPhase}", got "${response.phase}"`);
+  }
+
+  // Check valid is boolean
+  if (typeof response.valid !== 'boolean') {
+    errors.push(`Invalid field: valid must be boolean, got ${typeof response.valid}`);
+  }
+
+  // Check error field if valid=false
+  if (response.valid === false && (!response.error || response.error.trim().length === 0)) {
+    errors.push('Agent returned valid=false but error message is empty');
+  }
+
+  // Validate artifacts structure if present
+  if (response.artifacts && Array.isArray(response.artifacts)) {
+    for (let i = 0; i < response.artifacts.length; i++) {
+      const artifact = response.artifacts[i];
+      if (!artifact.type || typeof artifact.type !== 'string') {
+        errors.push(`Artifact ${i}: missing or invalid type field`);
+      }
+      if (!artifact.content || typeof artifact.content !== 'object') {
+        errors.push(`Artifact ${i}: missing or invalid content field`);
+      }
+    }
+  } else if (response.artifacts !== undefined) {
+    errors.push('Artifacts field must be an array if present');
+  }
+
+  if (errors.length > 0) {
+    throw new AgentResponseValidationError(
+      `Invalid agent response from ${expectedPhase}:\n  ${errors.join('\n  ')}`
+    );
+  }
+}
+
 export class FactoryOrchestrator {
   private invokeAgent: AgentInvoker;
   private verbose: boolean;
@@ -238,6 +285,15 @@ export class FactoryOrchestrator {
         `phase ${phase}`
       );
 
+      // Validate agent response structure
+      try {
+        validateAgentResponse(response, agentName);
+      } catch (validationError) {
+        this.logger.error(`Agent response validation failed for ${agentName}: ${validationError}`);
+        const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
+        return updatePhase(state, phase, false, undefined, errorMsg);
+      }
+
       let updatedState = updatePhase(
         state,
         phase,
@@ -353,6 +409,17 @@ export class FactoryOrchestrator {
 
     for (let i = 0; i < results.length; i++) {
       const response = results[i] as AgentResponse;
+
+      // Validate agent response
+      try {
+        validateAgentResponse(response, phases[i].agentName);
+      } catch (validationError) {
+        this.logger.error(`Parallel agent response validation failed for ${response.phase}: ${validationError}`);
+        const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
+        updatedState = updatePhase(updatedState, response.phase, false, undefined, errorMsg);
+        continue;
+      }
+
       updatedState = updatePhase(
         updatedState,
         response.phase,
