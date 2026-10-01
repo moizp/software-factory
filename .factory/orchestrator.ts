@@ -7,6 +7,7 @@ import {
   addArtifact,
   addNote
 } from './state';
+import { GitHubAPI } from './github-integration';
 
 interface AgentResponse {
   phase: Phase;
@@ -28,10 +29,17 @@ type AgentInvoker = (
 export class FactoryOrchestrator {
   private invokeAgent: AgentInvoker;
   private verbose: boolean;
+  private githubAPI: GitHubAPI | null;
+  private prNumber: number | null = null;
 
-  constructor(invokeAgent: AgentInvoker, verbose: boolean = false) {
+  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string) {
     this.invokeAgent = invokeAgent;
     this.verbose = verbose;
+    try {
+      this.githubAPI = new GitHubAPI(githubToken);
+    } catch {
+      this.githubAPI = null;
+    }
   }
 
   private log(message: string): void {
@@ -150,6 +158,23 @@ export class FactoryOrchestrator {
     state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
     saveWorkflowState(state);
 
+    // Create GitHub PR for workflow
+    if (this.githubAPI && process.env.GITHUB_OWNER && process.env.GITHUB_REPO) {
+      try {
+        this.prNumber = await this.githubAPI.createPR({
+          owner: process.env.GITHUB_OWNER,
+          repo: process.env.GITHUB_REPO,
+          title: `Factory Workflow: ${issueBrief.substring(0, 50)}`,
+          body: `## Software Factory Workflow\n\n**Brief:** ${issueBrief}\n\n**Workflow ID:** ${state.id}\n\n**Status:** Starting execution\n\n### Phase Progress\n- [ ] Product Manager\n- [ ] Analyzer\n- [ ] Architect\n- [ ] Builders\n- [ ] Testers\n- [ ] E2E Tester\n- [ ] Reviewer\n- [ ] Customer Support`,
+          branch: `factory/${state.id}`,
+          base: 'main'
+        });
+        state = addNote(state, `GitHub PR created: #${this.prNumber}`);
+      } catch (error) {
+        this.log(`Failed to create GitHub PR: ${error}`);
+      }
+    }
+
     // Phase 1: Product Manager (sequential)
     state = await this.executeSequentialPhase(
       state,
@@ -163,6 +188,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at product-manager phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **product-manager**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -179,6 +216,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at analyzer phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **analyzer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -195,6 +244,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at architect phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **architect**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -226,6 +287,21 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped: one or more builders failed');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          const failedBuilders = state.phases
+            .filter(p => (p.phase === 'backend-builder' || p.phase === 'frontend-builder' || p.phase === 'infrastructure-builder') && !p.valid)
+            .map(p => p.phase);
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at builders phase\n\nFailed builders: ${failedBuilders.join(', ')}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -257,6 +333,21 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped: one or more testers failed');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          const failedTesters = state.phases
+            .filter(p => (p.phase === 'backend-tester' || p.phase === 'frontend-tester' || p.phase === 'infrastructure-tester') && !p.valid)
+            .map(p => p.phase);
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at testers phase\n\nFailed testers: ${failedTesters.join(', ')}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -273,6 +364,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at e2e-tester phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **e2e-tester**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -289,6 +392,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at reviewer phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **reviewer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -305,6 +420,18 @@ export class FactoryOrchestrator {
       state = addNote(state, 'Workflow stopped at customer-support phase');
       state.status = 'failed';
       saveWorkflowState(state);
+
+      if (this.githubAPI && this.prNumber) {
+        try {
+          await this.githubAPI.postComment(
+            this.prNumber,
+            `❌ Workflow failed at phase: **customer-support**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
+          );
+        } catch (error) {
+          this.log(`Failed to post failure comment: ${error}`);
+        }
+      }
+
       return state;
     }
 
@@ -313,6 +440,16 @@ export class FactoryOrchestrator {
     state.currentPhase = 'completed';
     state = addNote(state, 'Workflow completed successfully');
     saveWorkflowState(state);
+
+    // Auto-merge PR on success
+    if (this.githubAPI && this.prNumber) {
+      try {
+        await this.githubAPI.autoMergePR(this.prNumber);
+        state = addNote(state, `PR #${this.prNumber} auto-merged`);
+      } catch (error) {
+        this.log(`Failed to auto-merge PR: ${error}`);
+      }
+    }
 
     return state;
   }
