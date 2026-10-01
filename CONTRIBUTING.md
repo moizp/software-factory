@@ -71,11 +71,21 @@ git pull origin develop
 # Create feature branch
 git checkout -b feature/your-feature-name
 
+# Add branch spec (controls automation & review requirements)
+cp .branchspec.json.example .branchspec.json
+# Edit .branchspec.json with your requirements
+nano .branchspec.json
+
 # Make changes, commit, and push
-git add .
+git add . .branchspec.json
 git commit -m "feat: your feature description"
 git push -u origin feature/your-feature-name
+
+# Validate branch spec
+npm run validate:branchspec
 ```
+
+**What's a branch spec?** See [BRANCH-SPEC.md](./docs/BRANCH-SPEC.md) for complete guide on controlling automation, review requirements, and merge behavior.
 
 #### 2. Committing Changes
 

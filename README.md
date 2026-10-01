@@ -552,23 +552,33 @@ git checkout develop
 git pull origin develop
 git checkout -b feature/your-feature-name
 
-# 2. Make changes and commit
-git add .
+# 2. Add branch spec (controls automation & review rules)
+cp .branchspec.json.example .branchspec.json
+# Edit .branchspec.json with your requirements
+nano .branchspec.json
+
+# 3. Make changes and commit
+git add . .branchspec.json
 git commit -m "feat: your feature description"
 git push -u origin feature/your-feature-name
 
-# 3. Create a Pull Request
+# 4. Validate branch spec
+npm run validate:branchspec
+
+# 5. Create a Pull Request
 # - Target: develop (not main!)
 # - Request review
 # - Address feedback
 
-# 4. After approval, merge to develop
+# 6. After approval, merge to develop
 git checkout develop
 git merge --no-ff feature/your-feature-name
 git push origin develop
 ```
 
-**See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete git flow guide, branch naming conventions, and workflows.**
+**Guides:**
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — Complete git flow guide & branch naming
+- [BRANCH-SPEC.md](./docs/BRANCH-SPEC.md) — Control automation & review rules with .branchspec.json
 
 ---
 

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://example.com/branchspec-schema.json",
+  "version": "1.0",
+  "description": "Branch automation and review requirements. Copy to .branchspec.json in your branch root.",
+
+  "automation": {
+    "auto_merge": false,
+    "allow_agent_approval": false,
+    "require_human_review": true
+  },
+
+  "review_requirements": {
+    "minimum_approvals": 1,
+    "require_code_owner_approval": false,
+    "require_specific_reviewers": false,
+    "reviewers": []
+  },
+
+  "testing": {
+    "require_tests": true,
+    "minimum_coverage": 70,
+    "required_test_files": [
+      ".factory/__tests__/**/*.test.ts"
+    ]
+  },
+
+  "ci": {
+    "required_checks": [
+      "build",
+      "test"
+    ],
+    "allow_ci_failures": false
+  },
+
+  "protected_areas": {
+    "critical_files": [
+      ".factory/orchestrator.ts",
+      ".factory/state.ts",
+      ".factory/cli.ts",
+      ".github/workflows/**"
+    ],
+    "require_extra_review_for_critical": true
+  },
+
+  "scope": {
+    "type": "feature",
+    "description": "Example feature branch with standard requirements",
+    "components_affected": [
+      "orchestrator",
+      "state-management"
+    ]
+  }
+}

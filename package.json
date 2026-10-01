@@ -7,6 +7,7 @@
     "build": "tsc",
     "dev": "ts-node",
     "validate-setup": "bash scripts/validate-setup.sh",
+    "validate:branchspec": "bash scripts/validate-branchspec.sh",
     "factory:start": "npm run validate-setup && ts-node .factory/cli.ts start",
     "factory:status": "ts-node .factory/cli.ts status",
     "factory:list": "ts-node .factory/cli.ts list",

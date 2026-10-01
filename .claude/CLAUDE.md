@@ -28,11 +28,16 @@ When spawning agents to work on this project, follow Git Flow:
 ### Quick Agent Workflow
 When you spawn to work on a task:
 1. Create branch: `git checkout develop && git pull origin develop && git checkout -b feature/your-feature`
-2. Make changes + test locally: `npm run build && npm test`
-3. Commit with proper format: `git commit -m "feat: description"`
-4. Push: `git push -u origin feature/your-feature`
-5. Create PR on GitHub (target: develop)
-6. **Do NOT merge yourself** — wait for human review
+2. Create branch spec: `cp .branchspec.json.example .branchspec.json` (controls automation/review)
+3. Make changes + test locally: `npm run build && npm test`
+4. Commit branch spec + changes: `git add .branchspec.json && git commit -m "feat: description"`
+5. Push: `git push -u origin feature/your-feature`
+6. Create PR on GitHub (target: develop)
+7. **RESPECT THE BRANCH SPEC:**
+   - If `auto_merge: false` → Stop, wait for human merge
+   - If `auto_merge: true` + `allow_agent_approval: true` → You can merge after tests pass
+   - If `auto_merge: true` + `allow_agent_approval: false` → Wait for human approval, then merge
+8. **Never override requirements** — if spec says 2 approvals, don't merge with 1
 
 ### Examples
 ```bash
