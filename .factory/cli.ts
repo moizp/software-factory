@@ -9,7 +9,8 @@ import {
   WorkflowState,
   saveWorkflowState
 } from './state';
-import { FactoryOrchestrator, mockAgentInvoker } from './orchestrator';
+import { FactoryOrchestrator } from './orchestrator';
+import { invokeClaudeAgent } from './claude-bridge';
 
 function printHeader(text: string): void {
   console.log(chalk.bold.blue(`\n╔ ${text}`));
@@ -62,7 +63,7 @@ function printWorkflowDetail(state: WorkflowState): void {
 async function cmdStart(issueBrief: string, issueNumber?: number): Promise<void> {
   printHeader('Starting Factory Workflow');
 
-  const orchestrator = new FactoryOrchestrator(mockAgentInvoker, true);
+  const orchestrator = new FactoryOrchestrator(invokeClaudeAgent, true);
   const finalState = await orchestrator.executeWorkflow(
     issueBrief,
     issueNumber
@@ -189,7 +190,7 @@ async function cmdRetry(workflowId: string): Promise<void> {
 
   saveWorkflowState(newState);
 
-  const orchestrator = new FactoryOrchestrator(mockAgentInvoker, true);
+  const orchestrator = new FactoryOrchestrator(invokeClaudeAgent, true);
   const finalState = await orchestrator.executeWorkflow(
     state.issueBrief,
     state.issueNumber,
