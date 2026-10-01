@@ -2,7 +2,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { FactoryOrchestrator, mockAgentInvoker } from './orchestrator';
+import { FactoryOrchestrator } from './orchestrator';
+import { invokeClaudeAgent } from './claude-bridge';
 import { saveWorkflowState } from './state';
 
 async function main() {
@@ -39,7 +40,7 @@ async function main() {
   try {
     // Create orchestrator with real agent invoker
     const orchestrator = new FactoryOrchestrator(
-      mockAgentInvoker,
+      invokeClaudeAgent,
       true,
       githubToken,
       { maxRetries: 3, backoffMs: 1000 }
