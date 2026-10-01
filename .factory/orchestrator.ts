@@ -96,11 +96,6 @@ export class FactoryOrchestrator {
     this.metricsCollector = new MetricsCollector();
   }
 
-  private log(message: string): void {
-    if (this.verbose) {
-      console.log(`[Orchestrator] ${message}`);
-    }
-  }
 
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -122,7 +117,7 @@ export class FactoryOrchestrator {
 
     for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
-        this.log(`Attempting ${operationName} (attempt ${attempt}/${this.retryConfig.maxRetries})`);
+        this.logger.info(`Attempting ${operationName} (attempt ${attempt}/${this.retryConfig.maxRetries})`);
         return await operation();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -133,7 +128,7 @@ export class FactoryOrchestrator {
 
         if (attempt < this.retryConfig.maxRetries) {
           const backoffMs = this.retryConfig.backoffMs * Math.pow(2, attempt - 1);
-          this.log(`Transient error in ${operationName}: ${lastError.message}. Retrying in ${backoffMs}ms...`);
+          this.logger.warn(`Transient error in ${operationName}: ${lastError.message}. Retrying in ${backoffMs}ms...`);
           await this.sleep(backoffMs);
         }
       }
@@ -210,14 +205,14 @@ export class FactoryOrchestrator {
     agentName: string,
     input: Record<string, unknown>
   ): Promise<WorkflowState> {
-    this.log(`Starting phase: ${phase}`);
+    this.logger.info(`Starting phase: ${phase}`);
 
     // Notify phase start
     if (this.slackNotifier) {
       try {
         await this.slackNotifier.notifyPhaseStart(state, phase);
       } catch (error) {
-        this.log(`Failed to notify phase start: ${error}`);
+        this.logger.error(`Failed to notify phase start: ${error}`);
       }
     }
 
@@ -226,7 +221,7 @@ export class FactoryOrchestrator {
       try {
         await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'pending');
       } catch (error) {
-        this.log(`Failed to update GitHub status: ${error}`);
+        this.logger.error(`Failed to update GitHub status: ${error}`);
       }
     }
 
@@ -234,7 +229,7 @@ export class FactoryOrchestrator {
     try {
       await this.rollbackManager.saveSnapshot(state, phase);
     } catch (error) {
-      this.log(`Failed to save snapshot: ${error}`);
+      this.logger.error(`Failed to save snapshot: ${error}`);
     }
 
     try {
@@ -262,7 +257,7 @@ export class FactoryOrchestrator {
       }
 
       if (!response.valid) {
-        this.log(`Phase ${phase} failed validation`);
+        this.logger.info(`Phase ${phase} failed validation`);
         updatedState = addNote(updatedState, `Phase ${phase} failed: ${response.error}`);
 
         // Notify failure
@@ -270,7 +265,7 @@ export class FactoryOrchestrator {
           try {
             await this.slackNotifier.notifyFailure(updatedState, phase, response.error || 'Unknown error');
           } catch (error) {
-            this.log(`Failed to notify failure: ${error}`);
+            this.logger.error(`Failed to notify failure: ${error}`);
           }
         }
 
@@ -279,21 +274,21 @@ export class FactoryOrchestrator {
           try {
             await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
           } catch (error) {
-            this.log(`Failed to update GitHub status: ${error}`);
+            this.logger.error(`Failed to update GitHub status: ${error}`);
           }
         }
 
         return updatedState;
       }
 
-      this.log(`Phase ${phase} completed successfully`);
+      this.logger.info(`Phase ${phase} completed successfully`);
 
       // Update GitHub status to success
       if (this.githubStatusUpdater && this.currentCommit) {
         try {
           await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'success');
         } catch (error) {
-          this.log(`Failed to update GitHub status: ${error}`);
+          this.logger.error(`Failed to update GitHub status: ${error}`);
         }
       }
 
@@ -302,13 +297,13 @@ export class FactoryOrchestrator {
         try {
           await this.slackNotifier.notifyPhaseComplete(updatedState, phase);
         } catch (error) {
-          this.log(`Failed to notify phase complete: ${error}`);
+          this.logger.error(`Failed to notify phase complete: ${error}`);
         }
       }
 
       return updatedState;
     } catch (error) {
-      this.log(`Phase ${phase} threw error: ${error}`);
+      this.logger.info(`Phase ${phase} threw error: ${error}`);
       const errorMsg = error instanceof Error ? error.message : String(error);
       const failedState = updatePhase(state, phase, false, undefined, errorMsg);
 
@@ -317,7 +312,7 @@ export class FactoryOrchestrator {
         try {
           await this.slackNotifier.notifyFailure(failedState, phase, errorMsg);
         } catch (err) {
-          this.log(`Failed to notify failure: ${err}`);
+          this.logger.error(`Failed to notify failure: ${err}`);
         }
       }
 
@@ -326,7 +321,7 @@ export class FactoryOrchestrator {
         try {
           await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
         } catch (err) {
-          this.log(`Failed to update GitHub status: ${err}`);
+          this.logger.error(`Failed to update GitHub status: ${err}`);
         }
       }
 
@@ -342,7 +337,7 @@ export class FactoryOrchestrator {
       input: Record<string, unknown>;
     }>
   ): Promise<WorkflowState> {
-    this.log(`Starting parallel phases: ${phases.map(p => p.phase).join(', ')}`);
+    this.logger.info(`Starting parallel phases: ${phases.map(p => p.phase).join(', ')}`);
 
     const results = await Promise.all(
       phases.map(({ phase, agentName, input }) =>
@@ -377,9 +372,9 @@ export class FactoryOrchestrator {
       }
 
       if (!response.valid) {
-        this.log(`Parallel phase ${response.phase} failed`);
+        this.logger.info(`Parallel phase ${response.phase} failed`);
       } else {
-        this.log(`Parallel phase ${response.phase} completed`);
+        this.logger.info(`Parallel phase ${response.phase} completed`);
       }
     }
 
@@ -414,7 +409,7 @@ export class FactoryOrchestrator {
 
     if (validation.warnings.length > 0) {
       validation.warnings.forEach(warning => {
-        this.log(`Warning: ${warning}`);
+        this.logger.warn(`Warning: ${warning}`);
         this.logger.warn(warning);
       });
     }
@@ -435,7 +430,7 @@ export class FactoryOrchestrator {
     try {
       this.currentCommit = await this.rollbackManager.getCurrentCommit();
     } catch (error) {
-      this.log(`Failed to get current commit: ${error}`);
+      this.logger.error(`Failed to get current commit: ${error}`);
     }
 
     // Create GitHub PR for workflow
@@ -451,7 +446,7 @@ export class FactoryOrchestrator {
         });
         state = addNote(state, `GitHub PR created: #${this.prNumber}`);
       } catch (error) {
-        this.log(`Failed to create GitHub PR: ${error}`);
+        this.logger.error(`Failed to create GitHub PR: ${error}`);
       }
     }
 
@@ -476,7 +471,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **product-manager**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -504,7 +499,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **analyzer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -532,7 +527,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **architect**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -578,7 +573,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at builders phase\n\nFailed builders: ${failedBuilders.join(', ')}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -624,7 +619,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at testers phase\n\nFailed testers: ${failedTesters.join(', ')}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -652,7 +647,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **e2e-tester**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -680,7 +675,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **reviewer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -708,7 +703,7 @@ export class FactoryOrchestrator {
             `❌ Workflow failed at phase: **customer-support**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
           );
         } catch (error) {
-          this.log(`Failed to post failure comment: ${error}`);
+          this.logger.error(`Failed to post failure comment: ${error}`);
         }
       }
 
@@ -751,7 +746,7 @@ export class FactoryOrchestrator {
         await this.githubAPI.autoMergePR(this.prNumber);
         state = addNote(state, `PR #${this.prNumber} auto-merged`);
       } catch (error) {
-        this.log(`Failed to auto-merge PR: ${error}`);
+        this.logger.error(`Failed to auto-merge PR: ${error}`);
         this.logger.warn('Failed to auto-merge PR', String(error));
       }
     }
