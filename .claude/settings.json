@@ -1,0 +1,48 @@
+{
+  "model": "claude-sonnet-4-20250514",
+  "context_window": 200000,
+  "max_tokens": 16000,
+  
+  "mcp_servers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "description": "GitHub repository and CI/CD integration",
+      "transport": "stdio",
+      "enabled": false
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "--host", "localhost", "--port", "5432"],
+      "description": "PostgreSQL database operations",
+      "transport": "stdio",
+      "enabled": false
+    }
+  },
+
+  "tool_settings": {
+    "filesystem": {
+      "allow_read": true,
+      "allow_write": true,
+      "allow_execute": true,
+      "restricted_dirs": [".env", ".git/hooks"]
+    },
+    "subprocess": {
+      "allow_execute": true,
+      "whitelist": ["npx", "npm", "node", "python3", "docker", "git"]
+    }
+  },
+
+  "defaults": {
+    "thinking": false,
+    "stream": true,
+    "auto_commit": false,
+    "verbose": true
+  },
+
+  "memory": {
+    "project_context": true,
+    "recent_files": 20,
+    "session_history": true
+  }
+}

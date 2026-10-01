@@ -1,0 +1,94 @@
+{
+  "name": "MySaaS",
+  "description": "A multi-tenant SaaS application with payments and real-time features",
+  "type": "saas",
+  "stack": "ts-react-node",
+  "features": [
+    "user-auth",
+    "multi-tenant",
+    "payments",
+    "real-time-sync",
+    "api",
+    "admin-dashboard"
+  ],
+  
+  "mcp_servers": {
+    "github": {
+      "type": "built-in",
+      "required": true,
+      "description": "Source control and CI/CD",
+      "config": {
+        "token": "env:GITHUB_TOKEN"
+      }
+    },
+    "postgres": {
+      "type": "postgres",
+      "required": true,
+      "description": "Primary database",
+      "config": {
+        "host": "localhost",
+        "port": 5432,
+        "auth": "env:DB_PASSWORD"
+      }
+    },
+    "stripe": {
+      "type": "http",
+      "required": true,
+      "description": "Payment processing",
+      "endpoint": "https://stripe-mcp.example.com",
+      "auth": "env:STRIPE_MCP_KEY"
+    },
+    "slack": {
+      "type": "http",
+      "required": false,
+      "description": "Team notifications",
+      "endpoint": "https://slack-mcp.example.com",
+      "auth": "env:SLACK_BOT_TOKEN"
+    },
+    "supabase": {
+      "type": "http",
+      "required": false,
+      "description": "Auth and realtime sync",
+      "endpoint": "https://supabase-mcp.example.com",
+      "auth": "env:SUPABASE_KEY"
+    }
+  },
+
+  "credentials_template": {
+    "GITHUB_TOKEN": "ghp_...",
+    "DB_PASSWORD": "postgres://user:password@localhost:5432/mydb",
+    "STRIPE_MCP_KEY": "sk_test_...",
+    "SLACK_BOT_TOKEN": "xoxb-...",
+    "SUPABASE_KEY": "eyJhbGc..."
+  },
+
+  "backend": {
+    "language": "typescript",
+    "runtime": "node",
+    "framework": "express",
+    "database": "postgres",
+    "orm": "prisma",
+    "auth": "jwt",
+    "api_style": "rest"
+  },
+
+  "frontend": {
+    "framework": "react",
+    "language": "typescript",
+    "styling": "tailwind",
+    "state_management": "tanstack-query"
+  },
+
+  "infrastructure": {
+    "container": "docker",
+    "orchestration": "none",
+    "hosting": "vercel",
+    "database_hosting": "render-postgres"
+  },
+
+  "deployment": {
+    "ci_cd": "github-actions",
+    "environments": ["dev", "staging", "production"],
+    "monitoring": "datadog"
+  }
+}
