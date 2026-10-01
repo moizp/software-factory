@@ -40,28 +40,42 @@ function readAgentMarkdown(agentName: string): AgentMarkdown {
 }
 
 function extractJsonFromResponse(response: string): Record<string, unknown> {
-  // Try to extract JSON from the response
-  // First, try to find a JSON code block
-  const jsonCodeBlockMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!response || response.trim().length === 0) {
+    throw new Error('Empty response from agent');
+  }
+
+  // Try to find a JSON code block first
+  const jsonCodeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (jsonCodeBlockMatch) {
+    const extracted = jsonCodeBlockMatch[1].trim();
     try {
-      return JSON.parse(jsonCodeBlockMatch[1]);
+      return JSON.parse(extracted);
     } catch (e) {
-      // Continue to other extraction methods
+      console.debug('Failed to parse JSON from code block:', e);
     }
   }
 
-  // Try to find raw JSON object
-  const jsonMatch = response.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      // Continue
+  // Try to find raw JSON object - look for { ... }
+  let braceCount = 0;
+  let startIdx = -1;
+  for (let i = 0; i < response.length; i++) {
+    if (response[i] === '{') {
+      if (braceCount === 0) startIdx = i;
+      braceCount++;
+    } else if (response[i] === '}') {
+      braceCount--;
+      if (braceCount === 0 && startIdx !== -1) {
+        const jsonStr = response.substring(startIdx, i + 1);
+        try {
+          return JSON.parse(jsonStr);
+        } catch (e) {
+          console.debug('Failed to parse extracted JSON:', e);
+        }
+      }
     }
   }
 
-  throw new Error('Could not extract JSON from response');
+  throw new Error(`Could not extract valid JSON from response (length: ${response.length})`);
 }
 
 function createAgentPrompt(
@@ -74,7 +88,7 @@ function createAgentPrompt(
 
 ---
 
-## INPUT CONTEXT (JSON)
+## INPUT CONTEXT
 
 \`\`\`json
 ${contextJson}
@@ -82,18 +96,18 @@ ${contextJson}
 
 ---
 
-Process this input according to your instructions and return ONLY the JSON output as specified in the "Output Format" section. Do not include any preamble or explanation, just the JSON.`;
+## INSTRUCTIONS
+
+Process this input according to the instructions above. Return ONLY valid JSON output as specified in your "Output Format" section. Do not include any preamble, explanation, markdown formatting, or other text — output ONLY the JSON object.`;
 }
 
 async function invokeClaudeAgentViaApi(
   prompt: string,
   timeout: number = 30000
 ): Promise<string> {
-  // This is a placeholder for API invocation
-  // In production, this would call the Anthropic API
-  // For now, we'll return an error
   throw new Error(
-    'Direct API invocation not configured. Use CLI method instead.'
+    'API invocation not implemented. This factory uses the Claude CLI method only. ' +
+    'Ensure "claude" command is available in PATH and authenticated.'
   );
 }
 
@@ -102,24 +116,41 @@ async function invokeClaudeAgentViaCli(
   timeout: number = 30000
 ): Promise<string> {
   try {
-    // Invoke claude CLI with input via stdin
     const result = execSync('claude', {
       input: prompt,
       encoding: 'utf-8',
       timeout,
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+      maxBuffer: 20 * 1024 * 1024, // 20MB buffer for large responses
+      stdio: ['pipe', 'pipe', 'pipe'], // Capture stderr separately
     });
 
-    return result;
+    return result.toString().trim();
   } catch (error) {
-    // Check if it's a timeout error
-    if (error instanceof Error && error.message.includes('ETIMEDOUT')) {
+    const errorObj = error as { code?: string; signal?: string; message?: string; status?: number };
+
+    // Handle timeout
+    if (errorObj.code === 'ETIMEDOUT' || errorObj.message?.includes('ETIMEDOUT')) {
       throw new Error(`Claude CLI timeout after ${timeout}ms`);
     }
 
-    throw new Error(
-      `Failed to invoke Claude CLI: ${error instanceof Error ? error.message : String(error)}`
-    );
+    // Handle command not found
+    if (errorObj.code === 'ENOENT') {
+      throw new Error(
+        'Claude CLI not found. Ensure "claude" command is in PATH. ' +
+        'Install Claude Code or add it to your PATH.'
+      );
+    }
+
+    // Handle non-zero exit (agent execution error)
+    if (errorObj.status && errorObj.status !== 0) {
+      throw new Error(
+        `Claude CLI exited with code ${errorObj.status}. ` +
+        `${errorObj.message || 'No additional error message available'}`
+      );
+    }
+
+    const msg = errorObj.message || String(error);
+    throw new Error(`Failed to invoke Claude CLI: ${msg}`);
   }
 }
 
@@ -130,34 +161,43 @@ export async function invokeClaudeAgent(
   timeout: number = 30000
 ): Promise<AgentResponse> {
   try {
+    console.debug(`[Agent] Invoking ${agentName}...`);
+
     // Load agent markdown
     const agentMarkdown = readAgentMarkdown(agentName);
+    console.debug(`[Agent] Loaded ${agentName}.md (${agentMarkdown.instructions.length} chars)`);
 
     // Create prompt
     const prompt = createAgentPrompt(agentMarkdown, input);
+    console.debug(`[Agent] Created prompt (${prompt.length} chars)`);
 
-    // Invoke Claude
+    // Invoke Claude via CLI (API method not implemented)
     let response: string;
     try {
+      console.debug(`[Agent] Invoking Claude CLI with ${timeout}ms timeout...`);
       response = await invokeClaudeAgentViaCli(prompt, timeout);
-    } catch (e) {
-      // Fallback to API (not implemented, will throw)
-      response = await invokeClaudeAgentViaApi(prompt, timeout);
+      console.debug(`[Agent] Received response (${response.length} chars)`);
+    } catch (cliError) {
+      const msg = cliError instanceof Error ? cliError.message : String(cliError);
+      console.error(`[Agent] CLI invocation failed: ${msg}`);
+      throw new Error(`Failed to invoke agent via Claude CLI: ${msg}`);
     }
 
     // Extract JSON from response
     const jsonOutput = extractJsonFromResponse(response);
+    console.debug(`[Agent] Extracted JSON with keys: ${Object.keys(jsonOutput).join(', ')}`);
 
-    // Validate response structure
+    // Validate response structure - type assertion after validation
     if (!jsonOutput.phase || typeof jsonOutput.valid !== 'boolean') {
       throw new Error(
-        'Invalid agent response: missing phase or valid field'
+        `Invalid agent response: missing phase or valid field. Got: ${JSON.stringify(jsonOutput)}`
       );
     }
 
-    return jsonOutput as AgentResponse;
+    return jsonOutput as unknown as AgentResponse;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[Agent] Error invoking ${agentName}: ${errorMsg}`);
 
     return {
       phase: agentName as Phase,
