@@ -12,6 +12,9 @@
     "factory:list": "ts-node .factory/cli.ts list",
     "factory:watch": "ts-node .factory/cli.ts watch",
     "factory:retry": "ts-node .factory/cli.ts retry",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "orchestrator:test": "ts-node .factory/test.ts"
   },
   "dependencies": {
@@ -19,7 +22,10 @@
     "chalk": "^5.3.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2"
   }

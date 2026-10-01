@@ -1,0 +1,133 @@
+name: Factory Test Suite
+
+on:
+  push:
+    branches: [main, develop, claude/**]
+    paths:
+      - '.factory/**'
+      - '.github/workflows/factory-test.yml'
+      - 'package.json'
+      - 'tsconfig.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.factory/**'
+      - '.github/workflows/factory-test.yml'
+      - 'package.json'
+      - 'tsconfig.json'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Unit & Integration Tests
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          CI: true
+
+      - name: Run type check
+        run: npm run build
+
+      - name: Run test suite
+        run: npm test -- --coverage
+        env:
+          CI: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(npm run test:coverage -- --silent 2>&1 | grep -oP 'Statements\s*:\s*\K[0-9.]+' | head -1)
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "❌ Coverage $COVERAGE% is below 70% threshold"
+            exit 1
+          else
+            echo "✅ Coverage $COVERAGE% meets threshold"
+          fi
+
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.node-version }}
+          path: coverage/
+          retention-days: 30
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Code Quality
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          CI: true
+
+      - name: Check TypeScript compilation
+        run: npm run build
+
+      - name: Verify test structure
+        run: |
+          echo "Checking test files exist..."
+          test -f .factory/__tests__/state.test.ts || (echo "Missing state.test.ts" && exit 1)
+          test -f .factory/__tests__/orchestrator.test.ts || (echo "Missing orchestrator.test.ts" && exit 1)
+          test -f .factory/__tests__/integration.test.ts || (echo "Missing integration.test.ts" && exit 1)
+          test -f .factory/__tests__/fixtures.ts || (echo "Missing fixtures.ts" && exit 1)
+          echo "✅ All test files present"
+
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: always()
+
+    steps:
+      - name: Test results summary
+        run: |
+          echo "## Software Factory Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Code Quality**: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage Requirements" >> $GITHUB_STEP_SUMMARY
+          echo "- Statements: **70%+**" >> $GITHUB_STEP_SUMMARY
+          echo "- Branches: **70%+**" >> $GITHUB_STEP_SUMMARY
+          echo "- Functions: **70%+**" >> $GITHUB_STEP_SUMMARY
+          echo "- Lines: **70%+**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check test status
+        if: needs.test.result != 'success' || needs.lint.result != 'success'
+        run: |
+          echo "❌ Tests failed. Please review the logs above."
+          exit 1
