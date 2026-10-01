@@ -10,150 +10,192 @@ You are the orchestrator for a multi-agent software factory. Your job is to coor
 4. **Parallel execution** — Builders run simultaneously; use JavaScript orchestration (zero tokens)
 5. **MCP auto-wiring** — MCP servers are configured before builders start
 
-## Factory Workflow
+## Complete 12-Agent Factory Workflow
 
 ```
 ENTRY
   ↓
 Load project.config.json
   ↓
-[ANALYZER PHASE]
-  ├─ Read brief & config
-  ├─ Detect required MCP servers
-  ├─ Output structured needs
+[PRODUCT MANAGER PHASE]
+  ├─ Transform brief → prioritized requirements
+  ├─ Create user personas & workflows
+  ├─ Define acceptance criteria & success metrics
   ↓
   GATE: valid=true?
   ├─ YES → proceed
-  └─ NO → loop back to user
+  └─ NO → clarify requirements
+  ↓
+[ANALYZER PHASE]
+  ├─ Extract tech stack, features, MCP needs
+  ├─ Output: features, dependencies, DB outline
+  ↓
+  GATE: valid=true?
+  ├─ YES → proceed
+  └─ NO → clarify stack
   ↓
 [MCP CONFIGURATOR PHASE]
-  ├─ Validate credentials exist
+  ├─ Validate credentials
   ├─ Register MCP servers
   ├─ Test connections
-  ├─ List available tools
   ↓
   GATE: valid=true?
   ├─ YES → proceed
-  └─ NO → fix credentials, retry
+  └─ NO → fix credentials
   ↓
-[ARCHITECT PHASE]
-  ├─ Read analyzer + MCP tools output
-  ├─ Design system architecture
-  ├─ Generate DB schema
-  ├─ Define API contracts
+[ARCHITECTURE PHASE - PARALLEL]
+  ├─ [SOFTWARE ARCHITECT]
+  │  ├─ Design: API contracts, DB schema, code organization
+  │  └─ Gate: valid=true?
+  │
+  └─ [PLATFORM ARCHITECT]
+     ├─ Design: Cloud setup, CI/CD, monitoring
+     └─ Gate: valid=true?
+  ↓
+[UI DESIGNER PHASE]
+  ├─ Design system, component specs, mockups
+  ├─ Accessibility, responsive design
   ↓
   GATE: valid=true?
   ├─ YES → proceed
-  └─ NO → loop back
+  └─ NO → refine design
   ↓
 [BUILDERS PHASE - PARALLEL]
-  ├─ Backend Builder
-  │  ├─ Uses: database MCP, github MCP
-  │  └─ Creates: API code + migrations
+  ├─ [BACKEND ENGINEER]
+  │  ├─ Generate: API server, auth, database integration
+  │  ├─ Uses: GitHub MCP, Database MCP
+  │  └─ Output: API code + tests
   │
-  ├─ Frontend Builder
-  │  ├─ Uses: github MCP
-  │  └─ Creates: React/Vue components
+  ├─ [FRONTEND ENGINEER]
+  │  ├─ Generate: React/Vue components, routing, state
+  │  ├─ Uses: GitHub MCP
+  │  └─ Output: UI code + tests
   │
-  └─ Infrastructure Builder
-     ├─ Uses: github Mcp
-     └─ Creates: Docker, K8s, Deploy configs
+  ├─ [INFRASTRUCTURE ENGINEER]
+  │  ├─ Generate: Docker, CI/CD, deployment configs
+  │  ├─ Uses: GitHub MCP
+  │  └─ Output: Infrastructure as code
+  │
+  ├─ [AUTOMATION TESTER]
+  │  ├─ Generate: Unit & integration tests
+  │  ├─ Coverage: > 70%
+  │  └─ Output: Test suite
+  │
+  └─ [CUSTOMER SUPPORT]
+     ├─ Generate: User docs, API docs, deployment guides
+     ├─ Create: FAQs, help articles, onboarding
+     └─ Output: Complete documentation
   ↓
   WAIT: All builders done (valid=true)
   ↓
-[REVIEWER PHASE]
-  ├─ Test generation
-  ├─ Security scan
-  ├─ Code style check
-  ├─ Deployment dry-run
+[E2E TESTER PHASE]
+  ├─ Validate complete user workflows
+  ├─ Test across browsers & devices
+  ├─ Verify performance & accessibility
   ↓
   GATE: valid=true?
-  ├─ YES → DONE (code ready)
+  ├─ YES → proceed
   └─ NO → loop back to builders
   ↓
-EXIT: Production code + running MCP servers
+[REVIEWER PHASE - QA GATE]
+  ├─ Verify all builder outputs
+  ├─ Check test results (automation + E2E)
+  ├─ Security audit, performance check
+  ├─ Verify documentation complete
+  ├─ Compliance with acceptance criteria
+  ↓
+  GATE: valid=true?
+  ├─ YES → DONE (production ready)
+  └─ NO → loop back to builders
+  ↓
+EXIT: Production code + docs + running services
 ```
 
-## Agent Responsibilities
+## All 12 Agent Roles
 
-### Analyzer
+### 1. Product Manager
+**File:** `.claude/agents/product-manager.md`
+
+Transforms brief into prioritized requirements with acceptance criteria.
+
+**Outputs:** Vision, personas, features (must-have/nice-to-have), success metrics, roadmap
+
+### 2. Analyzer
 **File:** `.claude/agents/analyzer.md`
 
-**Input:**
-- `project.config.json`
-- User's project brief
+Detects tech stack, features, and MCP dependencies.
 
-**Output:** JSON with:
-```json
-{
-  "phase": "analyzer",
-  "valid": true,
-  "features_needed": [...],
-  "mcp_servers_required": {...},
-  "tech_stack_confirmed": {...},
-  "database_schema_outline": {...},
-  "next_inputs": { "config": {...} }
-}
-```
+**Outputs:** Confirmed stack, feature list, MCP servers needed, API surface
 
-**Fail case:** Return `valid: false` + blockers list
-
-### MCP Configurator
+### 3. MCP Configurator
 **File:** `.claude/agents/mcp-configurator.md`
 
-**Input:** Analyzer output + project config
+Validates credentials and registers MCP servers.
 
-**Output:** JSON with:
-```json
-{
-  "phase": "mcp-configurator",
-  "valid": true,
-  "servers": [
-    {
-      "name": "github",
-      "status": "ready",
-      "command": "claude mcp add github -- npx -y @modelcontextprotocol/server-github"
-    }
-  ],
-  "available_tools": {...},
-  "setup_script": "scripts/setup-mcp.sh"
-}
-```
+**Outputs:** Ready MCP servers, available tools, setup script
 
-**Critical:** Only return `valid: true` if ALL required credentials are present
+### 4. Software Architect
+**File:** `.claude/agents/software-architect.md`
 
-### Architect
-**File:** `.claude/agents/architect.md`
+Designs application architecture (API contracts, database schema, auth).
 
-**Input:** Analyzer + MCP Configurator output
+**Outputs:** OpenAPI spec, Prisma schema, code organization, security model
 
-**Output:** JSON + markdown docs with:
-- System design (ASCII diagram)
-- Database schema (Prisma/SQLAlchemy)
-- API contracts (OpenAPI spec)
-- Deployment architecture
+### 5. Platform Architect
+**File:** `.claude/agents/platform-architect.md`
 
-### Builders (Backend, Frontend, Infrastructure)
-**File:** `.claude/agents/builder.md` (one agent, routed by stack)
+Designs infrastructure, cloud patterns, DevOps, and scaling strategy.
 
-**Input:** Architect output + assigned MCP tools
+**Outputs:** Deployment architecture, monitoring setup, cost estimate, disaster recovery
 
-**Output:** Source code committed via GitHub MCP
+### 6. UI Designer
+**File:** `.claude/agents/ui-designer.md`
 
-**Each builder:**
-1. Uses MCP tools (database, github) to understand context
-2. Generates code following patterns from `.claude/skills/`
-3. Commits to git via GitHub MCP
-4. Returns `valid: true` + commit SHA
+Creates design system, component specs, and mockups.
 
-### Reviewer
-**File:** `.claude/agents/reviewer.md`
+**Outputs:** Design tokens, component library, Figma file, accessibility specs
 
-**Input:** Builder outputs (code in git)
+### 7. Backend Engineer
+**File:** `.claude/agents/backend-engineer.md`
 
-**Output:** Test suite + QA report
+Generates API server code with auth, database, and business logic.
 
-**Fails if:** Security issues, bad coverage, style violations
+**Outputs:** Express/FastAPI/Gin code, Prisma schema, tests, GitHub repo
+
+### 8. Frontend Engineer
+**File:** `.claude/agents/frontend-engineer.md`
+
+Generates React/Vue components with routing and state management.
+
+**Outputs:** React components, API client, tests, GitHub repo
+
+### 9. Infrastructure Engineer
+**File:** `.claude/agents/infrastructure-engineer.md`
+
+Generates Docker configs, CI/CD pipelines, and deployment scripts.
+
+**Outputs:** Dockerfile, docker-compose, GitHub Actions, deployment guides
+
+### 10. Automation Tester
+**File:** `.claude/agents/automation-tester.md`
+
+Generates unit and integration tests in parallel with builders.
+
+**Outputs:** Test suite (45+ tests), > 70% coverage, test fixtures
+
+### 11. E2E Tester
+**File:** `.claude/agents/e2e-tester.md`
+
+Validates complete user workflows across browsers and devices.
+
+**Outputs:** Playwright tests, browser coverage, performance metrics
+
+### 12. Customer Support
+**File:** `.claude/agents/customer-support.md`
+
+Generates user docs, API docs, deployment guides, and FAQs.
+
+**Outputs:** Help articles, API reference, deployment guide, onboarding emails
 
 ## MCP Server Integration
 
@@ -208,47 +250,79 @@ If MCP Configurator detects missing credentials:
 
 ## Running the Factory
 
-### Full Workflow
+### Full 12-Agent Workflow
 
 ```bash
 source scripts/credentials.sh
-claude "Execute complete factory workflow with project.config.json"
+claude "Execute complete 12-agent factory workflow with project.config.json"
 ```
 
-Claude Code will:
-1. Load this CLAUDE.md (you are reading it now)
-2. Start with Analyzer
-3. Follow gates + handoffs
-4. Run Builders in parallel
-5. Complete with Reviewer
+Claude Code will automatically:
+1. **Product Manager** → Transform brief to requirements
+2. **Analyzer** → Detect tech stack & features
+3. **MCP Configurator** → Setup services
+4. **Software Architect** + **Platform Architect** → Design (parallel)
+5. **UI Designer** → Design system ready
+6. **5 Builders** → Generate code in parallel:
+   - Backend Engineer (API code)
+   - Frontend Engineer (React/Vue)
+   - Infrastructure Engineer (Docker, CI/CD)
+   - Automation Tester (unit + integration tests)
+   - Customer Support (docs)
+7. **E2E Tester** → Validate workflows
+8. **Reviewer** → Final QA gate
+9. **EXIT:** Production-ready code + docs
 
 ### Single Agent (Debugging)
 
 ```bash
+# Just product requirements
+claude "Run product-manager agent only"
+
 # Just analyze
 claude "Run analyzer agent only with project.config.json"
 
-# Just architect
-claude "Run architect agent with previous analyzer output"
+# Just software architecture
+claude "Run software-architect agent with analyzer output"
 
-# Test specific builder
-claude "Run backend-builder agent only"
+# Test backend engineer
+claude "Run backend-engineer agent with architect output"
 ```
+
+### Parallel Execution Strategy
+
+Builders 5-10 run simultaneously (0 token cost):
+- All builders read from same Architect + Platform Architect output
+- Each builder commits to separate GitHub repo
+- All builders output valid=true before proceeding to testers
+- Testers run together, then Reviewer gates final output
 
 ### Manual Agent Flow
 
 ```bash
-# Step 1: Analyze
-claude "Load analyzer.md agent. Input: project.config.json. Output: structured JSON"
+# Step 1: Product Manager
+claude "Load product-manager.md agent. Input: user brief. Output: requirements"
 
-# Step 2: Configure MCP
-claude "Load mcp-configurator.md agent. Input: analyzer output. Validate credentials first"
+# Step 2: Analyzer
+claude "Load analyzer.md agent. Input: project.config.json + product output"
 
-# Step 3: Architect
-claude "Load architect.md agent. Input: analyzer + mcp output. Output: design docs"
+# Step 3: MCP Configurator
+claude "Load mcp-configurator.md agent. Input: analyzer output"
 
-# Step 4: Builders (pick one)
-claude "Load builder.md agent as backend builder. Input: architect output"
+# Step 4: Architects (parallel)
+claude "Load software-architect.md and platform-architect.md agents"
+
+# Step 5: UI Designer
+claude "Load ui-designer.md agent. Input: product + architect outputs"
+
+# Step 6-10: Run 5 builders in parallel
+# (orchestration script triggers all at once)
+
+# Step 11: E2E Tester
+claude "Load e2e-tester.md agent. Input: all builder outputs"
+
+# Step 12: Reviewer
+claude "Load reviewer.md agent. Input: all builder + tester outputs"
 ```
 
 ## Extending the Factory
@@ -310,20 +384,29 @@ Builders load skills automatically based on project.config.json
 .claude/
 ├── CLAUDE.md (you are here)
 ├── settings.json
+│
 ├── agents/
-│   ├── analyzer.md
-│   ├── mcp-configurator.md
-│   ├── architect.md
-│   ├── builder.md
-│   └── reviewer.md
+│   ├── product-manager.md         # Transform brief → requirements
+│   ├── analyzer.md                # Detect tech stack & features
+│   ├── mcp-configurator.md        # Auto-setup services
+│   ├── software-architect.md      # Design software layer
+│   ├── platform-architect.md      # Design infrastructure
+│   ├── ui-designer.md             # Design system & components
+│   ├── backend-engineer.md        # Generate API server
+│   ├── frontend-engineer.md       # Generate React/Vue
+│   ├── infrastructure-engineer.md # Generate Docker, CI/CD
+│   ├── automation-tester.md       # Generate unit+integration tests
+│   ├── e2e-tester.md              # Generate workflow tests
+│   ├── customer-support.md        # Generate docs
+│   └── reviewer.md (QA Gate)      # Final validation
+│
 └── skills/
-    ├── mcp-setup.md
-    ├── mcp-github.md
-    ├── mcp-database.md
-    ├── mcp-stripe.md
+    ├── testing-patterns.md         # Unit, integration, E2E templates
+    ├── ui-design-system.md         # Design tokens, components
+    ├── documentation-patterns.md   # Help articles, API docs
     ├── backend-patterns.md
     ├── frontend-patterns.md
-    └── testing-suite.md
+    └── infra-patterns.md
 
 project.config.json
 scripts/
