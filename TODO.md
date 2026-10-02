@@ -60,7 +60,7 @@
 - [x] Create `.factory/github-integration.ts` — GitHub API wrapper
   - [ ] Create PR when workflow starts (code exists; the `factory/<id>` branch is never pushed, see Phase 2)
   - ~~Update PR status as phases complete~~ — 🗑️ dropped for simplicity (module removed)
-  - [x] Auto-merge PR when workflow succeeds (only if `.branchspec.json` sets `auto_merge: true`)
+  - [x] Auto-merge PR when workflow succeeds (only if `.factory/policy.json` allows it and required checks pass)
   - [x] Post failed phase details as PR comments
   - [x] Use Octokit (add to dependencies)
   - Estimate: 6 hours
@@ -217,7 +217,7 @@ From `docs/FACTORY_GAP_ANALYSIS.md`.
 - [x] Headless runner (`claude -p`), async so parallel stages run concurrently
 - [x] Green tests (55 pass / 6 fail → 102 pass); tests isolated from repo data via `FACTORY_DATA_DIR`
 - [x] Docs and drift tests (agent files, documented outputs, npm scripts)
-- [x] PR base is `main` (was `develop`); auto-merge gated by branch spec
+- [x] PR base is `main` (was `develop`); auto-merge gated by `.factory/policy.json`
 - [ ] Not verified: golden brief PM → reviewer with real agents (sandbox had no model access)
 
 ## 🧹 Simplicity Decisions (Review of choices so far)
@@ -237,7 +237,7 @@ Goal: a simple setup that works efficiently. Decisions reviewed on 2026-10-02.
 - [ ] Drop `chalk` (only used for CLI colours)
 - [ ] Drop `@octokit/rest` if delivery moves to plain `git` + MCP
 - [ ] Consider `node:test` + `tsx` instead of jest + ts-jest (removes 3 dev dependencies; low priority, not worth rewriting 102 tests alone)
-- [ ] Replace per-branch `.branchspec.json` with one repo-level policy file (the per-branch file caused add/add merge conflicts and no code enforces most of it)
+- [x] Replace per-branch `.branchspec.json` with one repo-level policy file, `.factory/policy.json` (read from `main`; see `docs/POLICY.md`). `policy-check` workflow labels PRs `policy:auto` / `policy:manual`.
 - [ ] Reduce 3 workflows to what works: keep tests; `factory-deploy.yml` only echoes, `factory-start.yml` has no CLI or secret
 - [ ] Prune agents: 3 are not executed (mcp-configurator, platform-architect, ui-designer) and 2 are duplicates (`builder.md`, `skeptical-reviewer.md`); fix the "12-agent" docs to match
 - [x] Trunk-based on `main`; `develop` retired (the factory has no release cadence; apps use the release candidate flow)
@@ -253,7 +253,7 @@ Decided 2026-10-02. Details: `.claude/skills/release-process.md`, templates in `
 - [x] Agents wired: infrastructure-engineer (release templates), backend/frontend/architect (feature settings)
 - [ ] Try the release templates end to end in a scratch repo (never run so far)
 - [ ] Generate `scripts/deploy.sh` per platform (Vercel, Netlify, Cloudflare Pages, VPS) in the infrastructure-engineer
-- [x] Retire `develop` in this repo and move to trunk-based on `main` (CLAUDE.md, CONTRIBUTING.md, README, workflows updated; delete the remote `develop` branch in GitHub)
+- [x] Retire `develop` in this repo and move to trunk-based on `main` (CLAUDE.md, CONTRIBUTING.md, README, workflows updated)
 - [ ] Factory opens a draft PR at workflow start, marks it ready on success, labels `needs-human` on failure (monitoring screens)
 - [ ] GitHub Projects board for active/needs-me/done
 

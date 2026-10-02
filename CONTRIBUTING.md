@@ -35,17 +35,16 @@ Short, descriptive, lowercase, hyphenated. Never `fix/bug` or `feature/stuff`.
 git checkout main && git pull origin main
 git checkout -b feature/your-feature-name
 
-# 2. Branch spec (controls automation and review rules, see docs/BRANCH-SPEC.md)
-cp .branchspec.json.example .branchspec.json     # edit scope, approvals, auto_merge
-npm run validate:branchspec
-
-# 3. Change, test, commit
+# 2. Change, test, commit
 npm run build && npm test
-git add <files> .branchspec.json
+git add <files>
 git commit -m "feat: your feature description"
 
-# 4. Push and open a PR targeting main
+# 3. Push and open a PR targeting main
 git push -u origin feature/your-feature-name
+
+# 4. See what the merge policy says about your change
+npm run policy:check -- --base origin/main --head HEAD --branch "$(git branch --show-current)"
 ```
 
 Keep branches small and short-lived (hours to a couple of days). To pick up newer `main`, merge it in (`git merge origin/main`); do not rewrite history on a pushed branch.
@@ -78,7 +77,7 @@ Do not add attribution lines to commits or PRs ("Generated with Claude Code", `C
 - **Target: `main`.**
 - Title uses the commit format. Description: what, why, how, testing, checklist.
 - Link issues with `Closes #123`.
-- Required: build and tests green. Respect the branch spec (`auto_merge`, approvals).
+- Required: build and tests green. The merge policy (`.factory/policy.json`, see `docs/POLICY.md`) decides whether it auto-merges or needs a human; the `policy-check` workflow labels the PR `policy:auto` or `policy:manual`.
 - Squash and merge is the default; delete the branch afterwards.
 
 ```markdown
@@ -109,6 +108,6 @@ Private repos on the free plan have no branch protection or required reviews, so
 
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Trunk Based Development](https://trunkbaseddevelopment.com/)
-- `docs/BRANCH-SPEC.md` for the branch spec
+- `docs/POLICY.md` for the merge policy
 
 **Last Updated:** 2026-10-02
