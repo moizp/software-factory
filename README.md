@@ -530,53 +530,42 @@ See **[ORCHESTRATION.md](./docs/ORCHESTRATION.md)** for:
 
 ## Development Workflow
 
-This project follows **Git Flow** branching model:
+This project is **trunk-based**: `main` is the only long-lived branch.
 
 ```
-main (production) ← release branches only
+main (trunk, always releasable)
   ↑
-develop (integration) ← all feature branches
-  ↑
-  ├─ feature/* (new features)
-  ├─ fix/* (bug fixes)
-  ├─ enhancement/* (improvements)
-  └─ chore/* (refactoring, deps)
+  ├─ feature/*      new features
+  ├─ fix/*          bug fixes
+  ├─ enhancement/*  improvements
+  └─ chore/*        refactoring, deps, docs, CI
 ```
 
 ### Quick Start for Contributors
 
 ```bash
-# 1. Create a feature branch from develop
-git checkout develop
-git pull origin develop
+# 1. Create a short-lived branch from main
+git checkout main
+git pull origin main
 git checkout -b feature/your-feature-name
 
 # 2. Add branch spec (controls automation & review rules)
 cp .branchspec.json.example .branchspec.json
-# Edit .branchspec.json with your requirements
-nano .branchspec.json
+npm run validate:branchspec
 
-# 3. Make changes and commit
+# 3. Make changes, test, commit
+npm run build && npm test
 git add . .branchspec.json
 git commit -m "feat: your feature description"
 git push -u origin feature/your-feature-name
 
-# 4. Validate branch spec
-npm run validate:branchspec
-
-# 5. Create a Pull Request
-# - Target: develop (not main!)
-# - Request review
-# - Address feedback
-
-# 6. After approval, merge to develop
-git checkout develop
-git merge --no-ff feature/your-feature-name
-git push origin develop
+# 4. Open a Pull Request targeting main, then squash and merge after review
 ```
 
+The factory has no release cadence. Apps it builds use release candidate branches promoted through `www-test` → `www-demo` → `www-prod` (see `.claude/skills/release-process.md`).
+
 **Guides:**
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — Complete git flow guide & branch naming
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — Branching guide & conventions
 - [BRANCH-SPEC.md](./docs/BRANCH-SPEC.md) — Control automation & review rules with .branchspec.json
 
 ---
