@@ -182,6 +182,36 @@ describe('loadPolicy and prInfoFromGit', () => {
   });
 });
 
+describe('policy CLI', () => {
+  // Guards against module resolution clashes (ts-node resolves .json before .ts)
+  it('runs under ts-node and reports a protected-path change as manual', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'policy-cli-'));
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf-8' });
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 't@example.com');
+    git('config', 'user.name', 't');
+    fs.mkdirSync(path.join(dir, '.factory'));
+    fs.writeFileSync(path.join(dir, '.factory', 'policy.json'), JSON.stringify(repoPolicy));
+    fs.writeFileSync(path.join(dir, 'README.md'), 'a\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'base');
+    git('checkout', '-q', '-b', 'chore/x');
+    fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'change');
+
+    const cli = path.join(__dirname, '..', 'policy-cli.ts');
+    const out = execFileSync(
+      path.join(__dirname, '..', '..', 'node_modules', '.bin', 'ts-node'),
+      [cli, '--base', 'main', '--head', 'chore/x', '--branch', 'chore/x'],
+      { cwd: dir, encoding: 'utf-8' }
+    );
+    const decision = JSON.parse(out);
+    expect(decision.autoMerge).toBe(false);
+    expect(decision.reasons.join()).toMatch(/protected paths changed: package.json/);
+  }, 60000);
+});
+
 describe('GitHubAPI policy helpers', () => {
   it('reads PR info', async () => {
     const api = new GitHubAPI('token');
