@@ -40,9 +40,14 @@ jobs:
 
       - name: Evaluate policy
         run: |
-          npx ts-node .factory/policy-cli.ts \
-            --base "origin/${{ github.event.pull_request.base.ref }}" --head pr-head \
-            --branch "$PR_BRANCH" --labels "$PR_LABELS" > decision.json
+          if [ -f .factory/policy-cli.ts ]; then
+            npx ts-node .factory/policy-cli.ts \
+              --base "origin/${{ github.event.pull_request.base.ref }}" --head pr-head \
+              --branch "$PR_BRANCH" --labels "$PR_LABELS" > decision.json
+          else
+            # The base branch has no policy engine yet (for example the PR that introduces it): fail closed
+            echo '{"autoMerge":false,"approvals":1,"require":["ci"],"reasons":["no policy engine on the base branch yet (strict default: a human merges)"]}' > decision.json
+          fi
           cat decision.json
           {
             echo '### Merge policy'
@@ -58,4 +63,6 @@ jobs:
           gh label create "policy:auto" --color 0E8A16 --description "Policy allows auto-merge" --force
           gh label create "policy:manual" --color D93F0B --description "Policy requires a human merge" --force
           if [ "$(jq -r .autoMerge decision.json)" = "true" ]; then ADD="policy:auto"; DROP="policy:manual"; else ADD="policy:manual"; DROP="policy:auto"; fi
-          gh pr edit "$PR_NUMBER" --add-label "$ADD" --remove-label "$DROP"
+          gh pr edit "$PR_NUMBER" --add-label "$ADD"
+          # Removing a label that is not on the PR is fine; ignore only that
+          gh pr edit "$PR_NUMBER" --remove-label "$DROP" || true
