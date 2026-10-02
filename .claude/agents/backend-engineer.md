@@ -20,6 +20,7 @@ You are the **backend engineer**. Your job is to generate production-quality API
 6. **Database Migrations** — Schema initialization and changes
 7. **Error Handling** — Consistent error responses
 8. **Commit to GitHub** — Push code via GitHub MCP
+9. **Feature Settings** — Implement the admin-managed feature toggles from `.claude/skills/feature-settings.md`
 
 ## Code Generation Process
 

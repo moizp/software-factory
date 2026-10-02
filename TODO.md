@@ -243,6 +243,20 @@ Goal: a simple setup that works efficiently. Decisions reviewed on 2026-10-02.
 - [ ] Decide on trunk-based (`main` only) vs git flow with `develop`; `release/*` and `hotfix/*` are heavy for an agent-run repo
 - [ ] Keep `logger.ts` minimal; remove if not used in practice
 
+## 🚀 Release Process for Generated Apps
+
+Decided 2026-10-02. Details: `.claude/skills/release-process.md`, templates in `templates/release/`.
+
+- [x] Release candidate flow: `release/vX.Y.Z` cut from `main`, draft PR as tracker, promote test → demo → prod, tag the shipped commit, merge back
+- [x] Workflow templates: release-start, promote, release-finish, `deploy.sh` contract
+- [x] Feature settings kit spec (admin-managed toggles per environment): `.claude/skills/feature-settings.md`
+- [x] Agents wired: infrastructure-engineer (release templates), backend/frontend/architect (feature settings)
+- [ ] Try the release templates end to end in a scratch repo (never run so far)
+- [ ] Generate `scripts/deploy.sh` per platform (Vercel, Netlify, Cloudflare Pages, VPS) in the infrastructure-engineer
+- [ ] Retire `develop` in this repo and move to trunk-based on `main` (update CLAUDE.md, CONTRIBUTING.md, workflows)
+- [ ] Factory opens a draft PR at workflow start, marks it ready on success, labels `needs-human` on failure (monitoring screens)
+- [ ] GitHub Projects board for active/needs-me/done
+
 ## Metrics
 
 | Category | Estimate | Status |
