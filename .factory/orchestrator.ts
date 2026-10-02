@@ -11,6 +11,7 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -395,30 +396,75 @@ export class FactoryOrchestrator {
     state = addNote(state, 'Workflow completed successfully');
     saveWorkflowState(state);
 
-    // Auto-merge PR on success, only when the branch spec explicitly allows it
-    if (this.githubAPI && this.prNumber && !this.autoMergeAllowed()) {
-      this.logger.info('Auto-merge skipped: .branchspec.json does not set automation.auto_merge=true');
-    } else if (this.githubAPI && this.prNumber) {
-      try {
-        await this.githubAPI.autoMergePR(this.prNumber);
-        state = addNote(state, `PR #${this.prNumber} auto-merged`);
-      } catch (error) {
-        this.logger.warn(`Failed to auto-merge PR: ${error}`);
-      }
-    }
+    // Merge only if the repo policy (read from the base branch) allows it
+    state = await this.maybeAutoMerge(state);
 
     this.logger.info('Workflow execution complete', { workflowId: state.id });
     return state;
   }
 
-  /** Conservative default: no .branchspec.json (or auto_merge unset) means a human merges. */
-  private autoMergeAllowed(): boolean {
+  /**
+   * Evaluates .factory/policy.json (from origin/main, never from the PR) and merges
+   * only when the policy allows auto-merge and every required check passed.
+   * Anything unclear leaves the PR open for a human.
+   */
+  private async maybeAutoMerge(state: WorkflowState): Promise<WorkflowState> {
+    if (!this.githubAPI || !this.prNumber) return state;
+
+    let decision: Decision;
+    let headSha: string;
     try {
-      const spec = JSON.parse(fs.readFileSync(path.join(process.cwd(), '.branchspec.json'), 'utf-8'));
-      return spec?.automation?.auto_merge === true;
-    } catch {
-      return false;
+      const info = await this.githubAPI.getPRInfo(this.prNumber);
+      headSha = info.headSha;
+      decision = evaluatePolicy(this.loadBasePolicy(), info);
+    } catch (error) {
+      this.logger.warn(`Auto-merge skipped: could not evaluate policy: ${error}`);
+      return addNote(state, 'Auto-merge skipped: could not evaluate policy');
     }
+
+    if (!decision.autoMerge) {
+      const message = `Needs a human merge (${decision.approvals} approval${decision.approvals === 1 ? '' : 's'}): ${decision.reasons.join('; ')}`;
+      this.logger.info(message);
+      await this.githubAPI.postComment(this.prNumber, `Policy: ${message}`).catch(() => undefined);
+      return addNote(state, message);
+    }
+
+    if (decision.require.includes('reviewer_verdict') && this.getLatestGateFor(state, 'reviewer')?.valid !== true) {
+      return addNote(state, 'Auto-merge skipped: reviewer verdict is not valid');
+    }
+
+    if (decision.require.includes('ci')) {
+      const ci = await this.waitForCi(headSha);
+      if (ci !== 'success') {
+        this.logger.info(`Auto-merge skipped: CI is ${ci}`);
+        return addNote(state, `Auto-merge skipped: CI is ${ci}`);
+      }
+    }
+
+    try {
+      await this.githubAPI.autoMergePR(this.prNumber);
+      return addNote(state, `PR #${this.prNumber} auto-merged (${decision.reasons.join('; ')})`);
+    } catch (error) {
+      this.logger.warn(`Failed to auto-merge PR: ${error}`);
+      return addNote(state, 'Auto-merge failed; a human needs to merge');
+    }
+  }
+
+  private async waitForCi(sha: string): Promise<'success' | 'failure' | 'pending' | 'none'> {
+    const pollMs = Number(process.env.FACTORY_CI_POLL_MS) || 30_000;
+    const timeoutMs = Number(process.env.FACTORY_CI_TIMEOUT_MS) || 15 * 60_000;
+    const deadline = Date.now() + timeoutMs;
+    let result: 'success' | 'failure' | 'pending' | 'none' = 'none';
+
+    for (;;) {
+      result = await this.githubAPI!.getCheckSummary(sha);
+      if (result === 'success' || result === 'failure' || Date.now() >= deadline) return result;
+      await this.sleep(pollMs);
+    }
+  }
+
+  private loadBasePolicy(): Policy {
+    return loadPolicy('origin/main');
   }
 
   private getLatestGateFor(state: WorkflowState, phase: Phase) {
