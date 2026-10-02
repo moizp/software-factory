@@ -1,0 +1,65 @@
+name: Release Start
+
+# Cuts release/vX.Y.Z from main (or from a tag for a hotfix) and opens a draft PR
+# back to main. The draft PR is the tracker for the whole release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v prefix, e.g. 1.4.0'
+        required: true
+      base:
+        description: 'Base ref (default main; use a tag such as v1.4.0 for a hotfix)'
+        required: false
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      BASE: ${{ inputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and one-RC-at-a-time
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must be X.Y.Z"; exit 1; }
+          if git ls-remote --exit-code --heads origin 'release/*' >/dev/null 2>&1; then
+            echo "A release branch is already open:"; git ls-remote --heads origin 'release/*'; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "Tag v$VERSION already exists"; exit 1
+          fi
+          BASE_REF="origin/$BASE"
+          git rev-parse -q --verify "$BASE_REF" >/dev/null || BASE_REF="$BASE"
+          # Previous release must be merged back, otherwise promotion cannot fast-forward
+          if git rev-parse -q --verify origin/www-test >/dev/null; then
+            git merge-base --is-ancestor origin/www-test "$BASE_REF" \
+              || { echo "www-test is not contained in $BASE: merge the previous release back first"; exit 1; }
+          fi
+          echo "BASE_REF=$BASE_REF" >> "$GITHUB_ENV"
+
+      - name: Create release branch and draft PR
+        run: |
+          git push origin "$BASE_REF:refs/heads/release/v$VERSION"
+          cat > body.md <<BODY
+          Tracker for release **v$VERSION**. Fixes during stabilisation are PRs targeting \`release/v$VERSION\`.
+
+          - [ ] test: promoted and healthy
+          - [ ] demo: promoted and healthy
+          - [ ] prod: promoted and healthy
+          - [ ] finished (tag v$VERSION, merged back to main)
+
+          Promote with the **Promote** workflow; close with **Release Finish**.
+          BODY
+          gh pr create --draft --base main --head "release/v$VERSION" \
+            --title "release: v$VERSION" --body-file body.md

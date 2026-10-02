@@ -1,0 +1,48 @@
+name: Release Finish
+
+# Closes a release after prod: tags the shipped commit, then merges the RC back
+# to main via the draft PR and deletes the branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without the v prefix, e.g. 1.4.0'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Verify prod runs this release
+        run: |
+          SHA=$(git rev-parse HEAD)
+          [ "$(git rev-parse -q --verify origin/www-prod)" = "$SHA" ] \
+            || { echo "www-prod is not at the release tip; promote to prod first"; exit 1; }
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+
+      - name: Tag the shipped commit
+        run: |
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git tag -a "v$VERSION" "$SHA" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Merge back to main
+        run: |
+          PR=$(gh pr list --head "release/v$VERSION" --json number --jq '.[0].number')
+          gh pr ready "$PR" || true
+          gh pr merge "$PR" --merge --delete-branch \
+            --subject "chore: merge release v$VERSION" --body ""

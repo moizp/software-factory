@@ -6,7 +6,7 @@ dist/
 scripts/credentials.sh
 .factory/workflows/
 .factory/snapshots/
-workflows/
+/workflows/
 coverage/
 logs/
 metrics/
