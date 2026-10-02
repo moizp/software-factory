@@ -57,75 +57,71 @@
   - ✅ Completed
 
 ### GitHub Integration
-- [ ] Create `.factory/github-integration.ts` — GitHub API wrapper
-  - [ ] Create PR when workflow starts
-  - [ ] Update PR status as phases complete
-  - [ ] Auto-merge PR when workflow succeeds
-  - [ ] Post failed phase details as PR comments
-  - [ ] Use Octokit (add to dependencies)
+- [x] Create `.factory/github-integration.ts` — GitHub API wrapper
+  - [ ] Create PR when workflow starts (code exists; the `factory/<id>` branch is never pushed, see Phase 2)
+  - ~~Update PR status as phases complete~~ — 🗑️ dropped for simplicity (module removed)
+  - [x] Auto-merge PR when workflow succeeds (only if `.branchspec.json` sets `auto_merge: true`)
+  - [x] Post failed phase details as PR comments
+  - [x] Use Octokit (add to dependencies)
   - Estimate: 6 hours
 
 - [ ] Update `factory-start.yml` GitHub Actions workflow
-  - [ ] Actually call orchestrator (not just mock)
+  - [ ] Actually call orchestrator (not just mock) (runner is real; CI still lacks the `claude` CLI and API secret, Phase 3)
   - [ ] Pass issue context to orchestrator
   - [ ] Report results back to GitHub
   - Estimate: 2 hours
 
 ### Validation & Setup
-- [ ] Create `scripts/validate-setup.sh`
+- [x] Create `scripts/validate-setup.sh`
   - [ ] Check Node.js version
   - [ ] Verify all dependencies installed
   - [ ] Validate credentials exist (GITHUB_TOKEN, etc.)
   - [ ] Test MCP server connectivity
-  - [ ] Verify agent files exist
+  - [x] Verify agent files exist
   - Estimate: 2 hours
 
 - [ ] Add pre-flight validation to orchestrator
   - [ ] Check all required MCP servers are registered
   - [ ] Validate project.config.json schema
-  - [ ] Verify all agent files readable
+  - [x] Verify all agent files readable
   - Estimate: 2 hours
 
 ## 📋 High Priority (Needed for MVP)
 
 ### Error Handling & Recovery
-- [ ] Implement retry logic in orchestrator
-  - [ ] Configurable max retries per agent
-  - [ ] Exponential backoff
-  - [ ] Log retry attempts
+- [x] Implement retry logic in orchestrator
+  - [x] Configurable max retries per agent
+  - [x] Exponential backoff
+  - [x] Log retry attempts
   - Estimate: 3 hours
 
-- [ ] Add failure notifications
-  - [ ] Slack integration (when workflow fails)
-  - [ ] GitHub status checks on every phase
-  - [ ] Email summaries (optional)
+- ~~Add failure notifications~~ — 🗑️ dropped for simplicity (module removed)
+  - Failures are posted as PR comments instead
   - Estimate: 3 hours
 
-- [ ] Implement rollback mechanism
-  - [ ] Save git state before each phase
-  - [ ] Revert on critical failures
-  - [ ] Document rollback process
+- ~~Implement rollback mechanism~~ — 🗑️ dropped for simplicity (module removed)
+  - The old version ran `git clean -fd` on the factory repo; resume (`factory retry`) replaces it
   - Estimate: 4 hours
 
 ### Testing Infrastructure
-- [ ] Create comprehensive test suite (`.factory/test.ts`)
-  - [ ] Unit tests for state management
-  - [ ] Unit tests for orchestrator logic
-  - [ ] Integration tests for agent sequencing
-  - [ ] Mock agent responses for realistic testing
-  - [ ] Add to `npm test` script
+- [x] Create comprehensive test suite (`.factory/__tests__/`, 102 tests)
+  - [x] Unit tests for state management
+  - [x] Unit tests for orchestrator logic
+  - [x] Integration tests for agent sequencing
+  - [x] Mock agent responses for realistic testing
+  - [x] Add to `npm test` script
   - Estimate: 6 hours
 
-- [ ] Create test fixtures
-  - [ ] Sample project.config.json variants
-  - [ ] Mock agent outputs (sample JSON)
-  - [ ] Test workflows for happy path + failure paths
+- [x] Create test fixtures
+  - [x] Sample project.config.json variants
+  - [x] Mock agent outputs (sample JSON)
+  - [x] Test workflows for happy path + failure paths
   - Estimate: 2 hours
 
-- [ ] Setup CI testing
-  - [ ] Create `.github/workflows/factory-test.yml`
-  - [ ] Run tests on every PR
-  - [ ] Check coverage thresholds
+- [x] Setup CI testing
+  - [x] Create `.github/workflows/factory-test.yml`
+  - [x] Run tests on every PR
+  - [x] Check coverage thresholds
   - Estimate: 2 hours
 
 ### Documentation
@@ -146,42 +142,33 @@
 ## 🔧 Medium Priority (Nice to Have)
 
 ### State Management Enhancement
-- [ ] Add workflow cleanup
-  - [ ] Archive completed workflows after 30 days
-  - [ ] Compress old state files
-  - [ ] Implement retention policy
+- ~~Add workflow cleanup~~ — 🗑️ dropped for simplicity (module removed)
   - Estimate: 3 hours
 
-- [ ] Add state recovery
-  - [ ] Detect incomplete workflows on startup
-  - [ ] Resume from last successful phase
-  - [ ] Add resume command to CLI
+- [x] Add state recovery
+  - ~~Detect incomplete workflows on startup~~ (dropped: it rewrote unrelated workflows; resume is explicit)
+  - [x] Resume from last successful phase
+  - [x] Add resume command to CLI (`npm run factory:retry <id>`)
   - Estimate: 4 hours
 
-- [ ] Add workflow analytics
-  - [ ] Track execution time per phase
-  - [ ] Measure success rate by agent
-  - [ ] Generate reports
+- ~~Add workflow analytics~~ — 🗑️ dropped for simplicity (module removed)
   - Estimate: 3 hours
 
 ### GitHub Deployment Integration
 - [ ] Create `.github/workflows/factory-deploy.yml`
-  - [ ] Auto-deploy on workflow success
+  - [ ] Auto-deploy on workflow success (the workflow currently only echoes)
   - [ ] Check deployment readiness
   - [ ] Rollback on deployment failure
   - Estimate: 4 hours
 
 ### Monitoring & Observability
-- [ ] Add structured logging
-  - [ ] JSON logs for parse-ability
-  - [ ] Persist logs to `.factory/logs/`
-  - [ ] Add log levels (DEBUG, INFO, WARN, ERROR)
+- [x] Add structured logging
+  - [x] JSON logs for parse-ability
+  - [x] Persist logs to `logs/`
+  - [x] Add log levels (DEBUG, INFO, WARN, ERROR)
   - Estimate: 2 hours
 
-- [ ] Add metrics collection
-  - [ ] Track workflow duration
-  - [ ] Count phases by status
-  - [ ] Export metrics to Prometheus (optional)
+- ~~Add metrics collection~~ — 🗑️ dropped for simplicity (module removed)
   - Estimate: 3 hours
 
 ## 🎯 New Features (Future)
@@ -220,23 +207,57 @@
 
 ---
 
+## ✅ Phase 1: Make it truthful (Done)
+
+From `docs/FACTORY_GAP_ANALYSIS.md`.
+
+- [x] One registry for agent names and stage order (`.factory/pipeline.ts`)
+- [x] JSON Schema contracts for agent responses (ajv, `.factory/contracts/`)
+- [x] Stage-driven orchestrator with real resume (`factory retry <id>`)
+- [x] Headless runner (`claude -p`), async so parallel stages run concurrently
+- [x] Green tests (55 pass / 6 fail → 102 pass); tests isolated from repo data via `FACTORY_DATA_DIR`
+- [x] Docs and drift tests (agent files, documented outputs, npm scripts)
+- [x] `develop` branch created; PR base is `develop`; auto-merge gated by branch spec
+- [ ] Not verified: golden brief PM → reviewer with real agents (sandbox had no model access)
+
+## 🧹 Simplicity Decisions (Review of choices so far)
+
+Goal: a simple setup that works efficiently. Decisions reviewed on 2026-10-02.
+
+**Keep**
+- [x] Headless `claude -p` as the agent runner (reuses auth, no key handling)
+- [x] ajv for schema validation (one dependency, real schemas)
+- [x] Stages as data in TypeScript; add loop-back and ESCALATED there rather than building a YAML graph engine
+
+**Done**
+- [x] Delete unused side modules: analytics, metrics, cleanup, notifications, recovery, rollback (~900 lines)
+- [x] Coverage thresholds relaxed to 55/60/55/55 (branches/functions/lines/statements) after the deletions
+
+**To do**
+- [ ] Drop `chalk` (only used for CLI colours)
+- [ ] Drop `@octokit/rest` if delivery moves to plain `git` + MCP
+- [ ] Consider `node:test` + `tsx` instead of jest + ts-jest (removes 3 dev dependencies; low priority, not worth rewriting 102 tests alone)
+- [ ] Replace per-branch `.branchspec.json` with one repo-level policy file (the per-branch file caused add/add merge conflicts and no code enforces most of it)
+- [ ] Reduce 3 workflows to what works: keep tests; `factory-deploy.yml` only echoes, `factory-start.yml` has no CLI or secret
+- [ ] Prune agents: 3 are not executed (mcp-configurator, platform-architect, ui-designer) and 2 are duplicates (`builder.md`, `skeptical-reviewer.md`); fix the "12-agent" docs to match
+- [ ] Decide on trunk-based (`main` only) vs git flow with `develop`; `release/*` and `hotfix/*` are heavy for an agent-run repo
+- [ ] Keep `logger.ts` minimal; remove if not used in practice
+
 ## Metrics
 
 | Category | Estimate | Status |
 |----------|----------|--------|
 | Real Agent Invoker (Critical) | 8.5 hours | ✅ Completed |
-| Remaining Critical Blockers | 11.5 hours | 🚨 Not Started |
-| High Priority | 24 hours | 🚨 Not Started |
+| Remaining Critical Blockers | 11.5 hours | 🔄 In progress (see ticked items) |
+| High Priority | 24 hours | 🔄 In progress (see ticked items) |
 | Medium Priority | 17 hours | ⏸️ Future |
 | Features | 26+ hours | ⏸️ Future |
 | **TOTAL MVP** | **44 hours** | **35.5% Complete** |
 
 ## Next Steps
 
-1. **Implement Claude bridge** (`.factory/claude-bridge.ts`) — This unblocks everything
-2. **Add GitHub integration** — Required for autonomous workflows
-3. **Setup validation** — Prevent broken deployments
-4. **Create test suite** — Verify orchestrator works
-5. **Add error handling** — Make it production-ready
-
-Start with items marked 🚨 before any others.
+1. Run a golden brief through real agents (PM → reviewer) and fix what breaks
+2. Phase 2: real artifacts (code lands in a git worktree, committed and pushed), loop-back with iteration cap, ESCALATED terminal
+3. Phase 3: real quality gate (build/test/lint/audit in a sandbox) and CI runner with secrets
+4. Phase 4: CHANGE mode (repo ingestion, change analysis, patch-mode builders)
+5. Work through the Simplicity Decisions above as you go
