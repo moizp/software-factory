@@ -1,0 +1,93 @@
+name: Promote
+
+# Moves a release candidate through test -> demo -> prod. The www-<env> branches
+# are fast-forward pointers: only this workflow moves them, and only after the
+# deploy succeeded, so `git log www-prod` is what is live.
+#   test <- release/vX.Y.Z      (any time)
+#   demo <- same commit as www-test, deploy/test succeeded
+#   prod <- same commit as www-demo, deploy/demo succeeded, version confirmed
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without the v prefix, e.g. 1.4.0'
+        required: true
+      env:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [test, demo, prod]
+      confirm:
+        description: 'prod only: retype the version to confirm'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: promote-${{ inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      TARGET: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Check promotion rules
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+          status() { gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/status" \
+            --jq ".statuses[] | select(.context==\"deploy/$1\") | .state"; }
+          case "$TARGET" in
+            test)
+              if git rev-parse -q --verify origin/www-test >/dev/null; then
+                git merge-base --is-ancestor origin/www-test "$SHA" \
+                  || { echo "www-test is not an ancestor of this RC"; exit 1; }
+              fi ;;
+            demo)
+              [ "$(git rev-parse -q --verify origin/www-test)" = "$SHA" ] \
+                || { echo "www-test is not at this commit; promote it to test first"; exit 1; }
+              [ "$(status test)" = "success" ] || { echo "deploy/test has not succeeded for $SHA"; exit 1; } ;;
+            prod)
+              [ "$CONFIRM" = "$VERSION" ] || { echo "Retype the version in 'confirm' to promote to prod"; exit 1; }
+              [ "$(git rev-parse -q --verify origin/www-demo)" = "$SHA" ] \
+                || { echo "www-demo is not at this commit; promote it to demo first"; exit 1; }
+              [ "$(status demo)" = "success" ] || { echo "deploy/demo has not succeeded for $SHA"; exit 1; } ;;
+          esac
+
+      - name: Deploy
+        id: deploy
+        env:
+          DEPLOY_ENV: ${{ inputs.env }}
+          DEPLOY_SHA: ${{ env.SHA }}
+          # Repo secrets are shared by every workflow on the free plan, so only the matching one is passed
+          DEPLOY_TOKEN: ${{ inputs.env == 'prod' && secrets.PROD_DEPLOY_TOKEN || inputs.env == 'demo' && secrets.DEMO_DEPLOY_TOKEN || secrets.TEST_DEPLOY_TOKEN }}
+        run: ./scripts/deploy.sh "$DEPLOY_ENV" "$DEPLOY_SHA"
+
+      - name: Record result and move branch
+        run: |
+          git push origin "$SHA:refs/heads/www-$TARGET"
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state=success -f context="deploy/$TARGET" -f description="Deployed to $TARGET"
+          PR=$(gh pr list --head "release/v$VERSION" --json number --jq '.[0].number')
+          [ -z "$PR" ] || gh pr comment "$PR" --body "Deployed \`$SHA\` to **$TARGET**."
+
+      - name: Record failure
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state=failure -f context="deploy/$TARGET" -f description="Promotion to $TARGET failed" || true

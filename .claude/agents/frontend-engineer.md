@@ -19,6 +19,7 @@ You are the **frontend engineer**. Your job is to generate production-quality Re
 6. **Styling** — Tailwind CSS matching design system
 7. **Tests** — Component tests with React Testing Library
 8. **Commit to GitHub** — Push code via GitHub MCP
+9. **Feature Settings** — Read `/api/config/features` once per session and build the admin screen per `.claude/skills/feature-settings.md`
 
 ## Code Generation Process
 

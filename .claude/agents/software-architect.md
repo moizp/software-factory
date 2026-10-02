@@ -17,6 +17,7 @@ Create a complete software architectural specification including:
 4. Authentication & authorization flow
 5. Error handling strategy
 6. Code organization & patterns
+7. Feature settings (tables, code registry, admin API) per `.claude/skills/feature-settings.md`
 
 ## What You Produce
 
