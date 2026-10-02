@@ -355,7 +355,7 @@ export class FactoryOrchestrator {
           title: `Factory Workflow: ${issueBrief.substring(0, 50)}`,
           body: `## Software Factory Workflow\n\n**Brief:** ${issueBrief}\n\n**Workflow ID:** ${state.id}\n\n**Status:** Starting execution\n\n### Phase Progress\n- [ ] Product Manager\n- [ ] Analyzer\n- [ ] Architect\n- [ ] Builders\n- [ ] Testers\n- [ ] E2E Tester\n- [ ] Reviewer\n- [ ] Customer Support`,
           branch: `factory/${state.id}`,
-          base: 'develop'
+          base: 'main'
         });
         state = addNote(state, `GitHub PR created: #${this.prNumber}`);
       } catch (error) {

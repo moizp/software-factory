@@ -2,7 +2,7 @@ name: Factory Test Suite
 
 on:
   push:
-    branches: [main, develop, claude/**]
+    branches: [main, claude/**]
     paths:
       - '.factory/**'
       - '.claude/**'
@@ -15,7 +15,7 @@ on:
       - 'jest.config.js'
       - 'tsconfig.json'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '.factory/**'
       - '.claude/**'
