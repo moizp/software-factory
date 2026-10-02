@@ -257,6 +257,18 @@ Decided 2026-10-02. Details: `.claude/skills/release-process.md`, templates in `
 - [ ] Factory opens a draft PR at workflow start, marks it ready on success, labels `needs-human` on failure (monitoring screens)
 - [ ] GitHub Projects board for active/needs-me/done
 
+## ⚡ Token Efficiency (runs on the existing Claude plan, no extra spend)
+
+- [x] Default Sonnet 5.5 at medium effort (`FACTORY_AGENT_MODEL`, `FACTORY_AGENT_EFFORT` override)
+- [x] Agents run from an empty directory: about 9,400 → 2,500 tokens of fixed context per call (measured)
+- [x] Compact JSON context (no indentation tokens)
+- [x] Per-phase token usage recorded; `state.tokensUsed`; budget guard `FACTORY_MAX_TOKENS` (pauses, resumable)
+- [x] `--until <agent>` for cheap, stepwise runs
+- [ ] First real run: `--until product-manager`, record the measured tokens per agent here
+- [ ] Slim agent prompts: trim the long "Output Format" examples (they are also the contract test fixtures) and per-agent context (reviewer and customer-support receive every artifact)
+- [ ] CI: never call the model on every PR; run the factory only on an explicit label, and use a subscription-backed token instead of a pay-per-token API key (verify in the Claude Code docs)
+- [ ] Cap cost of loop-backs in Phase 2 (iteration cap shares the token budget)
+
 ## Metrics
 
 | Category | Estimate | Status |

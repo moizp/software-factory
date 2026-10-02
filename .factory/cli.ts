@@ -11,6 +11,7 @@ import {
 } from './state';
 import { FactoryOrchestrator } from './orchestrator';
 import { invokeClaudeAgent } from './claude-bridge';
+import { AgentName } from './pipeline';
 
 function printHeader(text: string): void {
   console.log(chalk.bold.blue(`\n╔ ${text}`));
@@ -60,17 +61,21 @@ function printWorkflowDetail(state: WorkflowState): void {
   console.log(chalk.blue('╚'));
 }
 
-async function cmdStart(issueBrief: string, issueNumber?: number): Promise<void> {
+async function cmdStart(issueBrief: string, issueNumber?: number, until?: AgentName): Promise<void> {
   printHeader('Starting Factory Workflow');
 
   const orchestrator = new FactoryOrchestrator(invokeClaudeAgent, true);
   const finalState = await orchestrator.executeWorkflow(
     issueBrief,
-    issueNumber
+    issueNumber,
+    undefined,
+    undefined,
+    { until }
   );
 
   printWorkflowDetail(finalState);
-  console.log(chalk.green(`\n✓ Workflow ${finalState.id} created`));
+  console.log(chalk.green(`\n✓ Workflow ${finalState.id} ${finalState.status}`));
+  console.log(chalk.gray(`  Tokens used: ${finalState.tokensUsed ?? 0}`));
 }
 
 async function cmdStatus(workflowId: string): Promise<void> {
@@ -189,10 +194,20 @@ const command = args[0];
     switch (command) {
       case 'start':
         if (args.length < 2) {
-          console.error(chalk.red('Usage: factory start <brief> [issue-number]'));
+          console.error(chalk.red('Usage: factory start <brief> [issue-number] [--until <agent>]'));
           process.exit(1);
         }
-        await cmdStart(args[1], args[2] ? parseInt(args[2], 10) : undefined);
+        {
+          const untilIdx = args.indexOf('--until');
+          const until = untilIdx >= 0 ? (args[untilIdx + 1] as AgentName) : undefined;
+          const rest = untilIdx >= 0 ? args.filter((_, i) => i !== untilIdx && i !== untilIdx + 1) : args;
+          const issue = rest[2] && /^\d+$/.test(rest[2]) ? parseInt(rest[2], 10) : undefined;
+          if (!rest[1] || rest[1].startsWith('--')) {
+            console.error(chalk.red('Usage: factory start <brief> [issue-number] [--until <agent>]'));
+            process.exit(1);
+          }
+          await cmdStart(rest[1], issue, until);
+        }
         break;
 
       case 'status':
@@ -226,7 +241,7 @@ const command = args[0];
       default:
         console.error(chalk.red(`Unknown command: ${command}`));
         console.error(chalk.gray('\nUsage:'));
-        console.error(chalk.gray('  factory start <brief> [issue-number]'));
+        console.error(chalk.gray('  factory start <brief> [issue-number] [--until <agent>]'));
         console.error(chalk.gray('  factory status <workflow-id>'));
         console.error(chalk.gray('  factory list'));
         console.error(chalk.gray('  factory watch <workflow-id>'));

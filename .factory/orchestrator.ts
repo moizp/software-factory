@@ -1,6 +1,7 @@
 import {
   WorkflowState,
   Phase,
+  Usage,
   createWorkflowState,
   saveWorkflowState,
   updatePhase,
@@ -24,6 +25,7 @@ interface AgentResponse {
     type: string;
     content: Record<string, unknown>;
   }>;
+  usage?: Usage;
 }
 
 type AgentInvoker = (
@@ -196,7 +198,7 @@ export class FactoryOrchestrator {
       } catch (validationError) {
         this.logger.error(`Agent response validation failed for ${agentName}: ${validationError}`);
         const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
-        return updatePhase(state, phase, false, undefined, errorMsg);
+        return updatePhase(state, phase, false, undefined, errorMsg, rawResponse?.usage);
       }
 
       const response = normalizeResponse(rawResponse, agentName);
@@ -206,7 +208,8 @@ export class FactoryOrchestrator {
         phase,
         response.valid,
         response.output,
-        response.error
+        response.error,
+        response.usage
       );
 
       if (response.artifacts) {
@@ -270,7 +273,7 @@ export class FactoryOrchestrator {
       } catch (validationError) {
         this.logger.error(`Parallel agent response validation failed for ${phase}: ${validationError}`);
         const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
-        updatedState = updatePhase(updatedState, phase, false, undefined, errorMsg);
+        updatedState = updatePhase(updatedState, phase, false, undefined, errorMsg, rawResponse?.usage);
         continue;
       }
 
@@ -281,7 +284,8 @@ export class FactoryOrchestrator {
         phase,
         response.valid,
         response.output,
-        response.error
+        response.error,
+        response.usage
       );
 
       if (response.artifacts) {
@@ -313,8 +317,13 @@ export class FactoryOrchestrator {
     issueBrief: string,
     issueNumber?: number,
     config?: Record<string, unknown>,
-    resumeFrom?: WorkflowState
+    resumeFrom?: WorkflowState,
+    options: { until?: AgentName } = {}
   ): Promise<WorkflowState> {
+    if (options.until && !AGENT_NAMES.includes(options.until)) {
+      throw new Error(`Unknown agent for --until: ${options.until} (expected one of ${AGENT_NAMES.join(', ')})`);
+    }
+
     // Pre-flight validation
     const validation = this.validateSetup();
 
@@ -371,6 +380,15 @@ export class FactoryOrchestrator {
         continue;
       }
 
+      const budget = this.tokenBudget();
+      if (budget > 0 && (state.tokensUsed ?? 0) >= budget) {
+        state = addNote(state, `Token budget reached before stage ${stage.id}: ${state.tokensUsed}/${budget}. Raise FACTORY_MAX_TOKENS and run: factory retry ${state.id}`);
+        state.status = 'paused';
+        saveWorkflowState(state);
+        this.logger.warn(`Token budget reached (${state.tokensUsed}/${budget}); workflow paused`);
+        return state;
+      }
+
       state = stage.mode === 'parallel'
         ? await this.executeParallelPhases(
             state,
@@ -388,9 +406,18 @@ export class FactoryOrchestrator {
       if (failed.length > 0) {
         return this.failWorkflow(state, stage, failed);
       }
+
+      if (options.until && (stage.agents as string[]).includes(options.until)) {
+        state = addNote(state, `Stopped after ${options.until} (--until). Continue with: factory retry ${state.id}`);
+        state.status = 'paused';
+        saveWorkflowState(state);
+        this.logger.info(`Stopped after ${options.until}; ${state.tokensUsed ?? 0} tokens used`);
+        return state;
+      }
     }
 
     // Workflow completed
+    this.logger.info(`Tokens used: ${state.tokensUsed ?? 0}`);
     state.status = 'completed';
     state.currentPhase = 'completed';
     state = addNote(state, 'Workflow completed successfully');
@@ -465,6 +492,14 @@ export class FactoryOrchestrator {
 
   private loadBasePolicy(): Policy {
     return loadPolicy('origin/main');
+  }
+
+  /** Max tokens per workflow (input + output + cache); 0 disables. Tune with FACTORY_MAX_TOKENS. */
+  private tokenBudget(): number {
+    const fromEnv = Number(process.env.FACTORY_MAX_TOKENS);
+    return Number.isFinite(fromEnv) && fromEnv >= 0 && process.env.FACTORY_MAX_TOKENS !== undefined
+      ? fromEnv
+      : 600_000;
   }
 
   private getLatestGateFor(state: WorkflowState, phase: Phase) {
