@@ -11,7 +11,7 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
-import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy';
+import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy-engine';
 import * as fs from 'fs';
 import * as path from 'path';
 

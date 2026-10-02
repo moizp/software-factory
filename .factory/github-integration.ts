@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import { PrInfo } from './policy';
+import { PrInfo } from './policy-engine';
 
 export interface PROptions {
   owner: string;

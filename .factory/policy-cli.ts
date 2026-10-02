@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { evaluatePolicy, loadPolicy, prInfoFromGit } from './policy';
+import { evaluatePolicy, loadPolicy, prInfoFromGit } from './policy-engine';
 
 // Usage: policy-cli --base <ref> --head <ref> --branch <name> [--labels a,b] [--policy-ref <ref>]
 // The policy is read from --policy-ref (default: --base), never from the PR head.

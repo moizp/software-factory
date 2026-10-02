@@ -4,7 +4,7 @@ import * as path from 'path';
 import { execFileSync } from 'child_process';
 import {
   Policy, STRICT_POLICY, evaluatePolicy, globToRegExp, loadPolicy, parsePolicy, prInfoFromGit
-} from '../policy';
+} from '../policy-engine';
 import { FactoryOrchestrator } from '../orchestrator';
 import { GitHubAPI } from '../github-integration';
 import { createWorkflowState } from '../state';
