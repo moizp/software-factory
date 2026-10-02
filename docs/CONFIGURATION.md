@@ -666,7 +666,7 @@ export SLACK_BOT_TOKEN="xoxb-xxxx"
 
 ```bash
 # Validate project.config.json schema
-npm run validate:config
+npm run validate-setup
 
 # Check MCP servers
 ./scripts/validate-mcp.sh

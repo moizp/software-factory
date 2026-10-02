@@ -163,38 +163,18 @@ async function cmdRetry(workflowId: string): Promise<void> {
     return;
   }
 
-  const lastFailedPhase = state.phases.reverse().find(p => !p.valid);
-  if (!lastFailedPhase) {
-    console.error(chalk.red('No failed phase found'));
-    process.exit(1);
-  }
+  const failedGates = state.phases.filter(p => !p.valid);
+  const failedPhase = failedGates[failedGates.length - 1]?.phase ?? state.currentPhase;
 
-  printHeader(`Retrying from: ${lastFailedPhase.phase}`);
+  printHeader(`Resuming ${state.id} from: ${failedPhase}`);
 
-  const newState = {
-    ...state,
-    id: `wf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    startedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    status: 'running' as const,
-    phases: state.phases.filter(p => {
-      const phaseOrder: Record<string, number> = {
-        'product-manager': 0, 'analyzer': 1, 'architect': 2,
-        'backend-builder': 3, 'frontend-builder': 3, 'infrastructure-builder': 3,
-        'backend-tester': 4, 'frontend-tester': 4, 'infrastructure-tester': 4,
-        'e2e-tester': 5, 'reviewer': 6, 'customer-support': 7
-      };
-      return phaseOrder[p.phase] < phaseOrder[lastFailedPhase.phase];
-    })
-  };
-
-  saveWorkflowState(newState);
-
+  // Resume the same workflow: validated phases are kept, failed ones re-run
   const orchestrator = new FactoryOrchestrator(invokeClaudeAgent, true);
   const finalState = await orchestrator.executeWorkflow(
     state.issueBrief,
     state.issueNumber,
-    state.config
+    state.config,
+    state
   );
 
   printWorkflowDetail(finalState);

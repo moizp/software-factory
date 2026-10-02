@@ -8,4 +8,5 @@ scripts/credentials.sh
 .factory/snapshots/
 workflows/
 coverage/
+logs/
 metrics/

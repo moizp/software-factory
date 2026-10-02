@@ -1,22 +1,24 @@
 {
   "$schema": "https://example.com/branchspec-schema.json",
   "version": "1.0",
-  "description": "Docs-only chore: factory autonomy gap analysis. Human review required.",
+  "description": "Phase 1 of factory autonomy: pipeline registry, agent contracts, resume, headless claude -p. Human review required.",
   "automation": {
     "auto_merge": false,
     "allow_agent_approval": false,
     "require_human_review": true
   },
   "review_requirements": {
-    "minimum_approvals": 1,
+    "minimum_approvals": 2,
     "require_code_owner_approval": false,
     "require_specific_reviewers": false,
     "reviewers": []
   },
   "testing": {
-    "require_tests": false,
+    "require_tests": true,
     "minimum_coverage": 70,
-    "required_test_files": []
+    "required_test_files": [
+      ".factory/__tests__/**/*.test.ts"
+    ]
   },
   "ci": {
     "required_checks": [
@@ -35,11 +37,15 @@
     "require_extra_review_for_critical": true
   },
   "scope": {
-    "type": "chore",
-    "description": "Add factory autonomy gap analysis report",
+    "type": "feature",
+    "description": "Make the orchestrator consistent with the agent library and validate agent contracts",
     "components_affected": [
+      "orchestrator",
+      "state-management",
+      "claude-bridge",
+      "contracts",
       "docs"
     ],
-    "breaking_changes": false
+    "breaking_changes": true
   }
 }
