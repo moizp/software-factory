@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { WorkflowState, Phase } from './state';
+import { PHASE_ORDER } from './pipeline';
+import { workflowsDir as defaultWorkflowsDir, metricsDir as defaultMetricsDir } from './paths';
 
 export interface WorkflowMetrics {
   workflowId: string;
@@ -36,8 +38,8 @@ export class MetricsCollector {
   private workflows: Map<string, WorkflowMetrics> = new Map();
 
   constructor(workflowsDir?: string, metricsDir?: string) {
-    this.workflowsDir = workflowsDir || path.join(__dirname, '..', 'workflows');
-    this.metricsDir = metricsDir || path.join(__dirname, '..', 'metrics');
+    this.workflowsDir = workflowsDir || defaultWorkflowsDir();
+    this.metricsDir = metricsDir || defaultMetricsDir();
     this.ensureMetricsDir();
   }
 
@@ -91,20 +93,7 @@ export class MetricsCollector {
 
     // Simplified phase status counting
     const phaseStatuses: PhaseStatusCount[] = [];
-    const phases: Phase[] = [
-      'product-manager',
-      'analyzer',
-      'architect',
-      'backend-builder',
-      'frontend-builder',
-      'infrastructure-builder',
-      'backend-tester',
-      'frontend-tester',
-      'infrastructure-tester',
-      'e2e-tester',
-      'reviewer',
-      'customer-support'
-    ];
+    const phases: Phase[] = [...PHASE_ORDER];
 
     for (const phase of phases) {
       const successCount = workflows.filter(w => w.completedPhases > phases.indexOf(phase)).length;

@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { WorkflowState, Phase } from './state';
+import { PHASE_ORDER } from './pipeline';
+import { workflowsDir as defaultWorkflowsDir } from './paths';
 
 export interface PhaseMetrics {
   phase: Phase;
@@ -29,7 +31,7 @@ export class AnalyticsCollector {
   private agentSuccess: Map<Phase, { success: number; failure: number }> = new Map();
 
   constructor(workflowsDir?: string) {
-    this.workflowsDir = workflowsDir || path.join(__dirname, '..', 'workflows');
+    this.workflowsDir = workflowsDir || defaultWorkflowsDir();
   }
 
   private log(message: string): void {
@@ -98,20 +100,7 @@ export class AnalyticsCollector {
     }
 
     const phaseMetrics: PhaseMetrics[] = [];
-    const allPhases: Phase[] = [
-      'product-manager',
-      'analyzer',
-      'architect',
-      'backend-builder',
-      'frontend-builder',
-      'infrastructure-builder',
-      'backend-tester',
-      'frontend-tester',
-      'infrastructure-tester',
-      'e2e-tester',
-      'reviewer',
-      'customer-support'
-    ];
+    const allPhases: Phase[] = [...PHASE_ORDER];
 
     for (const phase of allPhases) {
       const metrics = this.calculateMetricsForPhase(phase);

@@ -1,12 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { WorkflowState, Phase } from './state';
+import { PHASE_ORDER } from './pipeline';
+import { workflowsDir as defaultWorkflowsDir } from './paths';
 
 export class RecoveryManager {
   private workflowsDir: string;
 
   constructor(workflowsDir?: string) {
-    this.workflowsDir = workflowsDir || path.join(__dirname, '..', 'workflows');
+    this.workflowsDir = workflowsDir || defaultWorkflowsDir();
   }
 
   private log(message: string): void {
@@ -101,21 +103,7 @@ export class RecoveryManager {
   }
 
   private getNextPhase(currentPhase: Phase): Phase {
-    const phaseOrder: Phase[] = [
-      'product-manager',
-      'analyzer',
-      'architect',
-      'backend-builder',
-      'frontend-builder',
-      'infrastructure-builder',
-      'backend-tester',
-      'frontend-tester',
-      'infrastructure-tester',
-      'e2e-tester',
-      'reviewer',
-      'customer-support',
-      'completed'
-    ];
+    const phaseOrder: Phase[] = [...PHASE_ORDER, 'completed'];
 
     const currentIndex = phaseOrder.indexOf(currentPhase);
     if (currentIndex === -1 || currentIndex === phaseOrder.length - 1) {

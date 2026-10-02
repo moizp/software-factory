@@ -1,13 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { WorkflowState } from './state';
+import { workflowsDir as defaultWorkflowsDir } from './paths';
 
 export class CleanupManager {
   private workflowsDir: string;
   private retentionDays: number;
 
   constructor(workflowsDir?: string, retentionDays: number = 30) {
-    this.workflowsDir = workflowsDir || path.join(__dirname, '..', 'workflows');
+    this.workflowsDir = workflowsDir || defaultWorkflowsDir();
     this.retentionDays = retentionDays;
   }
 

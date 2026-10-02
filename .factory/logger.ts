@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { logsDir as defaultLogsDir } from './paths';
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
@@ -23,7 +24,7 @@ export class Logger {
   };
 
   constructor(logsDir?: string, level: LogLevel = 'INFO') {
-    this.logsDir = logsDir || path.join(__dirname, '..', 'logs');
+    this.logsDir = logsDir || defaultLogsDir();
     this.level = level;
     this.ensureLogsDir();
     this.currentLogFile = this.getLogFilePath();

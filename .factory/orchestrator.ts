@@ -15,6 +15,8 @@ import { RecoveryManager } from './recovery';
 import { AnalyticsCollector } from './analytics';
 import { Logger } from './logger';
 import { MetricsCollector } from './metrics';
+import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
+import { validateContract, normalizeResponse, stubPayload } from './contracts';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -54,38 +56,11 @@ class AgentResponseValidationError extends Error {
 }
 
 function validateAgentResponse(response: AgentResponse, expectedPhase: string): void {
-  const errors: string[] = [];
-
-  // Check phase matches
-  if (response.phase !== expectedPhase) {
-    errors.push(`Phase mismatch: expected "${expectedPhase}", got "${response.phase}"`);
+  if (!response || typeof response !== 'object') {
+    throw new AgentResponseValidationError(`Invalid agent response from ${expectedPhase}: not an object`);
   }
 
-  // Check valid is boolean
-  if (typeof response.valid !== 'boolean') {
-    errors.push(`Invalid field: valid must be boolean, got ${typeof response.valid}`);
-  }
-
-  // Check error field if valid=false
-  if (response.valid === false && (!response.error || response.error.trim().length === 0)) {
-    errors.push('Agent returned valid=false but error message is empty');
-  }
-
-  // Validate artifacts structure if present
-  if (response.artifacts && Array.isArray(response.artifacts)) {
-    for (let i = 0; i < response.artifacts.length; i++) {
-      const artifact = response.artifacts[i];
-      if (!artifact.type || typeof artifact.type !== 'string') {
-        errors.push(`Artifact ${i}: missing or invalid type field`);
-      }
-      if (!artifact.content || typeof artifact.content !== 'object') {
-        errors.push(`Artifact ${i}: missing or invalid content field`);
-      }
-    }
-  } else if (response.artifacts !== undefined) {
-    errors.push('Artifacts field must be an array if present');
-  }
-
+  const errors = validateContract(response, expectedPhase);
   if (errors.length > 0) {
     throw new AgentResponseValidationError(
       `Invalid agent response from ${expectedPhase}:\n  ${errors.join('\n  ')}`
@@ -189,24 +164,10 @@ export class FactoryOrchestrator {
     const warnings: string[] = [];
 
     // Check required agent files
-    const requiredAgents = [
-      'product-manager',
-      'analyzer',
-      'mcp-configurator',
-      'software-architect',
-      'platform-architect',
-      'ui-designer',
-      'backend-engineer',
-      'frontend-engineer',
-      'infrastructure-engineer',
-      'automation-tester',
-      'e2e-tester',
-      'customer-support',
-      'reviewer'
-    ];
+    const requiredAgents: string[] = [...AGENT_NAMES];
 
     for (const agent of requiredAgents) {
-      const agentPath = path.join(process.cwd(), '.claude', 'agents', `${agent}.md`);
+      const agentPath = agentFilePath(agent);
       if (!fs.existsSync(agentPath)) {
         errors.push(`Missing agent file: ${agentPath}`);
       } else {
@@ -280,19 +241,21 @@ export class FactoryOrchestrator {
     }
 
     try {
-      const response = await this.retryWithBackoff(
+      const rawResponse = await this.retryWithBackoff(
         () => this.invokeAgent(state, agentName, input),
         `phase ${phase}`
       );
 
-      // Validate agent response structure
+      // Validate agent response against its contract
       try {
-        validateAgentResponse(response, agentName);
+        validateAgentResponse(rawResponse, agentName);
       } catch (validationError) {
         this.logger.error(`Agent response validation failed for ${agentName}: ${validationError}`);
         const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
         return updatePhase(state, phase, false, undefined, errorMsg);
       }
+
+      const response = normalizeResponse(rawResponse, agentName);
 
       let updatedState = updatePhase(
         state,
@@ -408,21 +371,24 @@ export class FactoryOrchestrator {
     let updatedState = state;
 
     for (let i = 0; i < results.length; i++) {
-      const response = results[i] as AgentResponse;
+      const rawResponse = results[i] as AgentResponse;
+      const { phase } = phases[i];
 
-      // Validate agent response
+      // Validate agent response against its contract
       try {
-        validateAgentResponse(response, phases[i].agentName);
+        validateAgentResponse(rawResponse, phases[i].agentName);
       } catch (validationError) {
-        this.logger.error(`Parallel agent response validation failed for ${response.phase}: ${validationError}`);
+        this.logger.error(`Parallel agent response validation failed for ${phase}: ${validationError}`);
         const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
-        updatedState = updatePhase(updatedState, response.phase, false, undefined, errorMsg);
+        updatedState = updatePhase(updatedState, phase, false, undefined, errorMsg);
         continue;
       }
 
+      const response = normalizeResponse(rawResponse, phases[i].agentName);
+
       updatedState = updatePhase(
         updatedState,
-        response.phase,
+        phase,
         response.valid,
         response.output,
         response.error
@@ -439,13 +405,13 @@ export class FactoryOrchestrator {
       }
 
       if (!response.valid) {
-        this.logger.info(`Parallel phase ${response.phase} failed`);
+        this.logger.info(`Parallel phase ${phase} failed`);
       } else {
-        this.logger.info(`Parallel phase ${response.phase} completed`);
+        this.logger.info(`Parallel phase ${phase} completed`);
       }
     }
 
-    const allValid = results.every(r => r.valid);
+    const allValid = phases.every(({ phase }) => this.getLatestGateFor(updatedState, phase)?.valid);
     if (!allValid) {
       updatedState = addNote(updatedState, 'One or more parallel phases failed');
     }
@@ -456,7 +422,8 @@ export class FactoryOrchestrator {
   async executeWorkflow(
     issueBrief: string,
     issueNumber?: number,
-    config?: Record<string, unknown>
+    config?: Record<string, unknown>,
+    resumeFrom?: WorkflowState
   ): Promise<WorkflowState> {
     // Pre-flight validation
     const validation = this.validateSetup();
@@ -480,17 +447,21 @@ export class FactoryOrchestrator {
       });
     }
 
-    // Attempt recovery of incomplete workflows
-    this.logger.info('Checking for incomplete workflows...');
-    const recovery = await this.recoveryManager.recoverState();
-    if (recovery.recovered > 0) {
-      this.logger.info(`Recovered ${recovery.recovered} workflows`);
+    // Report (read-only) incomplete workflows; resuming is an explicit action
+    const incomplete = await this.recoveryManager.detectIncomplete();
+    if (incomplete.length > 0) {
+      this.logger.info(`Found ${incomplete.length} incomplete workflows (resume with: factory retry <id>)`);
     }
 
-    let state = createWorkflowState(issueBrief, issueNumber, config);
-    state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
+    let state: WorkflowState;
+    if (resumeFrom) {
+      state = this.prepareResume(resumeFrom);
+    } else {
+      state = createWorkflowState(issueBrief, issueNumber, config);
+      state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
+    }
     saveWorkflowState(state);
-    this.logger.info('Workflow created', { workflowId: state.id, brief: issueBrief.substring(0, 100) });
+    this.logger.info(resumeFrom ? 'Workflow resumed' : 'Workflow created', { workflowId: state.id, brief: issueBrief.substring(0, 100) });
 
     // Capture current commit
     try {
@@ -508,7 +479,7 @@ export class FactoryOrchestrator {
           title: `Factory Workflow: ${issueBrief.substring(0, 50)}`,
           body: `## Software Factory Workflow\n\n**Brief:** ${issueBrief}\n\n**Workflow ID:** ${state.id}\n\n**Status:** Starting execution\n\n### Phase Progress\n- [ ] Product Manager\n- [ ] Analyzer\n- [ ] Architect\n- [ ] Builders\n- [ ] Testers\n- [ ] E2E Tester\n- [ ] Reviewer\n- [ ] Customer Support`,
           branch: `factory/${state.id}`,
-          base: 'main'
+          base: 'develop'
         });
         state = addNote(state, `GitHub PR created: #${this.prNumber}`);
       } catch (error) {
@@ -516,264 +487,30 @@ export class FactoryOrchestrator {
       }
     }
 
-    // Phase 1: Product Manager (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'product-manager',
-      'product-manager',
-      { brief: issueBrief }
-    );
-    saveWorkflowState(state);
+    // Execute stages in order; stages already satisfied (resume) are skipped
+    for (const stage of STAGES) {
+      if (this.isStageDone(state, stage)) {
+        this.logger.info(`Skipping completed stage: ${stage.id}`);
+        continue;
+      }
 
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at product-manager phase');
-      state.status = 'failed';
+      state = stage.mode === 'parallel'
+        ? await this.executeParallelPhases(
+            state,
+            stage.agents.map(agent => ({ phase: agent, agentName: agent, input: this.buildInput(state, agent) }))
+          )
+        : await this.executeSequentialPhase(
+            state,
+            stage.agents[0],
+            stage.agents[0],
+            this.buildInput(state, stage.agents[0])
+          );
       saveWorkflowState(state);
 
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **product-manager**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
+      const failed = stage.agents.filter(agent => !this.getLatestGateFor(state, agent)?.valid);
+      if (failed.length > 0) {
+        return this.failWorkflow(state, stage, failed);
       }
-
-      return state;
-    }
-
-    // Phase 2: Analyzer (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'analyzer',
-      'analyzer',
-      { brief: issueBrief, productManagerOutput: this.getLatestArtifact(state) }
-    );
-    saveWorkflowState(state);
-
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at analyzer phase');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **analyzer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 3: Architect (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'architect',
-      'architect',
-      { analyzerOutput: this.getLatestArtifact(state) }
-    );
-    saveWorkflowState(state);
-
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at architect phase');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **architect**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 4: Builders (parallel)
-    state = await this.executeParallelPhases(state, [
-      {
-        phase: 'backend-builder',
-        agentName: 'backend-builder',
-        input: { architectOutput: this.getLatestArtifact(state) }
-      },
-      {
-        phase: 'frontend-builder',
-        agentName: 'frontend-builder',
-        input: { architectOutput: this.getLatestArtifact(state) }
-      },
-      {
-        phase: 'infrastructure-builder',
-        agentName: 'infrastructure-builder',
-        input: { architectOutput: this.getLatestArtifact(state) }
-      }
-    ]);
-    saveWorkflowState(state);
-
-    const buildersPassed = state.phases
-      .filter(p => p.phase === 'backend-builder' || p.phase === 'frontend-builder' || p.phase === 'infrastructure-builder')
-      .every(p => p.valid);
-
-    if (!buildersPassed) {
-      state = addNote(state, 'Workflow stopped: one or more builders failed');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          const failedBuilders = state.phases
-            .filter(p => (p.phase === 'backend-builder' || p.phase === 'frontend-builder' || p.phase === 'infrastructure-builder') && !p.valid)
-            .map(p => p.phase);
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at builders phase\n\nFailed builders: ${failedBuilders.join(', ')}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 5: Testers (parallel)
-    state = await this.executeParallelPhases(state, [
-      {
-        phase: 'backend-tester',
-        agentName: 'backend-tester',
-        input: { builderOutput: this.getLatestArtifactByPhase(state, 'backend-builder') }
-      },
-      {
-        phase: 'frontend-tester',
-        agentName: 'frontend-tester',
-        input: { builderOutput: this.getLatestArtifactByPhase(state, 'frontend-builder') }
-      },
-      {
-        phase: 'infrastructure-tester',
-        agentName: 'infrastructure-tester',
-        input: { builderOutput: this.getLatestArtifactByPhase(state, 'infrastructure-builder') }
-      }
-    ]);
-    saveWorkflowState(state);
-
-    const testersPassed = state.phases
-      .filter(p => p.phase === 'backend-tester' || p.phase === 'frontend-tester' || p.phase === 'infrastructure-tester')
-      .every(p => p.valid);
-
-    if (!testersPassed) {
-      state = addNote(state, 'Workflow stopped: one or more testers failed');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          const failedTesters = state.phases
-            .filter(p => (p.phase === 'backend-tester' || p.phase === 'frontend-tester' || p.phase === 'infrastructure-tester') && !p.valid)
-            .map(p => p.phase);
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at testers phase\n\nFailed testers: ${failedTesters.join(', ')}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 6: E2E Tester (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'e2e-tester',
-      'e2e-tester',
-      { builderOutputs: this.getAllArtifactsByPhases(state, ['backend-builder', 'frontend-builder', 'infrastructure-builder']) }
-    );
-    saveWorkflowState(state);
-
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at e2e-tester phase');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **e2e-tester**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 7: Reviewer (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'reviewer',
-      'reviewer',
-      { allArtifacts: state.artifacts }
-    );
-    saveWorkflowState(state);
-
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at reviewer phase');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **reviewer**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
-    }
-
-    // Phase 8: Customer Support (sequential)
-    state = await this.executeSequentialPhase(
-      state,
-      'customer-support',
-      'customer-support',
-      { allArtifacts: state.artifacts, brief: issueBrief }
-    );
-    saveWorkflowState(state);
-
-    if (!this.getLatestPhaseGate(state)?.valid) {
-      state = addNote(state, 'Workflow stopped at customer-support phase');
-      state.status = 'failed';
-      saveWorkflowState(state);
-
-      if (this.githubAPI && this.prNumber) {
-        try {
-          await this.githubAPI.postComment(
-            this.prNumber,
-            `❌ Workflow failed at phase: **customer-support**\n\nError: ${state.phases[state.phases.length - 1]?.error || 'Unknown error'}`
-          );
-        } catch (error) {
-          this.logger.error(`Failed to post failure comment: ${error}`);
-        }
-      }
-
-      return state;
     }
 
     // Workflow completed
@@ -806,8 +543,10 @@ export class FactoryOrchestrator {
       errors: retentionResult.errors.length
     });
 
-    // Auto-merge PR on success
-    if (this.githubAPI && this.prNumber) {
+    // Auto-merge PR on success, only when the branch spec explicitly allows it
+    if (this.githubAPI && this.prNumber && !this.autoMergeAllowed()) {
+      this.logger.info('Auto-merge skipped: .branchspec.json does not set automation.auto_merge=true');
+    } else if (this.githubAPI && this.prNumber) {
       try {
         await this.githubAPI.autoMergePR(this.prNumber);
         state = addNote(state, `PR #${this.prNumber} auto-merged`);
@@ -820,8 +559,100 @@ export class FactoryOrchestrator {
     return state;
   }
 
-  private getLatestPhaseGate(state: WorkflowState) {
-    return state.phases[state.phases.length - 1] || null;
+  /** Conservative default: no .branchspec.json (or auto_merge unset) means a human merges. */
+  private autoMergeAllowed(): boolean {
+    try {
+      const spec = JSON.parse(fs.readFileSync(path.join(process.cwd(), '.branchspec.json'), 'utf-8'));
+      return spec?.automation?.auto_merge === true;
+    } catch {
+      return false;
+    }
+  }
+
+  private getLatestGateFor(state: WorkflowState, phase: Phase) {
+    const gates = state.phases.filter(p => p.phase === phase);
+    return gates[gates.length - 1] || null;
+  }
+
+  private isStageDone(state: WorkflowState, stage: Stage): boolean {
+    return stage.agents.every(agent => this.getLatestGateFor(state, agent)?.valid === true);
+  }
+
+  /** Keep only validated work; failed gates and their artifacts are re-run. */
+  private prepareResume(previous: WorkflowState): WorkflowState {
+    const okPhases = new Set(
+      AGENT_NAMES.filter(agent => this.getLatestGateFor(previous, agent)?.valid === true)
+    );
+    const dropped = previous.phases.filter(p => !okPhases.has(p.phase as AgentName)).length;
+
+    let state: WorkflowState = {
+      ...previous,
+      status: 'running',
+      updatedAt: new Date().toISOString(),
+      phases: previous.phases.filter(p => okPhases.has(p.phase as AgentName) && p.valid),
+      artifacts: previous.artifacts.filter(a => okPhases.has(a.phase as AgentName))
+    };
+    state = addNote(state, `Resumed: keeping ${okPhases.size} completed phases, re-running ${dropped} failed gates`);
+    return state;
+  }
+
+  private async failWorkflow(state: WorkflowState, stage: Stage, failedAgents: AgentName[]): Promise<WorkflowState> {
+    state = addNote(state, `Workflow stopped at ${stage.id} stage: ${failedAgents.join(', ')}`);
+    state.status = 'failed';
+    saveWorkflowState(state);
+
+    if (this.githubAPI && this.prNumber) {
+      const details = failedAgents
+        .map(agent => `- **${agent}**: ${this.getLatestGateFor(state, agent)?.error || 'Unknown error'}`)
+        .join('\n');
+      try {
+        await this.githubAPI.postComment(
+          this.prNumber,
+          `❌ Workflow failed at stage: **${stage.id}**\n\n${details}`
+        );
+      } catch (error) {
+        this.logger.error(`Failed to post failure comment: ${error}`);
+      }
+    }
+
+    return state;
+  }
+
+  /** Input handed to each agent; payloads come from earlier phases' artifacts. */
+  private buildInput(state: WorkflowState, agent: AgentName): Record<string, unknown> {
+    const pm = this.getLatestArtifactByPhase(state, 'product-manager');
+    const analyzer = this.getLatestArtifactByPhase(state, 'analyzer');
+    const architect = this.getLatestArtifactByPhase(state, 'software-architect');
+    const builders: AgentName[] = ['backend-engineer', 'frontend-engineer', 'infrastructure-engineer'];
+
+    switch (agent) {
+      case 'product-manager':
+        return { brief: state.issueBrief };
+      case 'analyzer':
+        return { brief: state.issueBrief, productManagerOutput: pm };
+      case 'software-architect':
+        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer };
+      case 'backend-engineer':
+      case 'frontend-engineer':
+      case 'infrastructure-engineer':
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm };
+      case 'automation-tester':
+        return {
+          builderOutputs: this.getAllArtifactsByPhases(state, builders),
+          architectOutput: architect,
+          productManagerOutput: pm
+        };
+      case 'e2e-tester':
+        return {
+          builderOutputs: this.getAllArtifactsByPhases(state, builders),
+          testerOutput: this.getLatestArtifactByPhase(state, 'automation-tester'),
+          productManagerOutput: pm
+        };
+      case 'reviewer':
+        return { allArtifacts: state.artifacts };
+      case 'customer-support':
+        return { allArtifacts: state.artifacts, brief: state.issueBrief };
+    }
   }
 
   private getLatestArtifact(state: WorkflowState) {
@@ -847,12 +678,15 @@ export async function mockAgentInvoker(
 ): Promise<AgentResponse> {
   await new Promise(resolve => setTimeout(resolve, 100));
 
+  // Contract-conformant stub: every required payload key is present
+  const payload = stubPayload(agentName, Object.keys(input));
+
   return {
-    phase: state.currentPhase,
+    phase: agentName as Phase,
     valid: true,
     output: {
       agent: agentName,
-      processedInput: input
+      processedInputKeys: Object.keys(input)
     },
     artifacts: [
       {
@@ -860,9 +694,11 @@ export async function mockAgentInvoker(
         content: {
           agent: agentName,
           timestamp: new Date().toISOString(),
-          data: input
+          inputKeys: Object.keys(input),
+          ...payload
         }
       }
-    ]
-  };
+    ],
+    ...payload
+  } as AgentResponse;
 }

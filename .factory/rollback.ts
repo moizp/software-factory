@@ -3,6 +3,7 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { WorkflowState } from './state';
+import { snapshotsDir as defaultSnapshotsDir } from './paths';
 
 const execAsync = promisify(exec);
 
@@ -18,7 +19,7 @@ interface Snapshot {
 export class RollbackManager {
   private snapshotsDir: string;
 
-  constructor(snapshotsDir: string = path.join(process.cwd(), '.factory', 'snapshots')) {
+  constructor(snapshotsDir: string = defaultSnapshotsDir()) {
     this.snapshotsDir = snapshotsDir;
     this.ensureSnapshotsDir();
   }

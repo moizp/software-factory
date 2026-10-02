@@ -1,3 +1,4 @@
+import { stubPayload } from '../contracts';
 import { FactoryOrchestrator } from '../orchestrator';
 import { createWorkflowState, updatePhase, addArtifact } from '../state';
 import {
@@ -15,7 +16,8 @@ describe('Integration Tests - Agent Sequencing', () => {
         return {
           phase: agentName,
           valid: true,
-          output: { completed: true }
+          output: { completed: true },
+          ...stubPayload(agentName)
         };
       };
 
@@ -43,6 +45,7 @@ describe('Integration Tests - Agent Sequencing', () => {
         return {
           phase: agentName,
           valid: true,
+          ...stubPayload(agentName),
           output: { data: `output-from-${agentName}` },
           artifacts: [
             {
@@ -97,17 +100,17 @@ describe('Integration Tests - Agent Sequencing', () => {
       let state = createWorkflowState('Build', undefined, mockProjectConfig);
 
       const parallelPhases = [
-        { phase: 'backend-builder', agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder', agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder', agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer', agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer', agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer', agentName: 'infrastructure-engineer', input: {} }
       ];
 
       state = await orchestrator.executeParallelPhases(state, parallelPhases as any);
 
       const builders = Array.from(startTimes.keys());
-      expect(builders).toContain('backend-builder');
-      expect(builders).toContain('frontend-builder');
-      expect(builders).toContain('infrastructure-builder');
+      expect(builders).toContain('backend-engineer');
+      expect(builders).toContain('frontend-engineer');
+      expect(builders).toContain('infrastructure-engineer');
     });
   });
 
@@ -158,6 +161,7 @@ describe('Integration Tests - Agent Sequencing', () => {
         return {
           phase: agentName,
           valid: true,
+          ...stubPayload(agentName),
           artifacts: [{ type: 'output', content: {} }]
         };
       };
@@ -168,7 +172,7 @@ describe('Integration Tests - Agent Sequencing', () => {
 
       expect(phaseOrder).toContain('product-manager');
       expect(phaseOrder).toContain('analyzer');
-      expect(phaseOrder).not.toContain('architect');
+      expect(phaseOrder).not.toContain('software-architect');
     });
 
     it('should skip remaining phases on builder failure', async () => {
@@ -177,7 +181,7 @@ describe('Integration Tests - Agent Sequencing', () => {
       const failingBuilderInvoker = async (state: any, agentName: string): Promise<any> => {
         phaseOrder.push(agentName);
 
-        if (agentName === 'backend-builder') {
+        if (agentName === 'backend-engineer') {
           return {
             phase: agentName,
             valid: false,
@@ -185,7 +189,7 @@ describe('Integration Tests - Agent Sequencing', () => {
           };
         }
 
-        if (['product-manager', 'analyzer', 'architect'].includes(agentName)) {
+        if (['product-manager', 'analyzer', 'software-architect'].includes(agentName)) {
           return { phase: agentName, valid: true };
         }
 
@@ -212,7 +216,8 @@ describe('Integration Tests - Agent Sequencing', () => {
         }
         return {
           phase: 'analyzer',
-          valid: true
+          valid: true,
+          ...stubPayload('analyzer')
         };
       };
 
@@ -284,7 +289,7 @@ describe('Integration Tests - Agent Sequencing', () => {
     });
 
     it('should track all phase gates in order', async () => {
-      const phases = ['product-manager', 'analyzer', 'architect'];
+      const phases = ['product-manager', 'analyzer', 'software-architect'];
       let phaseIndex = 0;
 
       const orderedInvoker = async (state: any, agentName: string): Promise<any> => {
@@ -311,14 +316,15 @@ describe('Integration Tests - Agent Sequencing', () => {
       expect(state.phases).toHaveLength(3);
       expect(state.phases[0].phase).toBe('product-manager');
       expect(state.phases[1].phase).toBe('analyzer');
-      expect(state.phases[2].phase).toBe('architect');
+      expect(state.phases[2].phase).toBe('software-architect');
     });
 
     it('should accumulate artifacts across phases', async () => {
       const orchestrator = new FactoryOrchestrator(
         async (state, agentName) => ({
-          phase: state.currentPhase as any,
+          phase: agentName as any,
           valid: true,
+          ...stubPayload(agentName),
           artifacts: [
             {
               type: `${agentName}-output`,
@@ -347,15 +353,15 @@ describe('Integration Tests - Agent Sequencing', () => {
 
       state = await orchestrator.executeSequentialPhase(
         state,
-        'architect',
-        'architect',
+        'software-architect',
+        'software-architect',
         {}
       );
 
       expect(state.artifacts).toHaveLength(3);
       expect(state.artifacts[0].type).toBe('product-manager-output');
       expect(state.artifacts[1].type).toBe('analyzer-output');
-      expect(state.artifacts[2].type).toBe('architect-output');
+      expect(state.artifacts[2].type).toBe('software-architect-output');
     });
   });
 
@@ -364,9 +370,9 @@ describe('Integration Tests - Agent Sequencing', () => {
       let builderAttempts = 0;
 
       const partialFailInvoker = async (state: any, agentName: string): Promise<any> => {
-        if (agentName.includes('builder')) {
+        if (agentName.endsWith('-engineer')) {
           builderAttempts++;
-          if (agentName === 'frontend-builder') {
+          if (agentName === 'frontend-engineer') {
             return {
               phase: agentName,
               valid: false,
@@ -378,6 +384,7 @@ describe('Integration Tests - Agent Sequencing', () => {
         return {
           phase: agentName,
           valid: true,
+          ...stubPayload(agentName),
           artifacts: [{ type: 'output', content: {} }]
         };
       };
@@ -385,9 +392,9 @@ describe('Integration Tests - Agent Sequencing', () => {
       const orchestrator = new FactoryOrchestrator(partialFailInvoker, false);
 
       const phases = [
-        { phase: 'backend-builder', agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder', agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder', agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer', agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer', agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer', agentName: 'infrastructure-engineer', input: {} }
       ];
 
       const state = createWorkflowState('Build', 1);
@@ -395,7 +402,7 @@ describe('Integration Tests - Agent Sequencing', () => {
 
       const failedPhases = result.phases.filter(p => !p.valid);
       expect(failedPhases).toHaveLength(1);
-      expect(failedPhases[0].phase).toBe('frontend-builder');
+      expect(failedPhases[0].phase).toBe('frontend-engineer');
     });
   });
 });
