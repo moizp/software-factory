@@ -28,9 +28,10 @@ fi
 SCHEMA=$(jq -r '.version // "unknown"' "$BRANCHSPEC_FILE")
 AUTO_MERGE=$(jq -r '.automation.auto_merge // false' "$BRANCHSPEC_FILE")
 ALLOW_AGENT_APPROVAL=$(jq -r '.automation.allow_agent_approval // false' "$BRANCHSPEC_FILE")
-REQUIRE_HUMAN=$(jq -r '.automation.require_human_review // true' "$BRANCHSPEC_FILE")
+# jq's `//` treats false as missing, so booleans that default to true need an explicit null check
+REQUIRE_HUMAN=$(jq -r '.automation.require_human_review | if . == null then true else . end' "$BRANCHSPEC_FILE")
 MIN_APPROVALS=$(jq -r '.review_requirements.minimum_approvals // 1' "$BRANCHSPEC_FILE")
-REQUIRE_TESTS=$(jq -r '.testing.require_tests // true' "$BRANCHSPEC_FILE")
+REQUIRE_TESTS=$(jq -r '.testing.require_tests | if . == null then true else . end' "$BRANCHSPEC_FILE")
 MIN_COVERAGE=$(jq -r '.testing.minimum_coverage // 70' "$BRANCHSPEC_FILE")
 SCOPE_TYPE=$(jq -r '.scope.type // "unknown"' "$BRANCHSPEC_FILE")
 BREAKING=$(jq -r '.scope.breaking_changes // false' "$BRANCHSPEC_FILE")

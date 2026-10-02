@@ -301,7 +301,7 @@ cp scripts/credentials.sh.template scripts/credentials.sh
 source scripts/credentials.sh
 
 # 3. Validate setup
-npm run validate:setup
+npm run validate-setup
 ./scripts/validate-mcp.sh
 
 # 4. Start workflow
@@ -333,13 +333,13 @@ npm run factory:watch wf-id
 
 ```bash
 # Run just the Product Manager
-npm run factory:run product-manager --input='...'
+claude "Run product-manager agent only"
 
 # Run just the Backend Engineer
-npm run factory:run backend-engineer --input='...'
+claude "Run backend-engineer agent with architect output"
 
 # See all available agents
-npm run factory:run --list
+ls .claude/agents
 ```
 
 ---
@@ -360,7 +360,7 @@ echo $GITHUB_TOKEN  # Should not be empty
 # All servers should show ✅
 
 # Validate project config
-npm run validate:config
+npm run validate-setup
 ```
 
 ---
@@ -441,8 +441,7 @@ npm run factory:retry wf-id --from-phase=software-architect
 # Check current status
 npm run factory:status wf-id
 
-# If waiting >10 minutes, kill and restart
-npm run factory:kill wf-id
+# If a phase failed or stalled, resume the same workflow (validated phases are kept)
 npm run factory:retry wf-id
 ```
 
@@ -598,5 +597,5 @@ MIT — Use freely, modify, distribute.
 
 ---
 
-**Questions?** Check [ORCHESTRATION.md](./docs/ORCHESTRATION.md) or run `npm run factory:help`.
+**Questions?** Check [ORCHESTRATION.md](./docs/ORCHESTRATION.md) or run `npm run factory:list`.
 

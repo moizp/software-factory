@@ -81,7 +81,7 @@ describe('State Management - CRUD Operations', () => {
 
     it('should track invalid phase with error', () => {
       const error = 'Phase validation failed';
-      const updated = updatePhase(baseState, 'architect', false, undefined, error);
+      const updated = updatePhase(baseState, 'software-architect', false, undefined, error);
 
       expect(updated.phases[0].valid).toBe(false);
       expect(updated.phases[0].error).toBe(error);
@@ -89,9 +89,9 @@ describe('State Management - CRUD Operations', () => {
     });
 
     it('should update currentPhase', () => {
-      const updated = updatePhase(baseState, 'backend-builder', true);
+      const updated = updatePhase(baseState, 'backend-engineer', true);
 
-      expect(updated.currentPhase).toBe('backend-builder');
+      expect(updated.currentPhase).toBe('backend-engineer');
     });
 
     it('should update timestamp on phase change', () => {
@@ -108,12 +108,12 @@ describe('State Management - CRUD Operations', () => {
       let state = baseState;
       state = updatePhase(state, 'product-manager', true);
       state = updatePhase(state, 'analyzer', true);
-      state = updatePhase(state, 'architect', true);
+      state = updatePhase(state, 'software-architect', true);
 
       expect(state.phases).toHaveLength(3);
       expect(state.phases[0].phase).toBe('product-manager');
       expect(state.phases[1].phase).toBe('analyzer');
-      expect(state.phases[2].phase).toBe('architect');
+      expect(state.phases[2].phase).toBe('software-architect');
     });
 
     it('should not modify original state', () => {

@@ -5,15 +5,27 @@ on:
     branches: [main, develop, claude/**]
     paths:
       - '.factory/**'
+      - '.claude/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'QUICKSTART.md'
+      - 'CONTRIBUTING.md'
       - '.github/workflows/factory-test.yml'
       - 'package.json'
+      - 'jest.config.js'
       - 'tsconfig.json'
   pull_request:
     branches: [main, develop]
     paths:
       - '.factory/**'
+      - '.claude/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'QUICKSTART.md'
+      - 'CONTRIBUTING.md'
       - '.github/workflows/factory-test.yml'
       - 'package.json'
+      - 'jest.config.js'
       - 'tsconfig.json'
 
 jobs:

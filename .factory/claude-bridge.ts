@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { WorkflowState, Phase } from './state';
+import { agentFilePath } from './pipeline';
 
 interface AgentResponse {
   phase: Phase;
@@ -21,13 +22,7 @@ interface AgentMarkdown {
 }
 
 function readAgentMarkdown(agentName: string): AgentMarkdown {
-  const agentPath = path.join(
-    __dirname,
-    '..',
-    '.claude',
-    'agents',
-    `${agentName}.md`
-  );
+  const agentPath = agentFilePath(agentName);
 
   if (!fs.existsSync(agentPath)) {
     throw new Error(`Agent markdown not found: ${agentPath}`);
@@ -101,64 +96,103 @@ ${contextJson}
 Process this input according to the instructions above. Return ONLY valid JSON output as specified in your "Output Format" section. Do not include any preamble, explanation, markdown formatting, or other text — output ONLY the JSON object.`;
 }
 
-async function invokeClaudeAgentViaApi(
-  prompt: string,
-  timeout: number = 30000
-): Promise<string> {
-  throw new Error(
-    'API invocation not implemented. This factory uses the Claude CLI method only. ' +
-    'Ensure "claude" command is available in PATH and authenticated.'
-  );
+export const DEFAULT_AGENT_TIMEOUT_MS = 10 * 60 * 1000;
+
+function agentTimeoutMs(): number {
+  const fromEnv = Number(process.env.FACTORY_AGENT_TIMEOUT_MS);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_AGENT_TIMEOUT_MS;
+}
+
+/** Args for headless, tool-less, stateless agent runs (agents only emit JSON in this phase). */
+export function buildCliArgs(): string[] {
+  const args = ['-p', '--output-format', 'json', '--tools', '', '--no-session-persistence'];
+  if (process.env.FACTORY_AGENT_MODEL) {
+    args.push('--model', process.env.FACTORY_AGENT_MODEL);
+  }
+  return args;
+}
+
+/** Unwraps `claude -p --output-format json`: throws on is_error, returns the model text. */
+export function parseCliOutput(stdout: string): string {
+  let parsed: { result?: unknown; is_error?: boolean; total_cost_usd?: number } | null = null;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    return stdout.trim();
+  }
+
+  if (parsed && typeof parsed === 'object' && 'result' in parsed) {
+    if (parsed.is_error) {
+      throw new Error(`Claude CLI reported an error: ${String(parsed.result)}`);
+    }
+    if (typeof parsed.total_cost_usd === 'number') {
+      console.debug(`[Agent] cost_usd=${parsed.total_cost_usd}`);
+    }
+    return String(parsed.result).trim();
+  }
+  return stdout.trim();
 }
 
 async function invokeClaudeAgentViaCli(
   prompt: string,
-  timeout: number = 30000
+  timeout: number = agentTimeoutMs()
 ): Promise<string> {
-  try {
-    const result = execSync('claude', {
-      input: prompt,
-      encoding: 'utf-8',
-      timeout,
-      maxBuffer: 20 * 1024 * 1024, // 20MB buffer for large responses
-      stdio: ['pipe', 'pipe', 'pipe'], // Capture stderr separately
+  // Async spawn (not execSync) so parallel stages really run concurrently
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn('claude', buildCliArgs(), { stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const finish = (fn: () => void): void => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      }
+    };
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(() => reject(new Error(`Claude CLI timeout after ${timeout}ms`)));
+    }, timeout);
+
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      finish(() => reject(new Error(
+        error.code === 'ENOENT'
+          ? 'Claude CLI not found. Ensure "claude" command is in PATH. Install Claude Code or add it to your PATH.'
+          : `Failed to invoke Claude CLI: ${error.message}`
+      )));
     });
 
-    return result.toString().trim();
-  } catch (error) {
-    const errorObj = error as { code?: string; signal?: string; message?: string; status?: number };
+    child.on('close', code => {
+      finish(() => {
+        try {
+          // A non-zero exit can still carry a structured error on stdout
+          const text = parseCliOutput(stdout);
+          if (code !== 0 && !stdout.trim()) {
+            throw new Error(`Claude CLI exited with code ${code}. ${stderr.trim()}`);
+          }
+          resolve(text);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
 
-    // Handle timeout
-    if (errorObj.code === 'ETIMEDOUT' || errorObj.message?.includes('ETIMEDOUT')) {
-      throw new Error(`Claude CLI timeout after ${timeout}ms`);
-    }
-
-    // Handle command not found
-    if (errorObj.code === 'ENOENT') {
-      throw new Error(
-        'Claude CLI not found. Ensure "claude" command is in PATH. ' +
-        'Install Claude Code or add it to your PATH.'
-      );
-    }
-
-    // Handle non-zero exit (agent execution error)
-    if (errorObj.status && errorObj.status !== 0) {
-      throw new Error(
-        `Claude CLI exited with code ${errorObj.status}. ` +
-        `${errorObj.message || 'No additional error message available'}`
-      );
-    }
-
-    const msg = errorObj.message || String(error);
-    throw new Error(`Failed to invoke Claude CLI: ${msg}`);
-  }
+    child.stdin.on('error', () => { /* child exited early; reported via close */ });
+    child.stdin.end(prompt);
+  });
 }
 
 export async function invokeClaudeAgent(
   state: WorkflowState,
   agentName: string,
   input: Record<string, unknown>,
-  timeout: number = 30000
+  timeout: number = agentTimeoutMs()
 ): Promise<AgentResponse> {
   try {
     console.debug(`[Agent] Invoking ${agentName}...`);
@@ -171,7 +205,7 @@ export async function invokeClaudeAgent(
     const prompt = createAgentPrompt(agentMarkdown, input);
     console.debug(`[Agent] Created prompt (${prompt.length} chars)`);
 
-    // Invoke Claude via CLI (API method not implemented)
+    // Invoke Claude via headless CLI
     let response: string;
     try {
       console.debug(`[Agent] Invoking Claude CLI with ${timeout}ms timeout...`);
@@ -211,7 +245,7 @@ export async function invokeClaudeAgentWithTimeout(
   state: WorkflowState,
   agentName: string,
   input: Record<string, unknown>,
-  timeoutSeconds: number = 30
+  timeoutSeconds: number = agentTimeoutMs() / 1000
 ): Promise<AgentResponse> {
   const timeoutMs = timeoutSeconds * 1000;
 

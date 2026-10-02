@@ -55,7 +55,7 @@ export const createValidWorkflowPath = (): WorkflowState => {
   const phases: PhaseGate[] = [
     createMockPhaseGate('product-manager', true),
     createMockPhaseGate('analyzer', true),
-    createMockPhaseGate('architect', true)
+    createMockPhaseGate('software-architect', true)
   ];
 
   return {
@@ -64,7 +64,7 @@ export const createValidWorkflowPath = (): WorkflowState => {
     artifacts: [
       createMockArtifact('product-manager', 'requirements'),
       createMockArtifact('analyzer', 'features'),
-      createMockArtifact('architect', 'design')
+      createMockArtifact('software-architect', 'design')
     ]
   };
 };
@@ -77,9 +77,9 @@ export const createFailureScenarioState = (failAtPhase: string): WorkflowState =
   const phaseSequence = [
     'product-manager',
     'analyzer',
-    'architect',
-    'backend-builder',
-    'frontend-builder'
+    'software-architect',
+    'backend-engineer',
+    'frontend-engineer'
   ];
 
   for (const phase of phaseSequence) {
@@ -101,18 +101,18 @@ export const createFailureScenarioState = (failAtPhase: string): WorkflowState =
 
 export const parallelPhasesInput = [
   {
-    phase: 'backend-builder',
-    agentName: 'backend-builder',
+    phase: 'backend-engineer',
+    agentName: 'backend-engineer',
     input: { architectOutput: { api: 'design' } }
   },
   {
-    phase: 'frontend-builder',
-    agentName: 'frontend-builder',
+    phase: 'frontend-engineer',
+    agentName: 'frontend-engineer',
     input: { architectOutput: { ui: 'design' } }
   },
   {
-    phase: 'infrastructure-builder',
-    agentName: 'infrastructure-builder',
+    phase: 'infrastructure-engineer',
+    agentName: 'infrastructure-engineer',
     input: { architectOutput: { infra: 'design' } }
   }
 ];

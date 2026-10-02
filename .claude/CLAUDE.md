@@ -54,6 +54,19 @@ git commit -m "updated documentation"   # Passive voice
 
 **See CONTRIBUTING.md for complete git flow guide.**
 
+## Executable Orchestrator (`.factory/`)
+
+The TypeScript orchestrator (`npm run factory:start`) is the runnable implementation. Its source of truth is `.factory/pipeline.ts`:
+
+- Phase name = agent file name (`.claude/agents/<name>.md`). Registered agents: product-manager, analyzer, software-architect, backend-engineer, frontend-engineer, infrastructure-engineer, automation-tester, e2e-tester, reviewer, customer-support.
+- Stage order: requirements → analysis → architecture → build (3 engineers in parallel) → test → e2e → review → docs.
+- Each agent response is validated against `.factory/contracts/envelope.schema.json` plus its required payload keys (`AGENT_CONTRACTS`). Payload keys are folded into artifacts and handed to later agents.
+- `npm run factory:retry <id>` resumes the same workflow: validated phases are kept, failed ones re-run.
+- Agents run via `claude -p` (headless, no tools); tune with `FACTORY_AGENT_TIMEOUT_MS` (default 10 min) and `FACTORY_AGENT_MODEL`.
+- The PR targets `develop`, and auto-merge happens only if `.branchspec.json` sets `automation.auto_merge: true`.
+
+Agents in the diagram below that are not in `pipeline.ts` (mcp-configurator, platform-architect, ui-designer) are not yet executed by the orchestrator. See `docs/FACTORY_GAP_ANALYSIS.md`.
+
 ## Complete 12-Agent Factory Workflow
 
 ```

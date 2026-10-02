@@ -595,11 +595,11 @@ npm run factory:watch wf-1704067200000-abc123
 # Retry from failure point
 npm run factory:retry wf-1704067200000-abc123
 
-# Retry from specific phase
-npm run factory:retry wf-1704067200000-abc123 --from-phase=software-architect
+# Resume a failed workflow (validated phases are kept, failed ones re-run)
+npm run factory:retry wf-1704067200000-abc123
 
 # Clean up workflow state
-npm run factory:clean wf-1704067200000-abc123
+rm workflows/wf-1704067200000-abc123.json
 ```
 
 ## Performance Tuning

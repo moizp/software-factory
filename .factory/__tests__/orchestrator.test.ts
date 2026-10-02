@@ -1,3 +1,4 @@
+import { stubPayload } from '../contracts';
 import { FactoryOrchestrator, mockAgentInvoker } from '../orchestrator';
 import { WorkflowState } from '../state';
 import {
@@ -50,17 +51,17 @@ describe('Orchestrator - Sequential Phase Execution', () => {
 
       const result = await orchestrator.executeSequentialPhase(
         state,
-        'backend-builder',
-        'backend-builder',
+        'backend-engineer',
+        'backend-engineer',
         {}
       );
 
-      expect(result.currentPhase).toBe('backend-builder');
+      expect(result.currentPhase).toBe('backend-engineer');
     });
 
     it('should handle agent validation failure', async () => {
       const failingInvoker = async (): Promise<any> => ({
-        phase: 'test',
+        phase: 'analyzer',
         valid: false,
         error: 'Validation failed'
       });
@@ -90,8 +91,8 @@ describe('Orchestrator - Sequential Phase Execution', () => {
 
       const result = await errorOrchestrator.executeSequentialPhase(
         state,
-        'architect',
-        'architect',
+        'software-architect',
+        'software-architect',
         {}
       );
 
@@ -101,7 +102,7 @@ describe('Orchestrator - Sequential Phase Execution', () => {
 
     it('should add notes for failed phases', async () => {
       const failingInvoker = async (): Promise<any> => ({
-        phase: 'test',
+        phase: 'analyzer',
         valid: false,
         error: 'Test error'
       });
@@ -135,27 +136,27 @@ describe('Orchestrator - Sequential Phase Execution', () => {
       const state = createMockWorkflowState();
 
       const phases = [
-        { phase: 'backend-builder' as const, agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder' as const, agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder' as const, agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer' as const, agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer' as const, agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer' as const, agentName: 'infrastructure-engineer', input: {} }
       ];
 
       const result = await parallelOrchestrator.executeParallelPhases(state, phases);
 
       expect(result.phases).toHaveLength(3);
       const phaseNames = result.phases.map(p => p.phase);
-      expect(phaseNames).toContain('backend-builder');
-      expect(phaseNames).toContain('frontend-builder');
-      expect(phaseNames).toContain('infrastructure-builder');
+      expect(phaseNames).toContain('backend-engineer');
+      expect(phaseNames).toContain('frontend-engineer');
+      expect(phaseNames).toContain('infrastructure-engineer');
     });
 
     it('should track all artifacts from parallel phases', async () => {
       const state = createMockWorkflowState();
 
       const phases = [
-        { phase: 'backend-builder' as const, agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder' as const, agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder' as const, agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer' as const, agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer' as const, agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer' as const, agentName: 'infrastructure-engineer', input: {} }
       ];
 
       const result = await orchestrator.executeParallelPhases(state, phases);
@@ -168,7 +169,7 @@ describe('Orchestrator - Sequential Phase Execution', () => {
       const partialFailInvoker = async (): Promise<any> => {
         callCount++;
         return {
-          phase: callCount === 2 ? ('frontend-builder' as const) : ('backend-builder' as const),
+          phase: callCount === 2 ? ('frontend-engineer' as const) : ('backend-engineer' as const),
           valid: callCount !== 2,
           error: callCount === 2 ? 'Frontend build failed' : undefined
         };
@@ -178,9 +179,9 @@ describe('Orchestrator - Sequential Phase Execution', () => {
       const state = createMockWorkflowState();
 
       const phases = [
-        { phase: 'backend-builder' as const, agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder' as const, agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder' as const, agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer' as const, agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer' as const, agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer' as const, agentName: 'infrastructure-engineer', input: {} }
       ];
 
       const result = await partialOrchestrator.executeParallelPhases(state, phases);
@@ -191,7 +192,7 @@ describe('Orchestrator - Sequential Phase Execution', () => {
 
     it('should note when parallel phases fail', async () => {
       const failingInvoker = async (): Promise<any> => ({
-        phase: 'backend-builder' as const,
+        phase: 'backend-engineer' as const,
         valid: false,
         error: 'Failed'
       });
@@ -200,9 +201,9 @@ describe('Orchestrator - Sequential Phase Execution', () => {
       const state = createMockWorkflowState();
 
       const phases = [
-        { phase: 'backend-builder' as const, agentName: 'backend-builder', input: {} },
-        { phase: 'frontend-builder' as const, agentName: 'frontend-builder', input: {} },
-        { phase: 'infrastructure-builder' as const, agentName: 'infrastructure-builder', input: {} }
+        { phase: 'backend-engineer' as const, agentName: 'backend-engineer', input: {} },
+        { phase: 'frontend-engineer' as const, agentName: 'frontend-engineer', input: {} },
+        { phase: 'infrastructure-engineer' as const, agentName: 'infrastructure-engineer', input: {} }
       ];
 
       const result = await failOrchestrator.executeParallelPhases(state, phases);
@@ -322,12 +323,12 @@ describe('Orchestrator - Full Workflow Execution', () => {
   describe('Retry and Backoff Logic', () => {
     it('should retry transient errors', async () => {
       let attempts = 0;
-      const transientErrorInvoker = async (): Promise<any> => {
+      const transientErrorInvoker = async (_state: any, agentName: string): Promise<any> => {
         attempts++;
         if (attempts < 2) {
           throw new Error('ECONNREFUSED: Connection refused');
         }
-        return { phase: 'product-manager', valid: true };
+        return { phase: agentName, valid: true, ...stubPayload(agentName) };
       };
 
       const retryOrchestrator = new FactoryOrchestrator(
@@ -445,5 +446,51 @@ describe('Orchestrator - State Persistence', () => {
     expect(state.id).toBe(originalId);
     expect(state.phases.length).toBe(0);
     expect(result.phases.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Orchestrator - Resume', () => {
+  it('resumes the same workflow, skipping validated phases and re-running the failed one', async () => {
+    const calls: string[] = [];
+    let failE2e = true;
+    const invoker = async (_state: any, agentName: string): Promise<any> => {
+      calls.push(agentName);
+      if (agentName === 'e2e-tester' && failE2e) {
+        return { phase: agentName, valid: false, error: 'e2e down' };
+      }
+      return { phase: agentName, valid: true, ...stubPayload(agentName) };
+    };
+    const orchestrator = new FactoryOrchestrator(invoker, false, undefined, { maxRetries: 1, backoffMs: 1 });
+
+    const failed = await orchestrator.executeWorkflow('Brief', undefined, {});
+    expect(failed.status).toBe('failed');
+    expect(calls).toEqual([
+      'product-manager', 'analyzer', 'software-architect',
+      'backend-engineer', 'frontend-engineer', 'infrastructure-engineer',
+      'automation-tester', 'e2e-tester'
+    ]);
+
+    calls.length = 0;
+    failE2e = false;
+    const resumed = await orchestrator.executeWorkflow('Brief', undefined, {}, failed);
+
+    expect(resumed.id).toBe(failed.id);
+    expect(resumed.status).toBe('completed');
+    expect(calls).toEqual(['e2e-tester', 'reviewer', 'customer-support']);
+  });
+
+  it('hands earlier payloads to later agents', async () => {
+    const inputs: Record<string, any> = {};
+    const invoker = async (_state: any, agentName: string, input: any): Promise<any> => {
+      inputs[agentName] = input;
+      return { phase: agentName, valid: true, ...stubPayload(agentName) };
+    };
+    const orchestrator = new FactoryOrchestrator(invoker, false);
+    await orchestrator.executeWorkflow('Brief', undefined, {});
+
+    expect(inputs['software-architect'].productManagerOutput).toBeTruthy();
+    expect(inputs['software-architect'].analyzerOutput).toBeTruthy();
+    expect(inputs['automation-tester'].builderOutputs['backend-engineer']).toBeTruthy();
+    expect(inputs['e2e-tester'].testerOutput).toBeTruthy();
   });
 });

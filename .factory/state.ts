@@ -1,21 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { AgentName } from './pipeline';
+import { workflowsDir } from './paths';
 
-export type Phase =
-  | 'product-manager'
-  | 'analyzer'
-  | 'architect'
-  | 'backend-builder'
-  | 'frontend-builder'
-  | 'infrastructure-builder'
-  | 'backend-tester'
-  | 'frontend-tester'
-  | 'infrastructure-tester'
-  | 'e2e-tester'
-  | 'reviewer'
-  | 'customer-support'
-  | 'completed'
-  | 'failed';
+export type Phase = AgentName | 'completed' | 'failed';
 
 export interface PhaseGate {
   phase: Phase;
@@ -47,11 +35,10 @@ export interface WorkflowState {
   notes: string[];
 }
 
-const WORKFLOWS_DIR = path.join(__dirname, '..', 'workflows');
 
 function ensureWorkflowsDir(): void {
-  if (!fs.existsSync(WORKFLOWS_DIR)) {
-    fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
+  if (!fs.existsSync(workflowsDir())) {
+    fs.mkdirSync(workflowsDir(), { recursive: true });
   }
 }
 
@@ -80,13 +67,13 @@ export function createWorkflowState(
 
 export function saveWorkflowState(state: WorkflowState): void {
   ensureWorkflowsDir();
-  const filePath = path.join(WORKFLOWS_DIR, `${state.id}.json`);
+  const filePath = path.join(workflowsDir(), `${state.id}.json`);
   fs.writeFileSync(filePath, JSON.stringify(state, null, 2));
 }
 
 export function loadWorkflowState(workflowId: string): WorkflowState | null {
   ensureWorkflowsDir();
-  const filePath = path.join(WORKFLOWS_DIR, `${workflowId}.json`);
+  const filePath = path.join(workflowsDir(), `${workflowId}.json`);
 
   if (!fs.existsSync(filePath)) {
     return null;
@@ -99,14 +86,14 @@ export function loadWorkflowState(workflowId: string): WorkflowState | null {
 export function listWorkflowStates(): WorkflowState[] {
   ensureWorkflowsDir();
 
-  if (!fs.existsSync(WORKFLOWS_DIR)) {
+  if (!fs.existsSync(workflowsDir())) {
     return [];
   }
 
-  return fs.readdirSync(WORKFLOWS_DIR)
+  return fs.readdirSync(workflowsDir())
     .filter(file => file.endsWith('.json'))
     .map(file => {
-      const content = fs.readFileSync(path.join(WORKFLOWS_DIR, file), 'utf-8');
+      const content = fs.readFileSync(path.join(workflowsDir(), file), 'utf-8');
       return JSON.parse(content) as WorkflowState;
     })
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
