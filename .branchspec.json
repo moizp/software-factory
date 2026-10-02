@@ -1,0 +1,45 @@
+{
+  "$schema": "https://example.com/branchspec-schema.json",
+  "version": "1.0",
+  "description": "Docs-only chore: factory autonomy gap analysis. Human review required.",
+  "automation": {
+    "auto_merge": false,
+    "allow_agent_approval": false,
+    "require_human_review": true
+  },
+  "review_requirements": {
+    "minimum_approvals": 1,
+    "require_code_owner_approval": false,
+    "require_specific_reviewers": false,
+    "reviewers": []
+  },
+  "testing": {
+    "require_tests": false,
+    "minimum_coverage": 70,
+    "required_test_files": []
+  },
+  "ci": {
+    "required_checks": [
+      "build",
+      "test"
+    ],
+    "allow_ci_failures": false
+  },
+  "protected_areas": {
+    "critical_files": [
+      ".factory/orchestrator.ts",
+      ".factory/state.ts",
+      ".factory/cli.ts",
+      ".github/workflows/**"
+    ],
+    "require_extra_review_for_critical": true
+  },
+  "scope": {
+    "type": "chore",
+    "description": "Add factory autonomy gap analysis report",
+    "components_affected": [
+      "docs"
+    ],
+    "breaking_changes": false
+  }
+}
