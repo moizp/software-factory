@@ -29,16 +29,15 @@ This repo is trunk-based: `main` is the only long-lived branch (there is no `dev
 ### Quick Agent Workflow
 When you spawn to work on a task:
 1. Create branch: `git checkout main && git pull origin main && git checkout -b feature/your-feature`
-2. Create branch spec: `cp .branchspec.json.example .branchspec.json` (controls automation/review)
-3. Make changes + test locally: `npm run build && npm test`
-4. Commit branch spec + changes: `git add .branchspec.json && git commit -m "feat: description"`
-5. Push: `git push -u origin feature/your-feature`
-6. Create PR on GitHub (target: main)
-7. **RESPECT THE BRANCH SPEC:**
-   - If `auto_merge: false` → Stop, wait for human merge
-   - If `auto_merge: true` + `allow_agent_approval: true` → You can merge after tests pass
-   - If `auto_merge: true` + `allow_agent_approval: false` → Wait for human approval, then merge
-8. **Never override requirements** — if spec says 2 approvals, don't merge with 1
+2. Make changes + test locally: `npm run build && npm test`
+3. Commit: `git commit -m "feat: description"` (single line, no attribution)
+4. Push: `git push -u origin feature/your-feature`
+5. Create PR on GitHub (target: main)
+6. **RESPECT THE POLICY** (`.factory/policy.json`, read from `main`, see `docs/POLICY.md`):
+   - Check: `npm run policy:check -- --base origin/main --head HEAD --branch "$(git branch --show-current)"`
+   - If `autoMerge` is false → Stop, wait for a human to merge (the PR also gets the `policy:manual` label)
+   - If `autoMerge` is true → merge only after every `require` item passed (`ci`, `reviewer_verdict`)
+7. **Never override the policy** — if it says 1 approval, don't merge without one. Agents never approve PRs, and never edit `.factory/policy.json` expecting it to apply to their own PR (it is read from `main`).
 
 ### Releases
 This repo has no release cadence or deploy environments; `main` is the product. Apps built by the factory follow the release candidate flow in `.claude/skills/release-process.md` (`release/vX.Y.Z` → `www-test` → `www-demo` → `www-prod`, tag, merge back), installed from `templates/release/` by the infrastructure-engineer.
@@ -67,7 +66,7 @@ The TypeScript orchestrator (`npm run factory:start`) is the runnable implementa
 - Each agent response is validated against `.factory/contracts/envelope.schema.json` plus its required payload keys (`AGENT_CONTRACTS`). Payload keys are folded into artifacts and handed to later agents.
 - `npm run factory:retry <id>` resumes the same workflow: validated phases are kept, failed ones re-run.
 - Agents run via `claude -p` (headless, no tools); tune with `FACTORY_AGENT_TIMEOUT_MS` (default 10 min) and `FACTORY_AGENT_MODEL`.
-- The PR targets `main`, and auto-merge happens only if `.branchspec.json` sets `automation.auto_merge: true`.
+- The PR targets `main`. Auto-merge happens only if `.factory/policy.json` (read from `main`) allows it and the required checks pass; otherwise the PR is left for a human.
 
 Agents in the diagram below that are not in `pipeline.ts` (mcp-configurator, platform-architect, ui-designer) are not yet executed by the orchestrator. See `docs/FACTORY_GAP_ANALYSIS.md`.
 

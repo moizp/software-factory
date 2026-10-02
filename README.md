@@ -549,24 +549,20 @@ git checkout main
 git pull origin main
 git checkout -b feature/your-feature-name
 
-# 2. Add branch spec (controls automation & review rules)
-cp .branchspec.json.example .branchspec.json
-npm run validate:branchspec
-
-# 3. Make changes, test, commit
+# 2. Make changes, test, commit
 npm run build && npm test
-git add . .branchspec.json
+git add .
 git commit -m "feat: your feature description"
 git push -u origin feature/your-feature-name
 
-# 4. Open a Pull Request targeting main, then squash and merge after review
+# 3. Open a Pull Request targeting main; the merge policy labels it policy:auto or policy:manual
 ```
 
 The factory has no release cadence. Apps it builds use release candidate branches promoted through `www-test` → `www-demo` → `www-prod` (see `.claude/skills/release-process.md`).
 
 **Guides:**
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — Branching guide & conventions
-- [BRANCH-SPEC.md](./docs/BRANCH-SPEC.md) — Control automation & review rules with .branchspec.json
+- [POLICY.md](./docs/POLICY.md) — Which PRs agents may auto-merge and which need a human (`.factory/policy.json`)
 
 ---
 

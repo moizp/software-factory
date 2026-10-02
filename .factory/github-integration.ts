@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import { PrInfo } from './policy-engine';
 
 export interface PROptions {
   owner: string;
@@ -78,6 +79,52 @@ export class GitHubAPI {
     } catch (error) {
       throw new Error(`Failed to auto-merge PR: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /** Branch, changed files, line count and labels of a PR, for policy evaluation. */
+  async getPRInfo(prNumber: number): Promise<PrInfo & { headSha: string }> {
+    try {
+      const { owner, repo } = this.repoCoordinates();
+      const pr = await this.octokit.pulls.get({ owner, repo, pull_number: prNumber });
+      const files = await this.octokit.paginate(this.octokit.pulls.listFiles, {
+        owner,
+        repo,
+        pull_number: prNumber,
+        per_page: 100
+      });
+      return {
+        branch: pr.data.head.ref,
+        headSha: pr.data.head.sha,
+        labels: pr.data.labels.map((l: { name?: string }) => l.name ?? ''),
+        files: files.map((f: { filename: string }) => f.filename),
+        changedLines: files.reduce((n: number, f: { additions: number; deletions: number }) => n + f.additions + f.deletions, 0)
+      };
+    } catch (error) {
+      throw new Error(`Failed to read PR info: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /** Summary of all check runs on a commit: success, failure, pending, or none. */
+  async getCheckSummary(ref: string): Promise<'success' | 'failure' | 'pending' | 'none'> {
+    try {
+      const { owner, repo } = this.repoCoordinates();
+      const res = await this.octokit.checks.listForRef({ owner, repo, ref, per_page: 100 });
+      const runs = res.data.check_runs;
+      if (runs.length === 0) return 'none';
+      const bad = ['failure', 'cancelled', 'timed_out', 'action_required', 'stale', 'startup_failure'];
+      if (runs.some((r: { conclusion: string | null }) => r.conclusion && bad.includes(r.conclusion))) return 'failure';
+      if (runs.some((r: { status: string }) => r.status !== 'completed')) return 'pending';
+      return 'success';
+    } catch (error) {
+      throw new Error(`Failed to read checks: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private repoCoordinates(): { owner: string; repo: string } {
+    return {
+      owner: process.env.GITHUB_OWNER || 'moizp',
+      repo: process.env.GITHUB_REPO || 'software-factory'
+    };
   }
 
   async postComment(prNumber: number, comment: string): Promise<void> {
