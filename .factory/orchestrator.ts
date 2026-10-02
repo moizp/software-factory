@@ -8,13 +8,7 @@ import {
   addNote
 } from './state';
 import { GitHubAPI } from './github-integration';
-import { SlackNotifier, GitHubStatusUpdater, NotificationConfig } from './notifications';
-import { RollbackManager } from './rollback';
-import { CleanupManager } from './cleanup';
-import { RecoveryManager } from './recovery';
-import { AnalyticsCollector } from './analytics';
 import { Logger } from './logger';
-import { MetricsCollector } from './metrics';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
 import * as fs from 'fs';
@@ -74,17 +68,9 @@ export class FactoryOrchestrator {
   private githubAPI: GitHubAPI | null;
   private prNumber: number | null = null;
   private retryConfig: RetryConfig;
-  private slackNotifier: SlackNotifier | null;
-  private githubStatusUpdater: GitHubStatusUpdater | null;
-  private rollbackManager: RollbackManager;
-  private currentCommit: string = '';
-  private cleanupManager: CleanupManager;
-  private recoveryManager: RecoveryManager;
-  private analyticsCollector: AnalyticsCollector;
   private logger: Logger;
-  private metricsCollector: MetricsCollector;
 
-  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>, notificationConfig?: NotificationConfig) {
+  constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>) {
     this.invokeAgent = invokeAgent;
     this.verbose = verbose;
     try {
@@ -98,26 +84,8 @@ export class FactoryOrchestrator {
       ...retryConfig
     };
 
-    // Initialize notifications
-    this.slackNotifier = notificationConfig?.slackWebhookUrl
-      ? new SlackNotifier(notificationConfig.slackWebhookUrl)
-      : null;
-
-    this.githubStatusUpdater = notificationConfig?.githubOwner && notificationConfig?.githubRepo && notificationConfig?.githubToken
-      ? new GitHubStatusUpdater(notificationConfig.githubOwner, notificationConfig.githubRepo, notificationConfig.githubToken)
-      : null;
-
-    // Initialize rollback manager
-    this.rollbackManager = new RollbackManager();
-
-    // Initialize new managers
-    this.cleanupManager = new CleanupManager();
-    this.recoveryManager = new RecoveryManager();
-    this.analyticsCollector = new AnalyticsCollector();
     this.logger = new Logger(undefined, verbose ? 'DEBUG' : 'INFO');
-    this.metricsCollector = new MetricsCollector();
   }
-
 
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -215,31 +183,6 @@ export class FactoryOrchestrator {
   ): Promise<WorkflowState> {
     this.logger.info(`Starting phase: ${phase}`);
 
-    // Notify phase start
-    if (this.slackNotifier) {
-      try {
-        await this.slackNotifier.notifyPhaseStart(state, phase);
-      } catch (error) {
-        this.logger.error(`Failed to notify phase start: ${error}`);
-      }
-    }
-
-    // Update GitHub status to pending
-    if (this.githubStatusUpdater && this.currentCommit) {
-      try {
-        await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'pending');
-      } catch (error) {
-        this.logger.error(`Failed to update GitHub status: ${error}`);
-      }
-    }
-
-    // Save snapshot before phase execution
-    try {
-      await this.rollbackManager.saveSnapshot(state, phase);
-    } catch (error) {
-      this.logger.error(`Failed to save snapshot: ${error}`);
-    }
-
     try {
       const rawResponse = await this.retryWithBackoff(
         () => this.invokeAgent(state, agentName, input),
@@ -279,70 +222,16 @@ export class FactoryOrchestrator {
         this.logger.info(`Phase ${phase} failed validation`);
         updatedState = addNote(updatedState, `Phase ${phase} failed: ${response.error}`);
 
-        // Notify failure
-        if (this.slackNotifier) {
-          try {
-            await this.slackNotifier.notifyFailure(updatedState, phase, response.error || 'Unknown error');
-          } catch (error) {
-            this.logger.error(`Failed to notify failure: ${error}`);
-          }
-        }
-
-        // Update GitHub status to failure
-        if (this.githubStatusUpdater && this.currentCommit) {
-          try {
-            await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
-          } catch (error) {
-            this.logger.error(`Failed to update GitHub status: ${error}`);
-          }
-        }
-
         return updatedState;
       }
 
       this.logger.info(`Phase ${phase} completed successfully`);
-
-      // Update GitHub status to success
-      if (this.githubStatusUpdater && this.currentCommit) {
-        try {
-          await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'success');
-        } catch (error) {
-          this.logger.error(`Failed to update GitHub status: ${error}`);
-        }
-      }
-
-      // Notify phase complete
-      if (this.slackNotifier) {
-        try {
-          await this.slackNotifier.notifyPhaseComplete(updatedState, phase);
-        } catch (error) {
-          this.logger.error(`Failed to notify phase complete: ${error}`);
-        }
-      }
 
       return updatedState;
     } catch (error) {
       this.logger.info(`Phase ${phase} threw error: ${error}`);
       const errorMsg = error instanceof Error ? error.message : String(error);
       const failedState = updatePhase(state, phase, false, undefined, errorMsg);
-
-      // Notify failure
-      if (this.slackNotifier) {
-        try {
-          await this.slackNotifier.notifyFailure(failedState, phase, errorMsg);
-        } catch (err) {
-          this.logger.error(`Failed to notify failure: ${err}`);
-        }
-      }
-
-      // Update GitHub status to failure
-      if (this.githubStatusUpdater && this.currentCommit) {
-        try {
-          await this.githubStatusUpdater.updatePhaseStatus(this.currentCommit, phase, 'failure');
-        } catch (err) {
-          this.logger.error(`Failed to update GitHub status: ${err}`);
-        }
-      }
 
       return failedState;
     }
@@ -447,12 +336,6 @@ export class FactoryOrchestrator {
       });
     }
 
-    // Report (read-only) incomplete workflows; resuming is an explicit action
-    const incomplete = await this.recoveryManager.detectIncomplete();
-    if (incomplete.length > 0) {
-      this.logger.info(`Found ${incomplete.length} incomplete workflows (resume with: factory retry <id>)`);
-    }
-
     let state: WorkflowState;
     if (resumeFrom) {
       state = this.prepareResume(resumeFrom);
@@ -462,13 +345,6 @@ export class FactoryOrchestrator {
     }
     saveWorkflowState(state);
     this.logger.info(resumeFrom ? 'Workflow resumed' : 'Workflow created', { workflowId: state.id, brief: issueBrief.substring(0, 100) });
-
-    // Capture current commit
-    try {
-      this.currentCommit = await this.rollbackManager.getCurrentCommit();
-    } catch (error) {
-      this.logger.error(`Failed to get current commit: ${error}`);
-    }
 
     // Create GitHub PR for workflow
     if (this.githubAPI && process.env.GITHUB_OWNER && process.env.GITHUB_REPO) {
@@ -518,30 +394,6 @@ export class FactoryOrchestrator {
     state.currentPhase = 'completed';
     state = addNote(state, 'Workflow completed successfully');
     saveWorkflowState(state);
-
-    // Record metrics
-    await this.metricsCollector.recordWorkflow(state);
-    this.logger.info('Workflow metrics recorded', { workflowId: state.id, status: state.status });
-
-    // Report analytics
-    const report = await this.analyticsCollector.generateReport();
-    this.logger.info('Analytics report generated', {
-      totalWorkflows: report.totalWorkflows,
-      completedWorkflows: report.completedWorkflows,
-      failedWorkflows: report.failedWorkflows,
-      averageDuration: report.averageDuration
-    });
-
-    // Cleanup old snapshots
-    this.rollbackManager.cleanupOldSnapshots(state.id, 5);
-
-    // Enforce retention policy
-    const retentionResult = await this.cleanupManager.enforceRetention();
-    this.logger.info('Retention policy enforced', {
-      archived: retentionResult.archived,
-      compressed: retentionResult.compressed,
-      errors: retentionResult.errors.length
-    });
 
     // Auto-merge PR on success, only when the branch spec explicitly allows it
     if (this.githubAPI && this.prNumber && !this.autoMergeAllowed()) {

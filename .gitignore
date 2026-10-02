@@ -9,4 +9,3 @@ scripts/credentials.sh
 workflows/
 coverage/
 logs/
-metrics/

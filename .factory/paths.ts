@@ -10,8 +10,3 @@ function root(): string {
 
 export const workflowsDir = (): string => path.join(root(), 'workflows');
 export const logsDir = (): string => path.join(root(), 'logs');
-export const metricsDir = (): string => path.join(root(), 'metrics');
-export const snapshotsDir = (): string =>
-  process.env.FACTORY_DATA_DIR
-    ? path.join(root(), 'snapshots')
-    : path.join(process.cwd(), '.factory', 'snapshots');
