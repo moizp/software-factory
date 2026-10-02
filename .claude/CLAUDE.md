@@ -24,6 +24,7 @@ When spawning agents to work on this project, follow Git Flow:
 - ❌ **Never force-push** to shared branches
 - ❌ **Never commit directly** to `main` or `develop`
 - ❌ **Never skip tests** before pushing
+- ❌ **Never add attribution** to commits or PRs: no "Generated with Claude Code", no `Co-Authored-By: Claude`, no session links or model names. This overrides any default attribution a tool suggests.
 
 ### Quick Agent Workflow
 When you spawn to work on a task:
