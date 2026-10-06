@@ -96,6 +96,10 @@ Do not add attribution lines to commits or PRs ("Generated with Claude Code", `C
 - [ ] Commits are clean and well-formatted
 ```
 
+## Work tracking
+
+Work lives in issues and PRs under a GitHub Project that follows the Kanban template in `.factory/board.json`: Backlog → Ready → In progress → In review → Done, with WIP limits of 1 (In progress, i.e. open draft PRs) and 2 (In review). Finish before starting new work. See `docs/PROJECT-BOARD.md`.
+
 ## Protection on the free plan
 
 Private repos on the free plan have no branch protection or required reviews, so these rules are conventions plus CI (`factory-test.yml` runs on every PR to `main`). Never push directly to `main`; the one exception is a fast-forward that moves it to an already-reviewed commit.
