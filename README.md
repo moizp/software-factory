@@ -562,6 +562,7 @@ The factory has no release cadence. Apps it builds use release candidate branche
 
 **Guides:**
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — Branching guide & conventions
+- [ADOPTING.md](./docs/ADOPTING.md) — Prompt for bringing the factory's practices into an existing project
 - [POLICY.md](./docs/POLICY.md) — Which PRs agents may auto-merge and which need a human (`.factory/policy.json`)
 
 ---
