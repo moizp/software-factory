@@ -269,6 +269,29 @@ Decided 2026-10-02. Details: `.claude/skills/release-process.md`, templates in `
 - [ ] CI: never call the model on every PR; run the factory only on an explicit label, and use a subscription-backed token instead of a pay-per-token API key (verify in the Claude Code docs)
 - [ ] Cap cost of loop-backs in Phase 2 (iteration cap shares the token budget)
 
+## ⚙️ Application Configuration for Generated Apps
+
+Static, read-only, per-environment config (`dev`, `test`, `demo`, `prod`), kept in a GitHub gist as one CSV per environment. Three layers, kept separate:
+
+| Layer | Holds | Lives in | Edited by |
+|---|---|---|---|
+| App config (this section) | Non-secret values: API base URLs, limits, branding, third-party IDs, default flag values | Gist: `config.dev.csv`, `config.test.csv`, `config.demo.csv`, `config.prod.csv` | A person, via the gist |
+| Feature settings | Runtime on/off toggles | App database (`.claude/skills/feature-settings.md`) | Admin screen |
+| Secrets | Tokens, passwords, keys | Platform secret store / env vars | Never in the gist |
+
+Precedence: a feature setting in the database overrides the CSV default; the CSV overrides the in-code default.
+
+- [ ] Define the model: CSV columns `key,value,type,description`; a code registry declares every allowed key with type, default and whether it is required (unknown or mistyped keys fail validation)
+- [ ] Skill `.claude/skills/app-config.md`: loader pattern for TypeScript, Python and Go (fetch raw gist URL, parse CSV, validate against the registry, typed accessors, `APP_ENV` selects the file)
+- [ ] Resilience: TTL cache, last-known-good copy on disk, fall back to registry defaults, fail closed if a required key is missing at startup
+- [ ] Safety: secret gists are unlisted, not private (anyone with the URL can read them), so no secrets, ever; add a check that rejects values that look like secrets (tokens, private keys)
+- [ ] Promotion: pin a gist revision per environment (`GIST_REVISION`) so prod config changes are deliberate and move test → demo → prod with the release (see `.claude/skills/release-process.md`); `dev` follows the latest revision
+- [ ] Public subset: backend exposes only keys marked public via `/api/config/public`; the frontend never reads the gist directly
+- [ ] Admin visibility: read-only screen showing effective config per environment, its source revision and any database overrides (editing stays in the gist)
+- [ ] Agent wiring: software-architect (config registry), backend-engineer (loader), frontend-engineer (public config), infrastructure-engineer (create gist and CSVs, set `APP_ENV`, `GIST_ID`, `GIST_REVISION`, optional `GIST_TOKEN` per environment), customer-support (document every key)
+- [ ] Templates in `templates/config/` with sample CSVs and loader tests, installed by the infrastructure-engineer
+- [ ] Open decision: gist versus `config/*.csv` in the app repo. A gist keeps config changes out of the PR flow and merge policy; repo files get review and history for free (no branch protection on the free plan either way). Decide before building the skill.
+
 ## Metrics
 
 | Category | Estimate | Status |
