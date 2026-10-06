@@ -41,6 +41,10 @@ The policy is always loaded from the base branch, never from the PR. A PR that e
 
 Globs: `*` matches within a directory, `**` crosses directories, `?` one character.
 
+## Merging
+
+Auto-merges use a merge commit, the same as human merges (see `CONTRIBUTING.md`).
+
 ## Evaluation rules
 
 1. Empty diff, a protected path, or a forcing label means a human.

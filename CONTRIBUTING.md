@@ -78,7 +78,9 @@ Do not add attribution lines to commits or PRs ("Generated with Claude Code", `C
 - Title uses the commit format. Description: what, why, how, testing, checklist.
 - Link issues with `Closes #123`.
 - Required: build and tests green. The merge policy (`.factory/policy.json`, see `docs/POLICY.md`) decides whether it auto-merges or needs a human; the `policy-check` workflow labels the PR `policy:auto` or `policy:manual`.
-- Squash and merge is the default; delete the branch afterwards.
+- **Merge with a merge commit.** No squash, no rebase: the branch's commits stay in `main`'s history, merged branches show as fully merged, and humans and agents can trace a change back to its PR. This is why every commit is a single-line conventional message.
+- Delete the branch afterwards.
+- Suggested repo setting (Settings → General → Pull Requests): allow merge commits only, and enable "Automatically delete head branches".
 
 ```markdown
 ## What
