@@ -231,6 +231,7 @@ Goal: a simple setup that works efficiently. Decisions reviewed on 2026-10-02.
 
 **Done**
 - [x] Delete unused side modules: analytics, metrics, cleanup, notifications, recovery, rollback (~900 lines)
+- [x] Merge commits only (no squash or rebase): orchestrator, docs and policy updated. Still to do in GitHub settings: allow merge commits only, enable auto-delete of head branches
 - [x] Coverage thresholds relaxed to 55/60/55/55 (branches/functions/lines/statements) after the deletions
 
 **To do**

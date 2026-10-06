@@ -74,7 +74,7 @@ export class GitHubAPI {
         owner,
         repo,
         pull_number: prNumber,
-        merge_method: 'squash'
+        merge_method: 'merge'
       });
     } catch (error) {
       throw new Error(`Failed to auto-merge PR: ${error instanceof Error ? error.message : String(error)}`);

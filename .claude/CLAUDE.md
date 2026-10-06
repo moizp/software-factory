@@ -21,6 +21,7 @@ This repo is trunk-based: `main` is the only long-lived branch (there is no `dev
 - ✅ **Push to remote** with `git push -u origin <branch-name>`
 - ✅ **Create Pull Requests** targeting `main`
 - ✅ **Request review** before merging
+- ✅ **Merge with a merge commit** (never squash or rebase), then delete the branch
 - ❌ **Never force-push** to shared branches
 - ❌ **Never commit directly** to `main`
 - ❌ **Never skip tests** before pushing

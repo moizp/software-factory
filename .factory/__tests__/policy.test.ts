@@ -225,6 +225,14 @@ describe('GitHubAPI policy helpers', () => {
     });
   });
 
+  it('merges with a merge commit, never squash or rebase', async () => {
+    const api = new GitHubAPI('token');
+    await api.autoMergePR(5);
+    expect((api as any).octokit.pulls.merge).toHaveBeenCalledWith(
+      expect.objectContaining({ pull_number: 5, merge_method: 'merge' })
+    );
+  });
+
   it.each([
     [[], 'none'],
     [[{ status: 'completed', conclusion: 'success' }], 'success'],
