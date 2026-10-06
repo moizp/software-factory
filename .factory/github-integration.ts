@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { PrInfo } from './policy-engine';
+import { WipCounts } from './board';
 
 export interface PROptions {
   owner: string;
@@ -101,6 +102,23 @@ export class GitHubAPI {
       };
     } catch (error) {
       throw new Error(`Failed to read PR info: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /** Open PRs by board column: drafts are In progress, ready-for-review PRs are In review. */
+  async getWipCounts(): Promise<WipCounts> {
+    try {
+      const { owner, repo } = this.repoCoordinates();
+      const open = await this.octokit.paginate(this.octokit.pulls.list, {
+        owner,
+        repo,
+        state: 'open',
+        per_page: 100
+      });
+      const drafts = open.filter((pr: { draft?: boolean }) => pr.draft === true).length;
+      return { inProgress: drafts, inReview: open.length - drafts };
+    } catch (error) {
+      throw new Error(`Failed to read open PRs: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

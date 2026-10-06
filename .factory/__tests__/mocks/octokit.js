@@ -20,15 +20,18 @@ module.exports = {
         get: jest.fn().mockResolvedValue({
           data: { head: { ref: 'fix/x', sha: 'abc123' }, labels: [{ name: 'agent' }] }
         }),
-        listFiles: jest.fn()
+        listFiles: jest.fn(),
+        list: jest.fn()
       };
+      this.openPulls = [];
       this.checks = {
         listForRef: jest.fn().mockResolvedValue({ data: { check_runs: [] } })
       };
-      this.paginate = jest.fn().mockResolvedValue([
+      const files = [
         { filename: 'docs/a.md', additions: 3, deletions: 1 },
         { filename: 'README.md', additions: 2, deletions: 0 }
-      ]);
+      ];
+      this.paginate = jest.fn(async fn => (fn === this.pulls.list ? this.openPulls : files));
     }
   }
 };
