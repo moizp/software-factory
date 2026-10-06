@@ -191,9 +191,33 @@ async function invokeClaudeAgentViaCli(
   prompt: string,
   timeout: number = agentTimeoutMs()
 ): Promise<CliResult> {
+  return runClaude(buildCliArgs(), prompt, agentCwd(), timeout);
+}
+
+/** Args for a builder that edits files inside a worktree (only the listed tools, spend capped). */
+export function buildBuilderArgs(tools: string[], maxBudgetUsd: number): string[] {
+  return [
+    '-p', '--output-format', 'json', '--no-session-persistence',
+    '--model', agentModel(), '--effort', agentEffort(),
+    '--tools', tools.join(','), '--permission-mode', 'acceptEdits',
+    '--max-budget-usd', String(maxBudgetUsd)
+  ];
+}
+
+/** Runs a builder in `cwd` (a git worktree). It writes files with the given tools; the caller commits. */
+export async function invokeClaudeBuilder(
+  prompt: string,
+  cwd: string,
+  options: { tools?: string[]; maxBudgetUsd?: number; timeout?: number } = {}
+): Promise<CliResult> {
+  const args = buildBuilderArgs(options.tools ?? ['Read', 'Write', 'Edit', 'Glob', 'Grep'], options.maxBudgetUsd ?? 0.5);
+  return runClaude(args, prompt, cwd, options.timeout ?? agentTimeoutMs());
+}
+
+async function runClaude(args: string[], prompt: string, cwd: string, timeout: number): Promise<CliResult> {
   // Async spawn (not execSync) so parallel stages really run concurrently
   return new Promise<CliResult>((resolve, reject) => {
-    const child = spawn('claude', buildCliArgs(), { stdio: ['pipe', 'pipe', 'pipe'], cwd: agentCwd() });
+    const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'], cwd });
     let stdout = '';
     let stderr = '';
     let settled = false;
