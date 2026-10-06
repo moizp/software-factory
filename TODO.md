@@ -292,6 +292,22 @@ Precedence: a feature setting in the database overrides the CSV default; the CSV
 - [ ] Templates in `templates/config/` with sample CSVs and loader tests, installed by the infrastructure-engineer
 - [ ] Open decision: gist versus `config/*.csv` in the app repo. A gist keeps config changes out of the PR flow and merge policy; repo files get review and history for free (no branch protection on the free plan either way). Decide before building the skill.
 
+## 📋 Work Tracking: GitHub Project and Issues
+
+Decided 2026-10-06. Issues become the working to-do list; `TODO.md` shrinks to the roadmap and decision log. A GitHub Project holds the issues and PRs that complete the autonomous AI-assisted development.
+
+- [ ] Create a GitHub Project (v2) for the repo. This is done in the GitHub UI because the tools available to agents cannot create Projects. Board columns: Backlog, Ready, In progress, In review (needs a human), Done. Turn on the built-in workflows: item added goes to Backlog, PR merged or issue closed goes to Done
+- [ ] Auto-add the repo's issues and PRs to the Project
+- [ ] Project fields: Phase (2, 3, 4), Area, Priority (p0, p1, p2)
+- [ ] Project views: Active agent work (draft PRs), Needs me (`policy:manual`, `needs-human`, review requested), Completed (merged), Roadmap by phase
+- [ ] Labels: `type:*`, `area:*`, `phase:*`, `priority:*`, `agent:ready` (an agent may take it), `needs-human`. Keep `factory:start` separate: it already triggers the factory workflow
+- [ ] Milestones per phase; one epic issue per phase with sub-issues
+- [ ] Issue templates (task, bug) in `.github/ISSUE_TEMPLATE/` and a `Closes #N` line in the PR template
+- [ ] Migrate the genuinely open `TODO.md` items into about 25 grouped issues, then shrink `TODO.md` to the roadmap and decision log with links to the issues
+- [ ] Autonomous loop, in the Project: issue labelled `agent:ready` → agent opens a branch and a draft PR with `Closes #N` → PR is added to the Project → `policy:auto` or `policy:manual` label → merge per policy → issue closes → card moves to Done. A failure labels the issue `needs-human` and comments why
+- [ ] Orchestrator (Phase 2): link every workflow PR to its issue, mark it ready on success, label `needs-human` on failure
+- [ ] Check how workflows may write to a Project: `GITHUB_TOKEN` may not be allowed to update a user-owned Project v2, in which case a token with `project` scope is needed (verify before relying on it)
+
 ## Metrics
 
 | Category | Estimate | Status |
