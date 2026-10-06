@@ -1,0 +1,45 @@
+name: Board Sync
+
+# Keeps the repo's labels and milestones in line with .factory/board.json (the board template).
+# The GitHub Project itself, its views and its column limits are created in the UI: see docs/PROJECT-BOARD.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.factory/board.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync labels
+        run: |
+          jq -c '.labels[]' .factory/board.json | while read -r label; do
+            name=$(jq -r .name <<<"$label")
+            gh label create "$name" \
+              --color "$(jq -r .color <<<"$label")" \
+              --description "$(jq -r '.description // ""' <<<"$label")" \
+              --force
+          done
+
+      - name: Sync milestones
+        run: |
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/milestones?state=all&per_page=100" --jq '.[].title')
+          jq -r '.milestones[]' .factory/board.json | while read -r title; do
+            if grep -Fxq "$title" <<<"$existing"; then
+              echo "milestone exists: $title"
+            else
+              gh api "repos/$GITHUB_REPOSITORY/milestones" -f title="$title" --silent
+              echo "milestone created: $title"
+            fi
+          done

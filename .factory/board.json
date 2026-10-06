@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "template": "kanban",
+  "description": "Board template followed by this repo and by every app built with the factory. Source of truth for the GitHub Project, its labels and the WIP limits.",
+  "statuses": [
+    { "name": "Backlog", "rule": "new issue or PR" },
+    { "name": "Ready", "rule": "issue labelled agent:ready" },
+    { "name": "In progress", "wip": 1, "rule": "open draft PR" },
+    { "name": "In review", "wip": 2, "rule": "open PR that is ready for review (needs a human unless policy:auto)" },
+    { "name": "Done", "rule": "PR merged or issue closed" }
+  ],
+  "wip_enforcement": {
+    "block_new_work": true,
+    "override_env": "FACTORY_IGNORE_WIP"
+  },
+  "fields": [
+    { "name": "Phase", "type": "single_select", "options": ["2", "3", "4"] },
+    { "name": "Area", "type": "single_select", "options": ["orchestrator", "agents", "release", "config", "docs", "ci"] },
+    { "name": "Priority", "type": "single_select", "options": ["p0", "p1", "p2"] },
+    { "name": "Tokens", "type": "number" }
+  ],
+  "views": [
+    { "name": "Board", "layout": "board", "group_by": "Status" },
+    { "name": "Needs me", "layout": "table", "filter": "is:open (label:policy:manual OR label:needs-human OR review-requested:@me)" },
+    { "name": "Active agent work", "layout": "table", "filter": "is:pr is:open is:draft" },
+    { "name": "Roadmap", "layout": "roadmap", "group_by": "Milestone" },
+    { "name": "Done this week", "layout": "table", "filter": "is:closed updated:>@today-7d" }
+  ],
+  "labels": [
+    { "name": "type:feature", "color": "1D76DB", "description": "New functionality" },
+    { "name": "type:fix", "color": "D73A4A", "description": "Bug fix" },
+    { "name": "type:chore", "color": "C5DEF5", "description": "Housekeeping, docs, CI" },
+    { "name": "area:orchestrator", "color": "5319E7", "description": "Orchestrator and pipeline" },
+    { "name": "area:agents", "color": "5319E7", "description": "Agent prompts and contracts" },
+    { "name": "area:release", "color": "5319E7", "description": "Release process and deploy" },
+    { "name": "area:config", "color": "5319E7", "description": "App configuration" },
+    { "name": "area:docs", "color": "5319E7", "description": "Documentation" },
+    { "name": "area:ci", "color": "5319E7", "description": "Workflows and CI" },
+    { "name": "phase:2", "color": "FBCA04", "description": "Phase 2: artifacts in git, loop-back, escalation" },
+    { "name": "phase:3", "color": "FBCA04", "description": "Phase 3: real quality gates and CI autonomy" },
+    { "name": "phase:4", "color": "FBCA04", "description": "Phase 4: change mode and delivery" },
+    { "name": "priority:p0", "color": "B60205", "description": "Blocks autonomy" },
+    { "name": "priority:p1", "color": "D93F0B", "description": "Needed for reliability" },
+    { "name": "priority:p2", "color": "FEF2C0", "description": "Nice to have" },
+    { "name": "agent:ready", "color": "0E8A16", "description": "An agent may take this issue" },
+    { "name": "needs-human", "color": "B60205", "description": "Forces human review (policy) or needs a decision" },
+    { "name": "policy:auto", "color": "0E8A16", "description": "Merge policy allows auto-merge" },
+    { "name": "policy:manual", "color": "D93F0B", "description": "Merge policy requires a human merge" }
+  ],
+  "milestones": [
+    "Phase 2: artifacts in git, loop-back, escalation",
+    "Phase 3: real quality gates and CI autonomy",
+    "Phase 4: change mode and delivery"
+  ]
+}

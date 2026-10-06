@@ -13,6 +13,7 @@ import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
 import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy-engine';
+import { Board, evaluateWip, loadBoardIfPresent } from './board';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -346,6 +347,11 @@ export class FactoryOrchestrator {
       });
     }
 
+    // New work respects the board's WIP limits; resuming existing work does not count as new
+    if (!resumeFrom) {
+      await this.enforceWipLimits();
+    }
+
     let state: WorkflowState;
     if (resumeFrom) {
       state = this.prepareResume(resumeFrom);
@@ -492,6 +498,38 @@ export class FactoryOrchestrator {
 
   private loadBasePolicy(): Policy {
     return loadPolicy('origin/main');
+  }
+
+  /**
+   * Refuses to start new work when the board's WIP limits are reached (.factory/board.json).
+   * Reading open PRs is best effort: if GitHub cannot be reached the limit is not enforced.
+   */
+  private async enforceWipLimits(): Promise<void> {
+    const board = this.loadWipBoard();
+    if (!board || !board.wip_enforcement.block_new_work) return;
+    const override = board.wip_enforcement.override_env;
+    if (override && process.env[override]) {
+      this.logger.warn(`WIP limits ignored (${override} is set)`);
+      return;
+    }
+    if (!this.githubAPI || !process.env.GITHUB_OWNER || !process.env.GITHUB_REPO) return;
+
+    let counts;
+    try {
+      counts = await this.githubAPI.getWipCounts();
+    } catch (error) {
+      this.logger.warn(`WIP check skipped: ${error}`);
+      return;
+    }
+
+    const decision = evaluateWip(board, counts);
+    if (!decision.canStart) {
+      throw new Error(`WIP limit reached. ${decision.reasons.join('. ')}. Set ${override ?? 'the override'} to start anyway.`);
+    }
+  }
+
+  private loadWipBoard(): Board | null {
+    return loadBoardIfPresent();
   }
 
   /** Max tokens per workflow (input + output + cache); 0 disables. Tune with FACTORY_MAX_TOKENS. */

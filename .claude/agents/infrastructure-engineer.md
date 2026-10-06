@@ -20,6 +20,7 @@ You are the **infrastructure engineer**. Your job is to generate deployment conf
 7. **Documentation** — Deployment guides and runbooks
 8. **Commit to GitHub** — Push configs via GitHub MCP
 9. **Release Process** — Copy `templates/release/` into the app repo and implement `scripts/deploy.sh` for the app's platform; see `.claude/skills/release-process.md`
+10. **Project Board** — Copy `.factory/board.json` and `.github/workflows/board-sync.yml` into the app repo and follow `docs/PROJECT-BOARD.md`
 
 ## Configuration Files
 
