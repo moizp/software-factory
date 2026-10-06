@@ -5,12 +5,24 @@ import { workflowsDir } from './paths';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
+/** Measured by the Claude CLI per agent call. costUsd is the API-equivalent figure, not necessarily billed. */
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  turns: number;
+}
+
 export interface PhaseGate {
   phase: Phase;
   valid: boolean;
   timestamp: string;
   output?: Record<string, unknown>;
   error?: string;
+  usage?: Usage;
 }
 
 export interface Artifact {
@@ -33,6 +45,8 @@ export interface WorkflowState {
   artifacts: Artifact[];
   config: Record<string, unknown>;
   notes: string[];
+  /** Total tokens used across all phases and resumes, for the budget guard */
+  tokensUsed?: number;
 }
 
 
@@ -104,12 +118,14 @@ export function updatePhase(
   phase: Phase,
   valid: boolean,
   output?: Record<string, unknown>,
-  error?: string
+  error?: string,
+  usage?: Usage
 ): WorkflowState {
   const now = new Date().toISOString();
 
   const updatedState = {
     ...state,
+    tokensUsed: (state.tokensUsed ?? 0) + (usage?.totalTokens ?? 0),
     currentPhase: phase,
     updatedAt: now,
     phases: [
@@ -119,7 +135,8 @@ export function updatePhase(
         valid,
         timestamp: now,
         output,
-        error
+        error,
+        usage
       }
     ],
     status: !valid ? 'failed' : state.status

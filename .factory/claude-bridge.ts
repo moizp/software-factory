@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { WorkflowState, Phase } from './state';
+import * as os from 'os';
+import { WorkflowState, Phase, Usage } from './state';
 import { agentFilePath } from './pipeline';
 
 interface AgentResponse {
@@ -13,6 +14,7 @@ interface AgentResponse {
     type: string;
     content: Record<string, unknown>;
   }>;
+  usage?: Usage;
 }
 
 interface AgentMarkdown {
@@ -77,7 +79,8 @@ function createAgentPrompt(
   agentMarkdown: AgentMarkdown,
   context: Record<string, unknown>
 ): string {
-  const contextJson = JSON.stringify(context, null, 2);
+  // Compact JSON: indentation is wasted tokens
+  const contextJson = JSON.stringify(context);
 
   return `${agentMarkdown.instructions}
 
@@ -103,43 +106,94 @@ function agentTimeoutMs(): number {
   return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_AGENT_TIMEOUT_MS;
 }
 
-/** Args for headless, tool-less, stateless agent runs (agents only emit JSON in this phase). */
-export function buildCliArgs(): string[] {
-  const args = ['-p', '--output-format', 'json', '--tools', '', '--no-session-persistence'];
-  if (process.env.FACTORY_AGENT_MODEL) {
-    args.push('--model', process.env.FACTORY_AGENT_MODEL);
-  }
-  return args;
+export const DEFAULT_MODEL = 'claude-sonnet-5-5';
+export const DEFAULT_EFFORT = 'medium';
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+export function agentModel(): string {
+  return process.env.FACTORY_AGENT_MODEL || DEFAULT_MODEL;
 }
 
-/** Unwraps `claude -p --output-format json`: throws on is_error, returns the model text. */
-export function parseCliOutput(stdout: string): string {
-  let parsed: { result?: unknown; is_error?: boolean; total_cost_usd?: number } | null = null;
+export function agentEffort(): string {
+  const effort = process.env.FACTORY_AGENT_EFFORT || DEFAULT_EFFORT;
+  if (!EFFORTS.includes(effort)) {
+    console.warn(`[Agent] Ignoring invalid FACTORY_AGENT_EFFORT "${effort}", using ${DEFAULT_EFFORT}`);
+    return DEFAULT_EFFORT;
+  }
+  return effort;
+}
+
+/** Args for headless, tool-less, stateless agent runs (agents only emit JSON in this phase). */
+export function buildCliArgs(): string[] {
+  return [
+    '-p', '--output-format', 'json', '--tools', '', '--no-session-persistence',
+    '--model', agentModel(), '--effort', agentEffort()
+  ];
+}
+
+let emptyCwd: string | null = null;
+
+/**
+ * Agents run from an empty directory: from the repo the CLI would load CLAUDE.md and
+ * project settings into every call (about 9,400 tokens vs about 2,500 measured).
+ */
+function agentCwd(): string {
+  if (!emptyCwd || !fs.existsSync(emptyCwd)) {
+    emptyCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-agent-'));
+  }
+  return emptyCwd;
+}
+
+export interface CliResult {
+  text: string;
+  usage?: Usage;
+}
+
+/** Unwraps `claude -p --output-format json`: throws on is_error, returns the model text and measured usage. */
+export function parseCliResult(stdout: string): CliResult {
+  let parsed: any = null;
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    return stdout.trim();
+    return { text: stdout.trim() };
   }
 
   if (parsed && typeof parsed === 'object' && 'result' in parsed) {
     if (parsed.is_error) {
       throw new Error(`Claude CLI reported an error: ${String(parsed.result)}`);
     }
-    if (typeof parsed.total_cost_usd === 'number') {
-      console.debug(`[Agent] cost_usd=${parsed.total_cost_usd}`);
-    }
-    return String(parsed.result).trim();
+    const u = parsed.usage ?? {};
+    const inputTokens = u.input_tokens ?? 0;
+    const outputTokens = u.output_tokens ?? 0;
+    const cacheReadTokens = u.cache_read_input_tokens ?? 0;
+    const cacheCreationTokens = u.cache_creation_input_tokens ?? 0;
+    return {
+      text: String(parsed.result).trim(),
+      usage: {
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
+        totalTokens: inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens,
+        costUsd: typeof parsed.total_cost_usd === 'number' ? parsed.total_cost_usd : 0,
+        turns: typeof parsed.num_turns === 'number' ? parsed.num_turns : 1
+      }
+    };
   }
-  return stdout.trim();
+  return { text: stdout.trim() };
+}
+
+export function parseCliOutput(stdout: string): string {
+  return parseCliResult(stdout).text;
 }
 
 async function invokeClaudeAgentViaCli(
   prompt: string,
   timeout: number = agentTimeoutMs()
-): Promise<string> {
+): Promise<CliResult> {
   // Async spawn (not execSync) so parallel stages really run concurrently
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn('claude', buildCliArgs(), { stdio: ['pipe', 'pipe', 'pipe'] });
+  return new Promise<CliResult>((resolve, reject) => {
+    const child = spawn('claude', buildCliArgs(), { stdio: ['pipe', 'pipe', 'pipe'], cwd: agentCwd() });
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -172,11 +226,11 @@ async function invokeClaudeAgentViaCli(
       finish(() => {
         try {
           // A non-zero exit can still carry a structured error on stdout
-          const text = parseCliOutput(stdout);
+          const result = parseCliResult(stdout);
           if (code !== 0 && !stdout.trim()) {
             throw new Error(`Claude CLI exited with code ${code}. ${stderr.trim()}`);
           }
-          resolve(text);
+          resolve(result);
         } catch (error) {
           reject(error);
         }
@@ -207,10 +261,13 @@ export async function invokeClaudeAgent(
 
     // Invoke Claude via headless CLI
     let response: string;
+    let usage: Usage | undefined;
     try {
-      console.debug(`[Agent] Invoking Claude CLI with ${timeout}ms timeout...`);
-      response = await invokeClaudeAgentViaCli(prompt, timeout);
-      console.debug(`[Agent] Received response (${response.length} chars)`);
+      console.debug(`[Agent] Invoking Claude CLI (${agentModel()}, effort ${agentEffort()}) with ${timeout}ms timeout...`);
+      const result = await invokeClaudeAgentViaCli(prompt, timeout);
+      response = result.text;
+      usage = result.usage;
+      console.debug(`[Agent] Received response (${response.length} chars, ${usage?.totalTokens ?? '?'} tokens)`);
     } catch (cliError) {
       const msg = cliError instanceof Error ? cliError.message : String(cliError);
       console.error(`[Agent] CLI invocation failed: ${msg}`);
@@ -228,7 +285,8 @@ export async function invokeClaudeAgent(
       );
     }
 
-    return jsonOutput as unknown as AgentResponse;
+    // Measured usage always overrides anything the model wrote under the same key
+    return { ...(jsonOutput as unknown as AgentResponse), usage };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[Agent] Error invoking ${agentName}: ${errorMsg}`);

@@ -65,7 +65,9 @@ The TypeScript orchestrator (`npm run factory:start`) is the runnable implementa
 - Stage order: requirements → analysis → architecture → build (3 engineers in parallel) → test → e2e → review → docs.
 - Each agent response is validated against `.factory/contracts/envelope.schema.json` plus its required payload keys (`AGENT_CONTRACTS`). Payload keys are folded into artifacts and handed to later agents.
 - `npm run factory:retry <id>` resumes the same workflow: validated phases are kept, failed ones re-run.
-- Agents run via `claude -p` (headless, no tools); tune with `FACTORY_AGENT_TIMEOUT_MS` (default 10 min) and `FACTORY_AGENT_MODEL`.
+- Agents run via `claude -p` (headless, no tools) from an empty directory, so the repo's CLAUDE.md and settings are not loaded into every call (about 9,400 tokens vs about 2,500 per call, measured). Defaults: model `claude-sonnet-5-5`, effort `medium`. Tune with `FACTORY_AGENT_MODEL`, `FACTORY_AGENT_EFFORT` (low|medium|high|xhigh|max) and `FACTORY_AGENT_TIMEOUT_MS` (default 10 min). Auth is whatever the `claude` CLI is logged in with, so usage counts against that plan or key.
+- Token tracking: per-phase usage is recorded in each gate and totalled in `state.tokensUsed`. `FACTORY_MAX_TOKENS` (default 600000, 0 disables) pauses the workflow before the next stage once reached; raise it and `factory retry <id>`.
+- Cheap iteration: `npm run factory:start -- "<brief>" --until <agent>` stops after that agent (state `paused`); `factory retry <id>` continues. Use a mock invoker (`npm test`) for anything that doesn't need real model output.
 - The PR targets `main`. Auto-merge happens only if `.factory/policy.json` (read from `main`) allows it and the required checks pass; otherwise the PR is left for a human.
 
 Agents in the diagram below that are not in `pipeline.ts` (mcp-configurator, platform-architect, ui-designer) are not yet executed by the orchestrator. See `docs/FACTORY_GAP_ANALYSIS.md`.
