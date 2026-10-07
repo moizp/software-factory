@@ -321,7 +321,8 @@ Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) 
 - [x] Plan written: architecture, risk tiers, hand-off protocol, gates, cost strategy, scaling, metrics, rollout
 - [x] Workspace scripts (`versions.env`, `bootstrap.sh`, `doctor.sh`, `agent-session.sh`, pre-push guard, Claude settings); guard and doctor exercised locally
 - [x] Guardrail prompts (system rubric, risk triage, logic, security, architecture, docs sync) and `ai-review.yml` template
-- [ ] Decide: branch protection or rulesets on `main` (needs a paid plan for private repos), monthly API budget, model tiers, monorepo or polyrepo
+- [x] Decided: Haiku 4.5 for simple few-turn work, Sonnet 5.5 medium for everything else; each writer has own subscription; separate Anthropic API key for Actions
+- [ ] Decide: branch protection or rulesets on `main` (needs a paid plan for private repos); monthly API ceiling (proposed $25, billed separately from any Pro plan); monorepo or polyrepo
 - [ ] Phase A: reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; run `ai-review.yml` in shadow mode
 - [ ] Phase B: seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard
 - [ ] Phase C: R0/R1 zero-review auto-merge rule in the policy

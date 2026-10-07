@@ -60,7 +60,8 @@ jobs:
           REVIEW_PR: ${{ runner.temp }}/pr.json
         # Phase A deliverable: .factory/review/cli.ts
         #   1. risk tier from .factory/policy.json protected paths, size, dependency and migration files
-        #   2. R0: skip the model. R1: one combined pass. R2: three lenses. R3: all lenses on the larger model
+        #   2. R0: skip the model. R1: one combined pass on Haiku 4.5 (re-run on Sonnet 5.5 on a major finding).
+        #      R2: three lenses on Sonnet 5.5 (medium). R3: all lenses plus architecture on Sonnet 5.5 (medium)
         #   3. drop findings whose evidence_quote is not in the diff; fail closed to policy:manual on any error
         #   4. post a PR review, apply risk:* and ai-review:* labels, upload review-result.json
         run: npx ts-node .factory/review/cli.ts

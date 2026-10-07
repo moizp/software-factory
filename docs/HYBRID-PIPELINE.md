@@ -47,9 +47,9 @@ Deterministic rules first; a cheap model only breaks ties. Higher tier wins.
 | Tier | Examples | AI review | Merge |
 |---|---|---|---|
 | **R0** | Docs, comments, tests only | none (Gate A only) | auto |
-| **R1** | Small local change, one module, no new dependency, no protected path | one combined pass, Sonnet 5.5, medium effort | auto if verdict `approve` |
-| **R2** | Several modules, new dependency, changed API behaviour, config, background jobs | three lenses (logic, security, tests) | human |
-| **R3** | Auth, money, secrets, data model or migrations, infra or CI, cross-service contracts, large diffs | all lenses on the larger model (Opus 5.5, high effort) plus architecture lens | human, mandatory |
+| **R1** | Small local change, one module, no new dependency, no protected path | one combined pass on **Haiku 4.5**; any major finding or low confidence re-runs once on Sonnet 5.5 | auto if the final verdict is `approve` |
+| **R2** | Several modules, new dependency, changed API behaviour, config, background jobs | three lenses (logic, security, tests) on **Sonnet 5.5, medium effort** | human |
+| **R3** | Auth, money, secrets, data model or migrations, infra or CI, cross-service contracts, large diffs | all lenses plus architecture lens on **Sonnet 5.5, medium effort** (a larger model is an optional escalation, see section 7) | human, mandatory |
 
 Inputs to the classifier: `protected_paths` from `.factory/policy.json` (reuse, do not duplicate), lines and files changed, new or changed dependency manifests, migration directories, workflow files, and the writer's own risk claim (a mismatch between the writer's claim and the computed tier is itself reported).
 
@@ -161,7 +161,7 @@ const Review = z.object({
 
 // Stable prefix first (rubric, then the diff), lens instruction last, so passes 2..n read the cache.
 const res = await client.beta.messages.create({
-  model: 'claude-sonnet-5-5',           // R3: 'claude-opus-5-5' with effort 'high'
+  model: 'claude-sonnet-5-5',           // R1 first pass: 'claude-haiku-4-5' (omit effort; see notes)
   max_tokens: 16000,
   betas: ['server-side-fallback-2026-07-01'],
   fallbacks: 'default',                 // a safety decline is re-run server side
@@ -175,7 +175,9 @@ const res = await client.beta.messages.create({
 if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') failClosedToHuman();
 ```
 
-Notes: Sonnet 5.5 and Opus 5.5 reject `thinking: {type:'disabled'}`, `budget_tokens`, sampling parameters and forced `tool_choice`, so control depth with `effort` and use structured outputs. Any error, refusal, timeout or schema failure **fails closed to `policy:manual`**, never to auto-merge. Server-side fallbacks are enabled by default for these models; drop them if you prefer a hard stop.
+Haiku 4.5 differences for the R1 first pass: omit `output_config.effort` (it errors on Haiku 4.5), do not send `thinking` (any thinking there uses a token budget, not adaptive), expect a 200K context window (cap the diff and send larger ones to Sonnet or a human), and confirm structured outputs against the SDK in Phase A.
+
+Notes: Sonnet 5.5 rejects `thinking: {type:'disabled'}`, `budget_tokens`, sampling parameters and forced `tool_choice`, so control depth with `effort` and use structured outputs. Any error, refusal, timeout or schema failure **fails closed to `policy:manual`**, never to auto-merge. Server-side fallbacks are enabled by default for these models; drop them if you prefer a hard stop.
 
 ## 7. API cost strategy
 
@@ -183,25 +185,27 @@ Notes: Sonnet 5.5 and Opus 5.5 reject `thinking: {type:'disabled'}`, `budget_tok
 
 **Levers, in order of effect:**
 1. **Do not call the model when you do not need to:** R0 (docs, tests only) skips AI entirely; draft PRs are skipped; bots and generated files excluded; the kill switch `AI_REVIEW_ENABLED=false` stops everything.
-2. **Tier the model:** Sonnet 5.5 for R1/R2, Opus 5.5 only for R3, Haiku 4.5 for triage tie-breaks.
+2. **Tier the model (decided):** Haiku 4.5 for simple, few-turn work (R1 first pass, triage tie-breaks); Sonnet 5.5 at medium effort for everything else. Escalate on signal, not by default: a Haiku finding of major severity or low confidence re-runs once on Sonnet. A larger model (for example Opus 5.5) stays an optional knob for R3 only if the seeded-flaw eval shows Sonnet missing real flaws.
 3. **Prompt caching:** rubric first (1h cache), diff second (5 min), lens instruction last. Multi-lens passes then read the shared prefix at cache-read price.
 4. **Send less:** diff plus only the files the diff touches, capped; chunk or refuse oversized diffs (and send them to a human) instead of paying to read them. Preflight with `messages.countTokens`; skip and escalate above a per-PR token cap.
-5. **Effort:** `medium` by default; raise only for R3.
+5. **Effort:** `medium` on Sonnet 5.5 everywhere; raise only if the eval shows missed flaws.
 6. **Batch API** (50% off) for non-urgent work: nightly whole-repo audits, docs-sync backlog.
 7. **Hard caps:** per-PR token cap, a monthly budget variable checked before each call using the usage the API returns (kept in a ledger artifact or issue), and a spend limit on the API workspace in the Anthropic Console (verify what your organization supports).
 
-**Estimated cost per review** (list prices: Sonnet 5.5 $2/$10 per MTok, Opus 5.5 $4/$20, cache reads $0.20; sizes are assumptions, measure in shadow mode):
+**Estimated cost per review** (list prices: Haiku 4.5 $1/$5 per MTok, Sonnet 5.5 $2/$10, cache reads $0.20; sizes are assumptions, measure in shadow mode):
 
 | Tier | Assumption | Approx. cost |
 |---|---|---|
 | R0 | no model | $0 |
-| R1 | 25k input (4k cached), 3k output, one pass | about $0.07 |
+| R1 | 25k input (4k cached), 2k output, one Haiku pass (about 20% re-run on Sonnet) | about $0.03 to $0.05 |
 | R2 | 30k shared prefix, three lens passes | about $0.18 |
-| R3 | 60k prefix on Opus 5.5, four lenses at high effort | about $0.75 |
+| R3 | 60k prefix on Sonnet 5.5, four lenses at medium effort | about $0.40 |
 
-At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $1.50 per day, about $30 to $60 per month. Track real tokens per merged PR from `usage` in each response and replace these numbers after the first two weeks.
+At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $0.80 per day, about $20 to $40 per month. Track real tokens per merged PR from `usage` in each response and replace these numbers after the first two weeks.
 
-**Subscription side:** one subscription per human writer; watch usage windows; if one account is exhausted the session pauses rather than switching to the API key (the doctor enforces that no key is present).
+**What pays for what (important):** a Claude Pro plan covers Claude Code use by its owner and does **not** fund API-key usage. The Anthropic API is billed separately (prepaid credits in the Console), so the Actions key is a separate, capped budget. If that budget must come out of plan allowance instead, the only route is running Claude Code in Actions with a subscription token; that shares one account's usage windows with its owner's interactive work and may conflict with Anthropic's terms for automated use, so it is not the default.
+
+**Subscription side:** each human writer has their own subscription (confirmed); watch usage windows; if one account is exhausted the session pauses rather than switching to the API key (the doctor enforces that no key is present).
 
 ## 8. Scaling from one agent to a team
 
@@ -245,12 +249,16 @@ The seeded-flaw eval is what turns "we think the reviewer is good" into evidence
 
 Phase A is first because it improves quality for the writing you already do today, costs little, and produces the numbers every later decision needs.
 
-### Decisions needed from you
-1. **Branch protection or rulesets on `main`** (requires a paid GitHub plan for private repos): without it the zero-review path is a convention, not a guarantee. Recommended before Phase C.
-2. **Metered budget:** monthly ceiling for the API key (the plan assumes $50) and who owns the Console workspace.
-3. **Who counts as a writer:** confirm each person has their own subscription, and that unattended runs stay on the metered key.
-4. **Default model tiers:** Sonnet 5.5 for R1/R2 and Opus 5.5 for R3 as proposed, or a single model for simplicity.
-5. **Where services live:** one monorepo or several repos, which decides the scaling pattern in section 8.
+### Decisions
+**Settled:**
+- Model tiers: Haiku 4.5 for simple few-turn work, Sonnet 5.5 at medium effort for everything else; no larger model by default.
+- Each human writer has their own Claude subscription; unattended runs never use a writer's subscription.
+- GitHub Actions use a separately provisioned Anthropic API key (Actions secret `ANTHROPIC_API_KEY`).
+
+**Still open:**
+1. **Monthly API ceiling.** The key is billed separately from any Pro plan. Proposed starting cap: **$25 per month** as a Console workspace spend limit plus `AI_REVIEW_MONTHLY_USD=25`, raised after two weeks of measured spend (estimate above is $20 to $40).
+2. **Branch protection or rulesets on `main`** (needs a paid plan for private repos). Without it the zero-review path is a convention, not a guarantee. Recommended before Phase C.
+3. **Repository layout:** one monorepo or several repos, which decides the scaling pattern in section 8.
 
 ### Not yet verified
-`bootstrap.sh` has not run on a real VPS (syntax checked; `doctor.sh` and the pre-push hook were exercised locally). `ai-review.yml` and the reviewer script do not exist yet as running code. All cost figures are estimates.
+`bootstrap.sh` has not run on a real VPS (syntax checked; `doctor.sh` and the pre-push hook were exercised locally). `ai-review.yml` and the reviewer script do not exist yet as running code. Haiku 4.5 as the R1 reviewer is untested: whether it catches enough is exactly what the seeded-flaw eval in Phase B decides. All cost figures are estimates.
