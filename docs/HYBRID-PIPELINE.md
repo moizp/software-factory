@@ -8,7 +8,7 @@ Implementation plan for separating **creating** code (interactive, high context,
 |---|---|---|
 | "Eliminate hallucinations" | Cannot be eliminated, in the writer or the reviewer. | Lean on deterministic gates (compile, test, scan) as ground truth; make the AI reviewer **grounded** (every finding must quote the diff, and a script drops findings that do not) and **advisory** except where a deterministic fact backs it. |
 | "Second pair of eyes" | A fresh-context reviewer breaks tunnel vision, but same-family models share blind spots. | Different context, different prompts, a larger model for high risk, plus a seeded-flaw eval to measure what it actually catches. |
-| "Zero manual review for low risk" | Only holds if a bad change cannot bypass the gates. On a free private repo GitHub cannot require checks or block pushes to `main`. | The merge policy and labels govern what agents merge; the writer's token and Claude settings are restricted; **branch protection (GitHub Team/Pro) is recommended before trusting the zero-review path**. Decision needed, see section 10. |
+| "Zero manual review for low risk" | Only holds if a bad change cannot bypass the gates. On a free private repo GitHub cannot require checks or block pushes to `main`, and **protection stays off by decision**. | The merge policy and labels govern what agents merge; the writer's token and Claude settings are restricted; rollout starts with R0 only and adds R1 after 30 days of evidence. Branch protection remains the recommended upgrade. See section 10. |
 | "Claude Pro on the VPS" | Subscription limits are per account and shared across devices; unattended or multi-agent use of one subscription may conflict with Anthropic's usage terms. | Keep subscription use **interactive and per person** (a human drives each tmux session). Anything unattended runs on the metered key. Check the current terms before scaling. |
 
 ## 2. Architecture
@@ -214,8 +214,8 @@ At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $0.80 per day, about
 | 1 agent, 1 repo | One VPS, one tmux session, this plan as written |
 | N agents, 1 team | Still one VPS (size for concurrent sessions) with a worktree per task (`git worktree`), session per agent-task, one GitHub identity per agent for audit |
 | Many services | Per-service `CLAUDE.md` and `REVIEW.md` (extra review rules), per-service `policy.json` protected paths, `CODEOWNERS` per service |
-| Monorepo | Path-filtered matrix in Actions: review and test only changed services; the policy engine already takes the changed paths |
-| Polyrepo | A central reusable workflow (`workflow_call`) versions the reviewer once; services call it with their policy |
+| **Monorepo (chosen)** | Layout, per-service files, path-filtered matrix and per-service policy rules are in `docs/MONOREPO.md` and `templates/monorepo/`; the policy engine already works on changed paths |
+| Several repos (later option) | A central reusable workflow (`workflow_call`) versions the reviewer once; services call it with their policy. Split recipe and notes: `docs/MONOREPO.md` section 4 |
 | Cross-service changes | A change to a shared contract is R3 and triggers dependent services' contract tests (Gate A) plus the architecture lens |
 | Ordering | Serialize merges per service (label plus "branch is up to date" check; a merge queue if the plan supports it) |
 | Capacity | Add a second VPS when concurrent sessions exceed what one machine runs smoothly or when an account's usage windows are the bottleneck; budget the metered spend per service |
@@ -242,23 +242,20 @@ The seeded-flaw eval is what turns "we think the reviewer is good" into evidence
 |---|---|---|
 | **A. Verifier in shadow mode** | Reviewer script (`.factory/review/`: risk classifier, request builder, grounding filter, result writer), `ai-review.yml` from the template, labels, comments only (no merge effect) | Runs on every PR; cost and `usage` logged; ungrounded rate measured |
 | **B. Calibrate** | Seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard | Recall and false-positive targets met on the eval; cost per tier measured |
-| **C. Zero-review path** | Policy rule: R0/R1 with `ai-review:pass` auto-merge; protection on `main` enabled (decision below) | 30 days with no severity-1 escapes from auto-merged PRs |
+| **C. Zero-review path** | Policy rule: R0 auto-merges first; R1 with `ai-review:pass` joins after 30 days of shadow evidence (branch protection stays off) | 30 days with no severity-1 escapes from auto-merged PRs |
 | **D. Standard writer** | Workspace scripts on the Buddy sandbox, hand-off protocol and PR template in use, `HANDOFF.md` convention | Two writers get identical doctor results; a full PR round trip works |
 | **E. Oracle migration** | Provision from `bootstrap.sh`, move sessions | Old box retired with no lost work |
-| **F. Scale out** | Per-service policy and review rules, reusable workflow, per-service budgets | A second service runs the same pipeline |
+| **F. Scale out (monorepo)** | Service resolver reading `services.json` (changed files to services and dependents), Gate A matrix, per-service `REVIEW.md` in the reviewer, per-service policy rules and board lane, per-service budgets | A second service runs the same pipeline in the same repo |
 
 Phase A is first because it improves quality for the writing you already do today, costs little, and produces the numbers every later decision needs.
 
-### Decisions
-**Settled:**
-- Model tiers: Haiku 4.5 for simple few-turn work, Sonnet 5.5 at medium effort for everything else; no larger model by default.
-- Each human writer has their own Claude subscription; unattended runs never use a writer's subscription.
-- GitHub Actions use a separately provisioned Anthropic API key (Actions secret `ANTHROPIC_API_KEY`).
-
-**Still open:**
-1. **Monthly API ceiling.** The key is billed separately from any Pro plan. Proposed starting cap: **$25 per month** as a Console workspace spend limit plus `AI_REVIEW_MONTHLY_USD=25`, raised after two weeks of measured spend (estimate above is $20 to $40).
-2. **Branch protection or rulesets on `main`** (needs a paid plan for private repos). Without it the zero-review path is a convention, not a guarantee. Recommended before Phase C.
-3. **Repository layout:** one monorepo or several repos, which decides the scaling pattern in section 8.
+### Decisions (all settled)
+- **Models:** Haiku 4.5 for simple few-turn work, Sonnet 5.5 at medium effort for everything else; no larger model by default.
+- **Writers:** each human writer has their own Claude subscription; unattended runs never use it.
+- **Actions:** a separately provisioned Anthropic API key (secret `ANTHROPIC_API_KEY`), billed separately from any Pro plan.
+- **Budget:** $25 per month to start, as a Console workspace spend limit plus `AI_REVIEW_MONTHLY_USD=25`; raise after two weeks of measured spend.
+- **Branch protection on `main`: stays off** (free private repo). The zero-review path is therefore a convention plus the policy, labels, the writer's guards and a restricted token, not a GitHub-enforced guarantee. Consequence for rollout: Phase C starts with **R0 only**, and R1 auto-merge is enabled only after 30 days of shadow-mode evidence (no severity-1 escapes, recall target met). Revisit if the plan is upgraded.
+- **Repository layout:** monorepo, with notes for splitting into several repos later (`docs/MONOREPO.md`).
 
 ### Not yet verified
 `bootstrap.sh` has not run on a real VPS (syntax checked; `doctor.sh` and the pre-push hook were exercised locally). `ai-review.yml` and the reviewer script do not exist yet as running code. Haiku 4.5 as the R1 reviewer is untested: whether it catches enough is exactly what the seeded-flaw eval in Phase B decides. All cost figures are estimates.
