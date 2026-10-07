@@ -314,6 +314,22 @@ Decided 2026-10-06. Issues become the working to-do list; `TODO.md` shrinks to t
 - [ ] Orchestrator (Phase 2): link every workflow PR to its issue, mark it ready on success, label `needs-human` on failure
 - [ ] Check how workflows may write to a Project: `GITHUB_TOKEN` may not be allowed to update a user-owned Project v2, in which case a token with `project` scope is needed (verify before relying on it)
 
+## 🔀 Hybrid Pipeline: Persistent Writers, Ephemeral Verifiers
+
+Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) and `templates/ai-review/` (prompts, workflow).
+
+- [x] Plan written: architecture, risk tiers, hand-off protocol, gates, cost strategy, scaling, metrics, rollout
+- [x] Workspace scripts (`versions.env`, `bootstrap.sh`, `doctor.sh`, `agent-session.sh`, pre-push guard, Claude settings); guard and doctor exercised locally
+- [x] Guardrail prompts (system rubric, risk triage, logic, security, architecture, docs sync) and `ai-review.yml` template
+- [ ] Decide: branch protection or rulesets on `main` (needs a paid plan for private repos), monthly API budget, model tiers, monorepo or polyrepo
+- [ ] Phase A: reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; run `ai-review.yml` in shadow mode
+- [ ] Phase B: seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard
+- [ ] Phase C: R0/R1 zero-review auto-merge rule in the policy
+- [ ] Phase D: run `bootstrap.sh` on a Buddy.works sandbox; PR template and `HANDOFF.md` convention
+- [ ] Phase E: provision Oracle Cloud from `bootstrap.sh` and migrate
+- [ ] Phase F: per-service policy and review rules, reusable workflow, per-service budgets
+- [ ] Gate A as a workflow: SAST, secret scan, dependency existence check, migration lint
+
 ## Metrics
 
 | Category | Estimate | Status |
