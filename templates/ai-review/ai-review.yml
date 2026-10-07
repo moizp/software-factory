@@ -1,0 +1,66 @@
+name: AI Review
+
+# Verification Tier, gate B: AI review with the metered API key.
+# Security model: this workflow runs on pull_request_target, so it uses the BASE branch's workflow, scripts and prompts
+# and can see secrets. It therefore must NEVER check out or execute code from the pull request. It only reads the diff
+# as data. Gate A (build, tests, lint, SAST, secret scan) runs the PR's code WITHOUT secrets in a separate workflow.
+#
+# Status: template. Needs the Phase A reviewer script (see docs/HYBRID-PIPELINE.md) before it can run.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Kill switch: set the repository variable AI_REVIEW_ENABLED to "false" to stop all spending.
+    if: ${{ vars.AI_REVIEW_ENABLED != 'false' && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      MONTHLY_BUDGET_USD: ${{ vars.AI_REVIEW_MONTHLY_USD || '50' }}
+    steps:
+      - name: Checkout the base branch (trusted code, prompts and policy)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      - name: Fetch the PR diff as data (never check out the PR head)
+        run: |
+          git fetch origin "pull/$PR_NUMBER/head:pr-head"
+          git diff --no-renames "origin/$BASE_REF...pr-head" > "$RUNNER_TEMP/pr.diff"
+          git diff --numstat --no-renames "origin/$BASE_REF...pr-head" > "$RUNNER_TEMP/pr.numstat"
+          gh pr view "$PR_NUMBER" --json title,body,labels,headRefName > "$RUNNER_TEMP/pr.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Classify risk (deterministic first), review, post result
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          REVIEW_DIFF: ${{ runner.temp }}/pr.diff
+          REVIEW_NUMSTAT: ${{ runner.temp }}/pr.numstat
+          REVIEW_PR: ${{ runner.temp }}/pr.json
+        # Phase A deliverable: .factory/review/cli.ts
+        #   1. risk tier from .factory/policy.json protected paths, size, dependency and migration files
+        #   2. R0: skip the model. R1: one combined pass. R2: three lenses. R3: all lenses on the larger model
+        #   3. drop findings whose evidence_quote is not in the diff; fail closed to policy:manual on any error
+        #   4. post a PR review, apply risk:* and ai-review:* labels, upload review-result.json
+        run: npx ts-node .factory/review/cli.ts
