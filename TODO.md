@@ -327,7 +327,9 @@ Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) 
 - [ ] Gate A matrix per changed service; reviewer appends each service's `REVIEW.md`
 - [ ] Board: add a `Service` field and, later, per-service WIP lanes
 - [ ] Per-service release tags and RC branches when cadences diverge
-- [ ] Phase A: reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; run `ai-review.yml` in shadow mode
+- [x] Decided: Actions run Claude on personal accounts (`claude setup-token`), Anthropic API key optional fallback (plan section 6a)
+- [ ] Each writer: run `claude setup-token`, store `CLAUDE_OAUTH_<LOGIN>` secret, add to `REVIEW_ACCOUNT_MAP`; check the plan's terms for automated use; schedule token rotation
+- [ ] Phase A: reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; run `ai-review.yml` in shadow mode; two runners behind one interface (`cli` on account tokens, `api` on the key), one credential exported at a time, daily review cap, usage ledger
 - [ ] Phase B: seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard
 - [ ] Phase C: R0/R1 zero-review auto-merge rule in the policy
 - [ ] Phase D: run `bootstrap.sh` on a Buddy.works sandbox; PR template and `HANDOFF.md` convention

@@ -1,6 +1,6 @@
 # Hybrid Pipeline: Persistent Writers, Ephemeral Verifiers
 
-Implementation plan for separating **creating** code (interactive, high context, fast) from **verifying** it (independent, fresh context, metered, automated). Goal: a zero-manual-review path for low-risk changes, and high-risk flaws caught before production.
+Implementation plan for separating **creating** code (interactive, high context, fast) from **verifying** it (independent, fresh context, automated). Goal: a zero-manual-review path for low-risk changes, and high-risk flaws caught before production.
 
 ## 1. Read this first: what the design can and cannot promise
 
@@ -9,7 +9,7 @@ Implementation plan for separating **creating** code (interactive, high context,
 | "Eliminate hallucinations" | Cannot be eliminated, in the writer or the reviewer. | Lean on deterministic gates (compile, test, scan) as ground truth; make the AI reviewer **grounded** (every finding must quote the diff, and a script drops findings that do not) and **advisory** except where a deterministic fact backs it. |
 | "Second pair of eyes" | A fresh-context reviewer breaks tunnel vision, but same-family models share blind spots. | Different context, different prompts, a larger model for high risk, plus a seeded-flaw eval to measure what it actually catches. |
 | "Zero manual review for low risk" | Only holds if a bad change cannot bypass the gates. On a free private repo GitHub cannot require checks or block pushes to `main`, and **protection stays off by decision**. | The merge policy and labels govern what agents merge; the writer's token and Claude settings are restricted; rollout starts with R0 only and adds R1 after 30 days of evidence. Branch protection remains the recommended upgrade. See section 10. |
-| "Claude Pro on the VPS" | Subscription limits are per account and shared across devices; unattended or multi-agent use of one subscription may conflict with Anthropic's usage terms. | Keep subscription use **interactive and per person** (a human drives each tmux session). Anything unattended runs on the metered key. Check the current terms before scaling. |
+| "Claude Pro on the VPS and in Actions" | Subscription limits are per account, shared across devices, and shared between a person's interactive work and any CI runs on the same account. Automated use of consumer subscriptions may conflict with Anthropic's usage terms. | Decision: **Actions run on personal Claude accounts** via `claude setup-token` (the CLI's supported long-lived token), with an **Anthropic API key as an optional fallback** (section 6a). Each person's allowance pays for their own PRs, reviews fail closed when an allowance runs out, and the terms need a check before this scales beyond your own repositories. |
 
 ## 2. Architecture
 
@@ -30,8 +30,8 @@ Implementation plan for separating **creating** code (interactive, high context,
 | | Creation Tier (Writer) | Verification Tier (Reviewer) |
 |---|---|---|
 | Runs on | Linux VPS (Buddy.works sandbox first, Oracle Cloud later) | GitHub Actions runners |
-| Tooling | Claude Code CLI in tmux | Scripts calling the Anthropic API |
-| Billing | Claude subscription (interactive) | Metered API key, hard-capped |
+| Tooling | Claude Code CLI in tmux | Scripts running `claude -p` on a personal account, or calling the Messages API when only an API key exists |
+| Billing | Claude subscription (interactive) | Personal account allowance (primary); metered API key only as an optional, capped fallback |
 | Context | Long, accumulated, biased by its own history | Fresh every time: diff, PR claims, selected files |
 | Trust | Has write access to feature branches only | Never executes PR code in the secret-bearing job |
 | Output | Commits, PR | Labels, review comments, `review-result.json`, merge decision |
@@ -77,7 +77,7 @@ Files: `templates/workspace/` (copy to every VPS; all idempotent).
 
 **Layers of protection for the writer (soft to hard):** Claude deny rules (best effort) → pre-push hook → fine-grained token scoped to one repo with no admin → branch protection on `main` (needs a paid plan). The hook and deny rules stop mistakes; only the last two stop a compromised or confused session.
 
-**Environment variables:** `DISABLE_AUTOUPDATER=1`, and `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` unset on writers. The metered key exists only as an Actions secret.
+**Environment variables:** `DISABLE_AUTOUPDATER=1`, and `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` unset on writers. Account tokens (and the optional API key) exist only as Actions secrets, never on a writer machine.
 
 **Treat the VPS as disposable.** State lives in git (commits, the PR body, a `HANDOFF.md` note in the branch), not in tmux scrollback. That makes the Buddy.works to Oracle Cloud move a rebuild, not a migration:
 
@@ -179,9 +179,39 @@ Haiku 4.5 differences for the R1 first pass: omit `output_config.effort` (it err
 
 Notes: Sonnet 5.5 rejects `thinking: {type:'disabled'}`, `budget_tokens`, sampling parameters and forced `tool_choice`, so control depth with `effort` and use structured outputs. Any error, refusal, timeout or schema failure **fails closed to `policy:manual`**, never to auto-merge. Server-side fallbacks are enabled by default for these models; drop them if you prefer a hard stop.
 
+### 6a. Running Claude in Actions: personal accounts first, API key optional
+
+Two interchangeable runners behind one interface (`review(request) -> Review`):
+
+| Runner | Credential | How it calls Claude | When |
+|---|---|---|---|
+| `cli` (default) | `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` | `claude -p --output-format json --tools "" --json-schema <schema> --model <m> --effort medium`, prompt on stdin, run from an empty directory (small fixed context, as in the factory's own agent runner) | a personal or shared account token exists |
+| `api` (fallback) | `ANTHROPIC_API_KEY` | Messages API as in the code sample above | no account token, or the owner prefers metered billing |
+
+**Selection order, per PR:** the PR author's own account token, then a shared account token, then the API key, then none. With none, the review is skipped and the PR is labelled `policy:manual` (fail closed).
+
+**Rules that avoid silent surprises:**
+- **Export exactly one credential.** If `ANTHROPIC_API_KEY` is present, Claude Code uses it instead of the subscription login and bills the API. The selection step exports one and unsets the other.
+- **Never use `--bare` with an account token.** In bare mode Claude Code reads only an API key, never OAuth.
+- Haiku runs omit `--effort`; Sonnet 5.5 runs use `--effort medium` (the same rules as the API).
+- Pin the CLI version (`CLAUDE_CODE_VERSION`, the same value as the writer workspace) so reviews do not change behaviour between runs.
+
+**Setting it up (once per person):**
+1. On any machine with a browser: `claude setup-token` (needs that person's subscription) and copy the token it prints.
+2. Store it as a repository secret named `CLAUDE_OAUTH_<GITHUB_LOGIN_UPPERCASE>`, for example `CLAUDE_OAUTH_ALICE` (GitHub CLI: `gh secret set CLAUDE_OAUTH_ALICE`).
+3. Add the login to the repository variable `REVIEW_ACCOUNT_MAP`, for example `{"alice":"CLAUDE_OAUTH_ALICE","bob":"CLAUDE_OAUTH_BOB"}`.
+4. Optional shared fallback account: secret `CLAUDE_CODE_OAUTH_TOKEN`. Optional API fallback: secret `ANTHROPIC_API_KEY`.
+5. Rotate tokens on a schedule, and revoke one by signing that device or token out of the account.
+
+**Risks to accept knowingly:**
+- **Terms and fair use:** `setup-token` is the CLI's supported way to authenticate non-interactive runs, but check your plan's terms for automated use, especially if the repository is shared with other people.
+- **Shared allowance:** reviews draw on the same usage windows as that person's interactive work. The daily cap and the Haiku-first, skip-R0 rules exist to protect it; heavy CI days can still slow the writer. A busy repository may need the API fallback or a dedicated account.
+- **Token exposure:** a long-lived token is a credential for the whole account. It is stored as a repo secret, only visible to workflows running base-branch code (the `pull_request_target` design in section 2), and any PR that touches `.github/**` is R3.
+- **Account ties to a person:** if someone leaves, their secret is removed and their PRs fall back to the shared account, the API key, or manual review.
+
 ## 7. API cost strategy
 
-**Division of spend:** subscription pays for the writer's interactive work (plan, build, refactor, fix rounds). The metered key pays only for verification, so spend scales with PR volume and risk, not with how long a writer thinks.
+**Division of spend:** each writer's own subscription pays for their interactive work (plan, build, refactor, fix rounds) and, by default, for the reviews of their own PRs in Actions. The optional API key (if provisioned) is a fallback that bills separately. Either way, verification cost scales with PR volume and risk, not with how long a writer thinks.
 
 **Levers, in order of effect:**
 1. **Do not call the model when you do not need to:** R0 (docs, tests only) skips AI entirely; draft PRs are skipped; bots and generated files excluded; the kill switch `AI_REVIEW_ENABLED=false` stops everything.
@@ -190,7 +220,7 @@ Notes: Sonnet 5.5 rejects `thinking: {type:'disabled'}`, `budget_tokens`, sampli
 4. **Send less:** diff plus only the files the diff touches, capped; chunk or refuse oversized diffs (and send them to a human) instead of paying to read them. Preflight with `messages.countTokens`; skip and escalate above a per-PR token cap.
 5. **Effort:** `medium` on Sonnet 5.5 everywhere; raise only if the eval shows missed flaws.
 6. **Batch API** (50% off) for non-urgent work: nightly whole-repo audits, docs-sync backlog.
-7. **Hard caps:** per-PR token cap, a monthly budget variable checked before each call using the usage the API returns (kept in a ledger artifact or issue), and a spend limit on the API workspace in the Anthropic Console (verify what your organization supports).
+7. **Hard caps:** per-PR token cap; a daily cap on Sonnet reviews per account (a repository variable) so CI cannot drain a person's allowance; usage from each response (`usage` in the CLI JSON or the API response) written to a ledger artifact; and, only when the API-key fallback is enabled, a monthly dollar cap (`AI_REVIEW_MONTHLY_USD`, proposed $25) plus a spend limit on the API workspace in the Console (verify what your organization supports).
 
 **Estimated cost per review** (list prices: Haiku 4.5 $1/$5 per MTok, Sonnet 5.5 $2/$10, cache reads $0.20; sizes are assumptions, measure in shadow mode):
 
@@ -203,9 +233,9 @@ Notes: Sonnet 5.5 rejects `thinking: {type:'disabled'}`, `budget_tokens`, sampli
 
 At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $0.80 per day, about $20 to $40 per month. Track real tokens per merged PR from `usage` in each response and replace these numbers after the first two weeks.
 
-**What pays for what (important):** a Claude Pro plan covers Claude Code use by its owner and does **not** fund API-key usage. The Anthropic API is billed separately (prepaid credits in the Console), so the Actions key is a separate, capped budget. If that budget must come out of plan allowance instead, the only route is running Claude Code in Actions with a subscription token; that shares one account's usage windows with its owner's interactive work and may conflict with Anthropic's terms for automated use, so it is not the default.
+**What pays for what (important):** the Pro plan allowance covers Claude Code runs authenticated with that account's token; it does **not** fund API-key usage, which is billed separately through the Console. Decision: Actions use **personal account tokens first** (the PR author's, then an optional shared one), and the API key is used **only when no account token is available**. Dollar figures above are API list prices; on a personal account the same numbers show how much of the allowance a review consumes.
 
-**Subscription side:** each human writer has their own subscription (confirmed); watch usage windows; if one account is exhausted the session pauses rather than switching to the API key (the doctor enforces that no key is present).
+**Subscription side:** each human writer has their own subscription (confirmed). Interactive sessions on the VPS never fall back to an API key (the doctor enforces that no key is present). In Actions, if a person's allowance is exhausted the review fails closed to a human, or falls back to the API key if one is configured.
 
 ## 8. Scaling from one agent to a team
 
@@ -218,7 +248,7 @@ At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $0.80 per day, about
 | Several repos (later option) | A central reusable workflow (`workflow_call`) versions the reviewer once; services call it with their policy. Split recipe and notes: `docs/MONOREPO.md` section 4 |
 | Cross-service changes | A change to a shared contract is R3 and triggers dependent services' contract tests (Gate A) plus the architecture lens |
 | Ordering | Serialize merges per service (label plus "branch is up to date" check; a merge queue if the plan supports it) |
-| Capacity | Add a second VPS when concurrent sessions exceed what one machine runs smoothly or when an account's usage windows are the bottleneck; budget the metered spend per service |
+| Capacity | Add a second VPS when concurrent sessions exceed what one machine runs smoothly or when an account's usage windows are the bottleneck; budget the allowance and any API fallback per service |
 | Board | Raise WIP limits per lane (service) rather than globally (`board.json` extension) |
 
 ## 9. Success metrics (proposed targets; set after a baseline)
@@ -231,7 +261,7 @@ At 20 PRs per day (12 R0, 5 R1, 2 R2, 1 R3) that is roughly $0.80 per day, about
 | False positive rate | Findings the writer or human marks wrong / all findings | under 20% |
 | Ungrounded rate | Findings dropped by the grounding filter / all findings | falling; alert if above 10% |
 | Cycle time | PR opened to merged, per tier | R1 under 15 minutes |
-| Cost | Metered tokens and dollars per merged PR, per tier | within the monthly budget |
+| Cost | Tokens (and API-equivalent dollars) per merged PR, per tier; share of each account's allowance used by CI | within the daily cap and, if the API fallback is on, the monthly budget |
 | Human minutes | Review time spent per PR, per tier | falling for R0/R1, stable for R3 |
 
 The seeded-flaw eval is what turns "we think the reviewer is good" into evidence, and what lets you change prompts or models safely.
@@ -252,10 +282,10 @@ Phase A is first because it improves quality for the writing you already do toda
 ### Decisions (all settled)
 - **Models:** Haiku 4.5 for simple few-turn work, Sonnet 5.5 at medium effort for everything else; no larger model by default.
 - **Writers:** each human writer has their own Claude subscription; unattended runs never use it.
-- **Actions:** a separately provisioned Anthropic API key (secret `ANTHROPIC_API_KEY`), billed separately from any Pro plan.
-- **Budget:** $25 per month to start, as a Console workspace spend limit plus `AI_REVIEW_MONTHLY_USD=25`; raise after two weeks of measured spend.
+- **Actions:** run Claude on **personal accounts** (each writer's `claude setup-token` token, section 6a), with an **Anthropic API key as an optional fallback** when available.
+- **Budget:** on personal accounts the limit is each plan's allowance (guarded by a daily review cap, Haiku-first and skip-R0 rules). If the API-key fallback is enabled it has its own cap: $25 per month to start (`AI_REVIEW_MONTHLY_USD=25` plus a Console spend limit), raised after two weeks of measured spend.
 - **Branch protection on `main`: stays off** (free private repo). The zero-review path is therefore a convention plus the policy, labels, the writer's guards and a restricted token, not a GitHub-enforced guarantee. Consequence for rollout: Phase C starts with **R0 only**, and R1 auto-merge is enabled only after 30 days of shadow-mode evidence (no severity-1 escapes, recall target met). Revisit if the plan is upgraded.
 - **Repository layout:** monorepo, with notes for splitting into several repos later (`docs/MONOREPO.md`).
 
 ### Not yet verified
-`bootstrap.sh` has not run on a real VPS (syntax checked; `doctor.sh` and the pre-push hook were exercised locally). `ai-review.yml` and the reviewer script do not exist yet as running code. Haiku 4.5 as the R1 reviewer is untested: whether it catches enough is exactly what the seeded-flaw eval in Phase B decides. All cost figures are estimates.
+`bootstrap.sh` has not run on a real VPS (syntax checked; `doctor.sh` and the pre-push hook were exercised locally). `ai-review.yml` and the reviewer script do not exist yet as running code. The `cli` runner (`claude -p` with `--json-schema` on an account token) and the secret-selection expression in `ai-review.yml` have never run in Actions; whether Claude Code accepts the token in that environment is checked in Phase A's first run. Haiku 4.5 as the R1 reviewer is untested: whether it catches enough is exactly what the seeded-flaw eval in Phase B decides. All cost figures are estimates.

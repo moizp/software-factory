@@ -1,8 +1,8 @@
 name: AI Review
 
-# Verification Tier, gate B: AI review with the metered API key.
+# Verification Tier, gate B: AI review on a personal Claude account (primary) or an Anthropic API key (optional fallback).
 # Security model: this workflow runs on pull_request_target, so it uses the BASE branch's workflow, scripts and prompts
-# and can see secrets. It therefore must NEVER check out or execute code from the pull request. It only reads the diff
+# and can see secrets (account tokens and, if set, the API key). It therefore must NEVER check out or execute code from the pull request. It only reads the diff
 # as data. Gate A (build, tests, lint, SAST, secret scan) runs the PR's code WITHOUT secrets in a separate workflow.
 #
 # Status: template. Needs the Phase A reviewer script (see docs/HYBRID-PIPELINE.md) before it can run.
@@ -30,7 +30,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BASE_REF: ${{ github.event.pull_request.base.ref }}
-      MONTHLY_BUDGET_USD: ${{ vars.AI_REVIEW_MONTHLY_USD || '50' }}
+      MONTHLY_BUDGET_USD: ${{ vars.AI_REVIEW_MONTHLY_USD || '25' }}   # applies to the API-key fallback only
+      DAILY_REVIEW_CAP: ${{ vars.AI_REVIEW_DAILY_CAP || '20' }}       # protects personal account allowances
     steps:
       - name: Checkout the base branch (trusted code, prompts and policy)
         uses: actions/checkout@v4
@@ -52,16 +53,42 @@ jobs:
 
       - run: npm ci
 
+      # Pin the CLI so reviews behave the same on every run (keep in step with templates/workspace/versions.env).
+      - run: npm install -g "@anthropic-ai/claude-code@${{ vars.CLAUDE_CODE_VERSION || '2.1.292' }}"
+
       - name: Classify risk (deterministic first), review, post result
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Credentials are passed under neutral names so neither is exported by accident.
+          # Order: the PR author's own account, then a shared account, then the API key.
+          # REVIEW_ACCOUNT_MAP is a repo variable such as {"alice":"CLAUDE_OAUTH_ALICE"}.
+          # Verify on first run that an unmapped login resolves to an empty value.
+          AUTHOR_TOKEN: ${{ secrets[fromJSON(vars.REVIEW_ACCOUNT_MAP || '{}')[github.event.pull_request.user.login]] }}
+          SHARED_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           REVIEW_DIFF: ${{ runner.temp }}/pr.diff
           REVIEW_NUMSTAT: ${{ runner.temp }}/pr.numstat
           REVIEW_PR: ${{ runner.temp }}/pr.json
-        # Phase A deliverable: .factory/review/cli.ts
-        #   1. risk tier from .factory/policy.json protected paths, size, dependency and migration files
-        #   2. R0: skip the model. R1: one combined pass on Haiku 4.5 (re-run on Sonnet 5.5 on a major finding).
-        #      R2: three lenses on Sonnet 5.5 (medium). R3: all lenses plus architecture on Sonnet 5.5 (medium)
-        #   3. drop findings whose evidence_quote is not in the diff; fail closed to policy:manual on any error
-        #   4. post a PR review, apply risk:* and ai-review:* labels, upload review-result.json
-        run: npx ts-node .factory/review/cli.ts
+        run: |
+          # Export exactly ONE credential: with ANTHROPIC_API_KEY present Claude Code would use (and bill) the API
+          # instead of the account. Never run Claude Code with --bare here: bare mode ignores OAuth tokens.
+          if [ -n "$AUTHOR_TOKEN" ]; then
+            export CLAUDE_CODE_OAUTH_TOKEN="$AUTHOR_TOKEN" REVIEW_RUNNER=cli REVIEW_ACCOUNT=author
+          elif [ -n "$SHARED_TOKEN" ]; then
+            export CLAUDE_CODE_OAUTH_TOKEN="$SHARED_TOKEN" REVIEW_RUNNER=cli REVIEW_ACCOUNT=shared
+          elif [ -n "$API_KEY" ]; then
+            export ANTHROPIC_API_KEY="$API_KEY" REVIEW_RUNNER=api REVIEW_ACCOUNT=api-key
+          else
+            echo "No Claude credential available: skipping the AI review and leaving the PR for a human."
+            gh pr edit "$PR_NUMBER" --add-label "policy:manual" || true
+            exit 0
+          fi
+          unset AUTHOR_TOKEN SHARED_TOKEN API_KEY
+          # Phase A deliverable: .factory/review/cli.ts
+          #   1. risk tier from .factory/policy.json protected paths, size, dependency and migration files
+          #   2. R0: skip the model. R1: one combined pass on Haiku 4.5 (re-run on Sonnet 5.5 on a major finding).
+          #      R2: three lenses on Sonnet 5.5 (medium). R3: all lenses plus architecture on Sonnet 5.5 (medium)
+          #   3. runner 'cli': claude -p --output-format json --tools "" --json-schema ...; runner 'api': Messages API
+          #   4. drop findings whose evidence_quote is not in the diff; fail closed to policy:manual on any error,
+          #      an exhausted allowance, or the daily cap
+          #   5. post a PR review, apply risk:* and ai-review:* labels, upload review-result.json
+          npx ts-node .factory/review/cli.ts
