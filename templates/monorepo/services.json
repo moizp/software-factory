@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "name": "billing",
+      "path": "services/billing",
+      "owners": ["@your-org/billing"],
+      "language": "typescript",
+      "build": "npm run build",
+      "test": "npm test",
+      "depends_on": ["libs/shared-types", "contracts"],
+      "release": { "tag_prefix": "billing/" },
+      "deploy": "services/billing/scripts/deploy.sh"
+    },
+    {
+      "name": "auth",
+      "path": "services/auth",
+      "owners": ["@your-org/platform"],
+      "language": "typescript",
+      "build": "npm run build",
+      "test": "npm test",
+      "depends_on": ["libs/shared-types", "contracts"],
+      "release": { "tag_prefix": "auth/" },
+      "deploy": "services/auth/scripts/deploy.sh"
+    }
+  ],
+  "shared": [
+    { "path": "libs/shared-types", "note": "Imported by services; a change here affects every dependent" },
+    { "path": "contracts", "note": "API and event schemas between services; always human reviewed" }
+  ]
+}

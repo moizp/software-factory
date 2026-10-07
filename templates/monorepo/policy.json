@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "default": { "auto_merge": false, "approvals": 1, "require": ["ci"] },
+  "protected_paths": [
+    ".factory/**",
+    ".github/**",
+    ".claude/**",
+    "contracts/**",
+    "libs/**",
+    "services/*/migrations/**",
+    "services/*/scripts/deploy.sh",
+    "package.json",
+    "package-lock.json"
+  ],
+  "force_manual_labels": ["needs-human"],
+  "rules": [
+    {
+      "name": "docs only",
+      "match": { "paths_only": ["**/*.md", "docs/**"], "max_files": 20 },
+      "auto_merge": true
+    },
+    {
+      "name": "billing small fix",
+      "match": { "branch": ["fix/billing-*"], "paths_only": ["services/billing/**"], "max_files": 10, "max_lines": 300 },
+      "auto_merge": true,
+      "require": ["ci", "reviewer_verdict"]
+    },
+    {
+      "name": "auth always human",
+      "match": { "paths_any": ["services/auth/**"] },
+      "auto_merge": false,
+      "approvals": 1
+    }
+  ]
+}
