@@ -314,6 +314,29 @@ Decided 2026-10-06. Issues become the working to-do list; `TODO.md` shrinks to t
 - [ ] Orchestrator (Phase 2): link every workflow PR to its issue, mark it ready on success, label `needs-human` on failure
 - [ ] Check how workflows may write to a Project: `GITHUB_TOKEN` may not be allowed to update a user-owned Project v2, in which case a token with `project` scope is needed (verify before relying on it)
 
+## 🔀 Hybrid Pipeline: Persistent Writers, Ephemeral Verifiers
+
+Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) and `templates/ai-review/` (prompts, workflow).
+
+- [x] Plan written: architecture, risk tiers, hand-off protocol, gates, cost strategy, scaling, metrics, rollout
+- [x] Workspace scripts (`versions.env`, `bootstrap.sh`, `doctor.sh`, `agent-session.sh`, pre-push guard, Claude settings); guard and doctor exercised locally
+- [x] Guardrail prompts (system rubric, risk triage, logic, security, architecture, docs sync) and `ai-review.yml` template
+- [x] Decided: Haiku 4.5 for simple few-turn work, Sonnet 5.5 medium for everything else; each writer has own subscription; separate Anthropic API key for Actions
+- [x] Decided: main branch protection stays off (R0 auto-merge first, R1 after 30 days of shadow evidence); API cap $25 per month; monorepo with notes for several repos (`docs/MONOREPO.md`, `templates/monorepo/`)
+- [ ] Service resolver `.factory/services.ts` (reads `services.json`: changed files to services and dependents, cross-service floor for risk tier) with tests
+- [ ] Gate A matrix per changed service; reviewer appends each service's `REVIEW.md`
+- [ ] Board: add a `Service` field and, later, per-service WIP lanes
+- [ ] Per-service release tags and RC branches when cadences diverge
+- [x] Decided: Actions run Claude on personal accounts (`claude setup-token`), Anthropic API key optional fallback (plan section 6a)
+- [ ] Each writer: run `claude setup-token`, store `CLAUDE_OAUTH_<LOGIN>` secret, add to `REVIEW_ACCOUNT_MAP`; check the plan's terms for automated use; schedule token rotation
+- [ ] Phase A: reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; run `ai-review.yml` in shadow mode; two runners behind one interface (`cli` on account tokens, `api` on the key), one credential exported at a time, daily review cap, usage ledger
+- [ ] Phase B: seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard
+- [ ] Phase C: R0/R1 zero-review auto-merge rule in the policy
+- [ ] Phase D: run `bootstrap.sh` on a Buddy.works sandbox; PR template and `HANDOFF.md` convention
+- [ ] Phase E: provision Oracle Cloud from `bootstrap.sh` and migrate
+- [ ] Phase F: per-service policy and review rules, reusable workflow, per-service budgets
+- [ ] Gate A as a workflow: SAST, secret scan, dependency existence check, migration lint
+
 ## Metrics
 
 | Category | Estimate | Status |

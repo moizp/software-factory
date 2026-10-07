@@ -562,6 +562,8 @@ The factory has no release cadence. Apps it builds use release candidate branche
 
 **Guides:**
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — Branching guide & conventions
+- [MONOREPO.md](./docs/MONOREPO.md) — Chosen monorepo layout for services, and notes for splitting into several repos
+- [HYBRID-PIPELINE.md](./docs/HYBRID-PIPELINE.md) — Plan: persistent writer VPS plus ephemeral AI verification in GitHub Actions
 - [ADOPTING.md](./docs/ADOPTING.md) — Prompt for bringing the factory's practices into an existing project
 - [POLICY.md](./docs/POLICY.md) — Which PRs agents may auto-merge and which need a human (`.factory/policy.json`)
 

@@ -312,3 +312,36 @@ describe('Orchestrator auto-merge gating', () => {
     expect(state.notes.join()).toMatch(/could not evaluate policy/);
   });
 });
+
+describe('monorepo policy template (templates/monorepo/policy.json)', () => {
+  const monorepo = parsePolicy(
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'templates', 'monorepo', 'policy.json'), 'utf-8'))
+  );
+  const change = (branch: string, files: string[], changedLines = 20) => ({ branch, files, changedLines, labels: [] });
+
+  it('lets a small fix inside one service auto-merge', () => {
+    expect(evaluatePolicy(monorepo, change('fix/billing-rounding', ['services/billing/src/invoice.ts'])).autoMerge).toBe(true);
+  });
+
+  it.each([
+    ['a fix that also touches shared libs', ['services/billing/src/a.ts', 'libs/shared-types/index.ts']],
+    ['a fix that touches contracts', ['services/billing/src/a.ts', 'contracts/billing/openapi.yaml']],
+    ['a fix that adds a migration', ['services/billing/migrations/002.sql']],
+    ['a fix that touches another service', ['services/billing/src/a.ts', 'services/auth/src/b.ts']],
+    ['a fix that edits the deploy script', ['services/billing/scripts/deploy.sh']]
+  ])('needs a human for %s', (_name, files) => {
+    expect(evaluatePolicy(monorepo, change('fix/billing-x', files)).autoMerge).toBe(false);
+  });
+
+  it('always needs a human for the auth service', () => {
+    expect(evaluatePolicy(monorepo, change('fix/auth-token', ['services/auth/src/t.ts'])).autoMerge).toBe(false);
+  });
+
+  it('does not let the billing rule cover a differently named branch', () => {
+    expect(evaluatePolicy(monorepo, change('feature/billing-x', ['services/billing/src/a.ts'])).autoMerge).toBe(false);
+  });
+
+  it('keeps docs-only changes automatic', () => {
+    expect(evaluatePolicy(monorepo, change('chore/docs', ['docs/a.md', 'services/billing/README.md'])).autoMerge).toBe(true);
+  });
+});

@@ -1,0 +1,8 @@
+# Copy to .github/CODEOWNERS. On a repo without branch protection this requests reviewers automatically
+# but cannot block a merge; with protection it can be made mandatory.
+/services/billing/   @your-org/billing
+/services/auth/      @your-org/platform
+/contracts/          @your-org/platform @your-org/billing
+/libs/               @your-org/platform
+/.github/            @your-org/platform
+/.factory/           @your-org/platform
