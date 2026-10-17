@@ -69,7 +69,7 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 ## 4. What to build (one PR each)
 
-Built so far: slice 0 (the vulnerable workflow removed) and slice 1 (`.factory/route/`). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
+Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`) and slice 2 (the workflows below). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
 
 | # | Slice | Notes |
 |---|---|---|
@@ -81,6 +81,24 @@ Built so far: slice 0 (the vulnerable workflow removed) and slice 1 (`.factory/r
 | 5 | Ledger guard and the daily lease sweep | |
 
 Slice 2 depends on Phase 2: until agents can commit into a worktree and open a draft PR, a long job can run stages and post their artifacts on the issue but cannot deliver code.
+
+### Slice 2: how the pieces are wired
+
+| File | Job |
+|---|---|
+| `.github/workflows/route.yml` | On label `agent:ready` (or manual dispatch) runs `route-cli decide`: checks the sender, the issue state, WIP, the ledger and the Oracle heartbeat, then claims the issue (labels and a lease comment) and calls `agent-job.yml` |
+| `.github/workflows/agent-job.yml` | Two jobs so the Oracle job never references a secret: `hosted` (short lane, `ubuntu-latest`, gets Claude credentials) and `oracle` (long lane, `[self-hosted, oracle]`, uses the writer's local login) |
+| `.github/actions/agent-run/` | Shared steps: install, run `factory start <issue brief> --until <agent>` with a 10 minute lease heartbeat, hand the issue back (`agent:review` or `agent:failed`), charge the ledger, keep the workflow state as an artifact |
+| `.factory/route/cli.ts` | `decide`, `beat` and `finish` subcommands over the pure router and a thin `gh` wrapper |
+
+Behaviour to know:
+- The pipeline stops at the agent named by an `until:<agent>` label, default `software-architect`. It writes artifacts, not code, until Phase 2 exists.
+- The Oracle VM proves it is alive by setting the repository variable `ORACLE_LAST_SEEN` (UTC time) every few minutes (slice 3 adds the timer). No heartbeat means the long lane waits.
+- The ledger is an open issue labelled `agent:ledger`, created on first use. Each routed run costs one hosted minute for the router plus the job time.
+- The pipeline step gets no `GITHUB_TOKEN`, so the orchestrator cannot open or merge PRs from a routed run.
+- The hosted lane picks one credential: the issue author's account (`REVIEW_ACCOUNT_MAP`), a shared `CLAUDE_CODE_OAUTH_TOKEN`, then `ANTHROPIC_API_KEY`.
+
+To try it: create the label `agent:ready`, open an issue, label it with `agent:ready` and `task:review`, and watch the Actions tab. For the long lane, slice 3 must be done first.
 
 ## 5. Decisions (settled)
 
@@ -95,3 +113,4 @@ Slice 2 depends on Phase 2: until agents can commit into a worktree and open a d
 - That `runs-on: [self-hosted, oracle]` queues cleanly when the runner is offline (jobs wait, then time out).
 - Buddy's webhook response shape and maximum run time.
 - Cost and token use of long agent jobs on a personal Claude plan.
+- Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.

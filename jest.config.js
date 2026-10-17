@@ -18,7 +18,9 @@ module.exports = {
     '!.factory/test.ts',
     '!.factory/github-integration.ts',
     '!.factory/claude-bridge.ts',
-    '!.factory/review/cli.ts'
+    '!.factory/review/cli.ts',
+    '!.factory/route/cli.ts',
+    '!.factory/route/github.ts'
   ],
   coverageThreshold: {
     global: {

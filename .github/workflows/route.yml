@@ -1,0 +1,71 @@
+name: Route Agent Work
+
+# Event-driven router (docs/CLOUD-RUNNERS.md). When an issue gets the label agent:ready, picks a lane
+# (hosted Actions, the Oracle self-hosted runner), claims the issue, and calls agent-job.yml. There is no
+# schedule: polling would use up the hosted minutes. Code, board and prompts come from the default branch;
+# issue text is read through gh as data and never placed in a shell command.
+#
+# Needed before first use: label agent:ready, and for the long lane a runner labelled `oracle` plus the
+# repository variable ORACLE_LAST_SEEN refreshed by the VM. Kill switch: repository variable AGENTS_ENABLED=false.
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to route
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: route-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  route:
+    if: ${{ vars.AGENTS_ENABLED != 'false' && (github.event_name == 'workflow_dispatch' || github.event.label.name == 'agent:ready') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue }}
+      ACTOR: ${{ github.actor }}
+      RUN_ID: ${{ github.run_id }}
+      AGENTS_ENABLED: ${{ vars.AGENTS_ENABLED }}
+    outputs:
+      action: ${{ steps.decide.outputs.action }}
+      lane: ${{ steps.decide.outputs.lane }}
+      group: ${{ steps.decide.outputs.group }}
+      until: ${{ steps.decide.outputs.until }}
+      lease_comment: ${{ steps.decide.outputs.lease_comment }}
+      author: ${{ steps.decide.outputs.author }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - run: npm ci
+
+      - id: decide
+        run: npx ts-node .factory/route/cli.ts decide
+
+  agent:
+    needs: route
+    if: ${{ needs.route.outputs.action == 'start' }}
+    uses: ./.github/workflows/agent-job.yml
+    with:
+      issue: ${{ github.event.issue.number || inputs.issue }}
+      lane: ${{ needs.route.outputs.lane }}
+      group: ${{ needs.route.outputs.group }}
+      until: ${{ needs.route.outputs.until }}
+      lease_comment: ${{ needs.route.outputs.lease_comment }}
+      author: ${{ needs.route.outputs.author }}
+    secrets: inherit
