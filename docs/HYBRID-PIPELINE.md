@@ -113,7 +113,7 @@ How to undo it safely.
 
 **Verifier side (automatic):** Gate A and Gate B run on every push; a new push cancels the in-progress review (concurrency group). Outputs: `risk:r0..r3`, `ai-review:pass|changes|blocked`, `policy:auto|manual` labels, one PR review with grounded findings, and a `review-result.json` artifact.
 
-**Back to the writer:** `review-result.json` is the machine-readable hand-off (verdict, tier, findings with file, line, quote, suggested fix). The writer pulls it (`gh pr view` plus the artifact) and pastes or points its session at it. **Round cap:** three fix rounds, then `needs-human`. Repeating the same failure twice escalates immediately. This keeps the writer from looping on tokens.
+**Back to the writer:** `review-result.json` is the machine-readable hand-off (`head_sha`, `attempt`, `status`, verdict, tier, findings with file, line, quote, suggested fix). `head_sha` lets the writer reject a stale review; `status` is `complete`, `degraded` (a lens failed) or `failed_closed`. The loop the writer follows is `.claude/skills/review-loop.md`; the isolation and scope-check rules it works under are in `.claude/skills/task-isolation.md`. The writer pulls it (`gh pr view` plus the artifact) and pastes or points its session at it. **Round cap:** three fix rounds, then `needs-human`. Repeating the same failure twice escalates immediately. This keeps the writer from looping on tokens.
 
 **Merge:** by the policy engine only. The writer cannot merge (`gh pr merge` denied, no permission on `main`).
 

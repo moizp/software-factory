@@ -362,6 +362,8 @@ Based on `project.config.json.stack`:
 | mcp-github.md | All | Git patterns, branch strategy |
 | mcp-database.md | Backend | Schema generation, migrations |
 | infra-patterns.md | Infrastructure | Docker, K8s, deployment configs |
+| task-isolation.md | All (before any edit) | Worktree per task, scope check against open PRs, multi-agent rules |
+| review-loop.md | All (after the PR opens) | Capped fix loop on `review-result.json`, stale-review checks |
 
 ## Error Handling Strategy
 
