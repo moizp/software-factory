@@ -1,0 +1,54 @@
+name: PR Text Check
+
+# Gate A (deterministic, no AI, no secrets): lints the PR title, body and commit messages and checks that
+# the body carries evidence scaled to the change's risk tier (see docs/HYBRID-PIPELINE.md).
+# Code and policy come from the base branch, never the PR head. Attribution lines fail the check;
+# AI-tell prose and missing evidence are reported as warnings.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-text:
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+      # Untrusted text goes through the environment, never into the script body.
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Fetch PR head
+        run: git fetch origin "pull/$PR_NUMBER/head:pr-head"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check PR text
+        run: |
+          if [ ! -f .factory/gate/cli.ts ]; then
+            echo "The base branch has no PR text check yet (for example the PR that introduces it): skipping."
+            exit 0
+          fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/body.md"
+          set +e
+          npx ts-node .factory/gate/cli.ts --base "origin/${{ github.event.pull_request.base.ref }}" --head pr-head \
+            --branch "$PR_BRANCH" --title "$PR_TITLE" --body-file "$RUNNER_TEMP/body.md" | tee "$RUNNER_TEMP/summary.md"
+          status=${PIPESTATUS[0]}
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          exit $status
