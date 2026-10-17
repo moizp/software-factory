@@ -197,7 +197,9 @@ software-factory/
 │       ├── documentation-patterns.md
 │       ├── backend-patterns.md
 │       ├── frontend-patterns.md
-│       └── infra-patterns.md
+│       ├── infra-patterns.md
+│       ├── task-isolation.md
+│       └── review-loop.md
 │
 ├── scripts/
 │   ├── credentials.sh.template

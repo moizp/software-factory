@@ -323,6 +323,9 @@ Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) 
 - [x] Guardrail prompts (system rubric, risk triage, logic, security, architecture, docs sync) and `ai-review.yml` template
 - [x] Decided: Haiku 4.5 for simple few-turn work, Sonnet 5.5 medium for everything else; each writer has own subscription; separate Anthropic API key for Actions
 - [x] Decided: main branch protection stays off (R0 auto-merge first, R1 after 30 days of shadow evidence); API cap $25 per month; monorepo with notes for several repos (`docs/MONOREPO.md`, `templates/monorepo/`)
+- [x] Writer-side skills: `task-isolation.md` (worktree, scope check against open PRs, multi-agent rules) and `review-loop.md` (capped fix loop, stale-review check), adapted from michaelshimeles/skills
+- [ ] Phase A addition: `review-result.json` carries `head_sha`, `attempt`, `status`; port the freshness check (review tied to the current head) from the greploop helper (MIT)
+- [ ] Gate A addition: zero-token prose lint on PR title, body and commit messages (em dashes, filler, chatbot phrases) and an `Evidence` section check scaled by risk tier
 - [ ] Service resolver `.factory/services.ts` (reads `services.json`: changed files to services and dependents, cross-service floor for risk tier) with tests
 - [ ] Gate A matrix per changed service; reviewer appends each service's `REVIEW.md`
 - [ ] Board: add a `Service` field and, later, per-service WIP lanes
