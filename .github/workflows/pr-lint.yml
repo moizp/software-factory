@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# A newer run (for example after the body is edited) replaces an older one, so a superseded run cannot leave a stale red check.
+concurrency:
+  group: pr-text-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   pr-text:
     runs-on: ubuntu-latest
