@@ -122,6 +122,8 @@ How to undo it safely.
 ### Gate A: deterministic (ground truth, no AI)
 Build, unit and integration tests, lint, type check, SAST (for example Semgrep rules), secret scan (for example Gitleaks), dependency audit, **new-dependency existence and age check** (catches hallucinated or typosquatted packages), migration lint, contract tests, the merge-policy check. These can block on their own; the AI cannot overrule a red gate.
 
+**PR text check (built):** `.github/workflows/pr-lint.yml` runs `.factory/gate/` on the title, body and commit messages. It runs base-branch code with no secrets and no tokens. Attribution lines ("Generated with...", `Co-Authored-By: Claude`, session links) fail the check. AI tells (em dashes, chatbot phrases, filler, puffery) and missing evidence are warnings, so the check never blocks a merge on style. Evidence scales with the risk tier from `.factory/review/risk.ts`: R0 none, R1 a Testing section, R2 a concrete check in it, R3 also a Rollback section.
+
 ### Gate B: AI lenses (advisory, grounded)
 Prompts live in `templates/ai-review/prompts/`:
 
