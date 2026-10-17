@@ -335,6 +335,7 @@ Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) 
 - [x] Phase A (code): reviewer script `.factory/review/` (risk classifier, request builder, grounding filter, result writer) with tests; two runners behind one interface (`cli` on account tokens, `api` on the key), one credential exported at a time, daily review cap, usage ledger
 - [ ] Phase A (live): install `templates/ai-review/ai-review.yml` as a workflow in shadow mode, run it on a real PR with a writer's token, and check the `cli` runner, secret selection, labels and artifact upload; then try the `api` runner
 - [ ] Reviewer gaps found while writing the README setup: create the `risk:*` and `ai-review:*` labels in `cli.ts` (a missing label fails silently), wire `monthlyBudgetReached` (the `AI_REVIEW_MONTHLY_USD` variable is passed but unused), and confirm which field `claude -p --json-schema` returns the structured answer in
+- [ ] Cloud runners (`docs/CLOUD-RUNNERS.md`): slice 0 remove the injection in `factory-start.yml`; 1 `.factory/route/`; 2 `route.yml` and reusable `agent-job.yml`; 3 Oracle self-hosted runner bootstrap; 4 Buddy webhook lane; 5 ledger guard and lease sweep. Decisions pending: Oracle account type, self-hosted runner approach, Buddy as bonus only
 - [ ] Phase B: seeded-flaw eval, prompt tuning, per-PR token cap, monthly budget guard
 - [ ] Phase C: R0/R1 zero-review auto-merge rule in the policy
 - [ ] Phase D: run `bootstrap.sh` on a Buddy.works sandbox; PR template and `HANDOFF.md` convention
