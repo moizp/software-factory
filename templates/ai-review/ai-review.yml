@@ -5,7 +5,8 @@ name: AI Review
 # and can see secrets (account tokens and, if set, the API key). It therefore must NEVER check out or execute code from the pull request. It only reads the diff
 # as data. Gate A (build, tests, lint, SAST, secret scan) runs the PR's code WITHOUT secrets in a separate workflow.
 #
-# Status: template. Needs the Phase A reviewer script (see docs/HYBRID-PIPELINE.md) before it can run.
+# Status: template, not installed here yet. The reviewer script (.factory/review/) exists; the cli runner, the secret-selection
+# expression and the posting steps have not run in Actions. Install in shadow mode first (REVIEW_MODE below).
 
 on:
   pull_request_target:
@@ -29,6 +30,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      REVIEW_MODE: ${{ vars.AI_REVIEW_MODE || 'shadow' }}              # shadow: comment + risk label only; enforce: verdict labels too
+      REVIEW_OUT: ${{ runner.temp }}/review-out
       BASE_REF: ${{ github.event.pull_request.base.ref }}
       MONTHLY_BUDGET_USD: ${{ vars.AI_REVIEW_MONTHLY_USD || '25' }}   # applies to the API-key fallback only
       DAILY_REVIEW_CAP: ${{ vars.AI_REVIEW_DAILY_CAP || '20' }}       # protects personal account allowances
@@ -83,12 +87,13 @@ jobs:
             exit 0
           fi
           unset AUTHOR_TOKEN SHARED_TOKEN API_KEY
-          # Phase A deliverable: .factory/review/cli.ts
-          #   1. risk tier from .factory/policy.json protected paths, size, dependency and migration files
-          #   2. R0: skip the model. R1: one combined pass on Haiku 4.5 (re-run on Sonnet 5.5 on a major finding).
-          #      R2: three lenses on Sonnet 5.5 (medium). R3: all lenses plus architecture on Sonnet 5.5 (medium)
-          #   3. runner 'cli': claude -p --output-format json --tools "" --json-schema ...; runner 'api': Messages API
-          #   4. drop findings whose evidence_quote is not in the diff; fail closed to policy:manual on any error,
-          #      an exhausted allowance, or the daily cap
-          #   5. post a PR review, apply risk:* and ai-review:* labels, upload review-result.json
           npx ts-node .factory/review/cli.ts
+
+      - name: Upload review result (machine-readable hand-off to the writer)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-result-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/review-out/
+          if-no-files-found: ignore
+          retention-days: 14
