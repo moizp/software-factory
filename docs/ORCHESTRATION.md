@@ -1,5 +1,7 @@
 # Software Factory Orchestration
 
+> **Removed:** the `ready-to-build` issue-label trigger (`factory-start.yml`) was deleted. It pasted the issue title into a shell script (command injection) and could not run, since the runner has no `claude` CLI. The replacement is the event-driven router in [CLOUD-RUNNERS.md](CLOUD-RUNNERS.md). Sections below that mention the label describe the old design.
+
 Complete guide to autonomous multi-agent orchestration workflow—from GitHub issue to production code.
 
 ## Architecture Overview

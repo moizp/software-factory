@@ -65,7 +65,7 @@
   - [x] Use Octokit (add to dependencies)
   - Estimate: 6 hours
 
-- [ ] Update `factory-start.yml` GitHub Actions workflow
+- [x] `factory-start.yml` removed (command injection via issue title; could not run). Replacement: `route.yml` in the cloud runners plan
   - [ ] Actually call orchestrator (not just mock) (runner is real; CI still lacks the `claude` CLI and API secret, Phase 3)
   - [ ] Pass issue context to orchestrator
   - [ ] Report results back to GitHub

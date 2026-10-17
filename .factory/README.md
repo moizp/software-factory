@@ -262,6 +262,8 @@ Shows live updates of:
 
 ## Integration with GitHub
 
+> **Removed:** `factory-start.yml` (command injection via the issue title; it could not run). See `docs/CLOUD-RUNNERS.md` for the replacement. The steps below describe the old design.
+
 GitHub Actions trigger (`factory-start.yml`):
 
 1. Listen for issues labeled "ready-to-build"
