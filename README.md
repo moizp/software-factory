@@ -1,591 +1,250 @@
-# Software Factory Orchestrator
+# Software Factory
 
-A reusable, graph-engineered multi-agent workflow that transforms project briefs into production-ready code with zero manual intervention.
+A multi-agent workflow that turns a project brief into a built, tested, reviewed pull request, plus the working practices (trunk-based flow, merge policy, Kanban limits, AI review) that keep agent-written code safe to merge.
 
-⚠️ **Current Status:** This factory works for **local development and demonstrations**. GitHub Actions autonomous deployment is **not yet supported** — see [Limitations](#limitations) below.
+Three parts, usable on their own:
 
-**🚀 Key Features:**
-- Fully autonomous 12-agent workflow (local)
-- Parallel builders & testers (zero token overhead)
-- Validation gates at each phase
-- State persistence & retry capability
-- GitHub Actions integration framework
-- Complete documentation generation
+| Part | What it does | Where |
+|---|---|---|
+| **Pipeline** | Runs specialised agents in order, validates every hand-off, resumes after failures | `.factory/`, `.claude/agents/` |
+| **Governance** | Decides what an agent may merge and what needs a human; caps work in progress | `.factory/policy.json`, `.factory/board.json`, `.github/workflows/` |
+| **Verification** | Independent AI review and PR text checks on every pull request | `.factory/review/`, `.factory/gate/`, `templates/ai-review/` |
 
----
+## Status
 
-## Quick Start (3 Steps)
+Be clear about what is proven.
 
-### 1. Clone & Setup
+| Area | State |
+|---|---|
+| Pipeline engine (stages, contracts, retry, token budget, `--until`) | Works. Covered by tests with a mock agent invoker. **No full run with the real model has been done yet.** |
+| Agents run by the pipeline | product-manager, analyzer, software-architect, backend-engineer, frontend-engineer, infrastructure-engineer, automation-tester, e2e-tester, reviewer, customer-support |
+| Agents described but not run | mcp-configurator, platform-architect, ui-designer (see `docs/FACTORY_GAP_ANALYSIS.md`) |
+| Merge policy, WIP guard, board sync | Works, used on this repo's own PRs |
+| PR text check (`pr-lint.yml`) | Merged; its first real run is the next PR |
+| AI review code (`.factory/review/`) | Built and unit-tested. **Never run in GitHub Actions or against the live API.** Setup below is how to test it |
+| Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike exists on branch `spike/phase2-check` |
+| Unattended runs in GitHub Actions (`factory-start.yml`) | Not wired. Run the pipeline locally |
+
+## How it fits together
+
+```
+brief
+  ▼
+PIPELINE (local, claude -p, one agent per stage)
+requirements → analysis → architecture → build ×3 parallel → test → e2e → review → docs
+        each stage: JSON envelope validated, invalid = stop, `factory retry` resumes
+  ▼
+branch + pull request into main
+  ▼
+VERIFICATION (GitHub Actions, no PR code runs with secrets)
+  ├─ policy-check   labels policy:auto or policy:manual from .factory/policy.json (read from main)
+  ├─ pr-lint        title, body, commits: attribution fails, AI tells warn, evidence by risk tier
+  ├─ factory-test   build + tests
+  └─ ai-review      risk tier R0-R3, grounded findings only, review-result.json   (template, see setup)
+  ▼
+policy:auto  ──▶ may merge when required checks pass
+policy:manual ─▶ a human merges
+```
+
+Rules the flow enforces: `main` is the only long-lived branch, short-lived `feature/*`, `fix/*`, `enhancement/*`, `chore/*` branches, **merge commits only**, single-line conventional commits, **no AI attribution** in commits or PRs, and agents never approve a PR or edit `.factory/policy.json` expecting it to apply to their own PR.
+
+## Quick start: run the pipeline locally
+
+Needs Node 18+ and the `claude` CLI logged in. Runs use your Claude plan (default model `claude-sonnet-5-5`, effort `medium`).
 
 ```bash
-git clone <repository> my-project
-cd my-project
-cp scripts/credentials.sh.template scripts/credentials.sh
-# Edit credentials.sh with real API keys
+git clone https://github.com/moizp/software-factory && cd software-factory
+npm install
+cp scripts/credentials.sh.template scripts/credentials.sh   # fill in, then:
 source scripts/credentials.sh
+npm run build && npm test                                    # 240+ tests, no model calls
+
+# cheap first run: stop after one agent, then continue
+npm run factory:start -- "A todo app with user accounts" --until software-architect
+npm run factory:list
+npm run factory:retry <workflow-id>                          # resume; validated stages are kept
 ```
 
-### 2. Create GitHub Issue
+`factory:start` runs `scripts/validate-setup.sh` first, which expects `GITHUB_TOKEN`, `DB_PASSWORD` and `STRIPE_MCP_KEY` in the environment. To skip that check: `npx ts-node .factory/cli.ts start "<brief>"`.
 
-Create an issue with your project brief, then label it with **`ready-to-build`**.
+Token control: `FACTORY_MAX_TOKENS` (default 600000, `0` disables) pauses before the next stage once reached. The orchestrator also refuses to start new work when the board's WIP limits are full (`FACTORY_IGNORE_WIP=1` overrides).
 
-Orchestrator detects the label and starts automatically.
+## Setup: AI review in another project
 
-### 3. Track Progress
+This is the part to test next. Everything here is untested in Actions, so each step has a check. Use a private repo you can afford to experiment on.
 
-Monitor the companion PR that gets created automatically. When done, all generated code is ready to merge.
+### 1. Copy the files
 
----
-
-## Limitations
-
-### Current Environment Constraints
-
-This factory **works for local development** but cannot yet run autonomously in GitHub Actions due to:
-
-1. **Claude CLI Not Available** — GitHub Actions runners don't have `claude` command installed
-2. **No Authentication** — Claude API credentials not available in Actions environment
-3. **MCP Servers Offline** — GitHub, Postgres, Stripe, Slack, Supabase MCPs not wired to Actions
-4. **Missing Credentials** — Service secrets (STRIPE_MCP_KEY, DB_PASSWORD, etc.) not configured
-5. **No Code Artifact Storage** — Generated code has nowhere to persist post-workflow
-6. **No Review Gate** — PR auto-merges without human oversight
-7. **No Retry Loop** — Failures don't notify team or allow re-triggering
-8. **Sequential Instead of Parallel** — Actions runs builders serially (not truly parallel)
-9. **No Artifact Handoff** — Builder outputs not persisted between phases
-10. **30-Second Timeout Risk** — Complex agents may exceed default timeout
-
-**See [TODO.md](./TODO.md#-critical-blockers-production-readiness) for full blocking issues.**
-
-### What Works Today
-
-✅ **Local Development**
-- Run orchestrator locally with `npm run factory:start`
-- All agents available, MCP servers wired
-- Full 12-agent workflow end-to-end
-
-✅ **Proof of Concept**
-- Test agent patterns and orchestration
-- Verify output quality
-- Design system patterns
-
-✅ **Foundation**
-- Production-ready architecture
-- Extensible agent framework
-- State persistence & retry logic
-
----
-
-## How It Works
-
-```
-[Issue Labeled "ready-to-build"]
-              ↓
-[PHASE 1] Product Manager (2 min)
-          → Requirements + personas
-              ↓
-[PHASE 2] Analyzer (3 min)
-          → Tech stack detection
-              ↓
-[PHASE 3] Architects (5 min, parallel)
-          → Software architecture + infrastructure
-              ↓
-[PHASE 4] Builders (12 min, parallel, zero cost)
-          ├─ Backend Engineer → API server
-          ├─ Frontend Engineer → React components
-          ├─ Infrastructure Engineer → Docker + CI/CD
-          ├─ Automation Tester → Test suite
-          └─ Customer Support → Documentation
-              ↓
-[PHASE 5] E2E Tester (8 min)
-          → Full workflow validation
-              ↓
-[PHASE 6] Reviewer (5 min, QA Gate)
-          → Security audit + approval
-              ↓
-[COMPLETED] Production-ready code + PR + deployment guides
+```bash
+# from a clone of this repo; DEST is the target project
+DEST=/path/to/project
+cp -r .factory tsconfig.json "$DEST"/
+mkdir -p "$DEST/templates" "$DEST/.github/workflows"
+cp -r templates/ai-review "$DEST/templates/"
+cp templates/ai-review/ai-review.yml .github/workflows/policy-check.yml .github/workflows/pr-lint.yml "$DEST/.github/workflows/"
 ```
 
-**Total Time:** ~35 minutes end-to-end (highly parallelized)
+Copy `.factory/` whole (the reviewer imports `policy-engine.ts`, `claude-bridge.ts`, `state.ts`, `pipeline.ts`). The reviewer reads its prompts from `templates/ai-review/prompts/` relative to the repo root, so keep that path.
 
----
+### 2. Install dependencies
 
-## The 12 Agents
+The workflows run `npm ci`, so the project needs a `package.json` and a lockfile with:
 
-| Phase | Agent | Role | Duration |
-|-------|-------|------|----------|
-| 1 | Product Manager | Transform brief → requirements | 2 min |
-| 2 | Analyzer | Detect tech stack & features | 3 min |
-| 3a | Software Architect | Design API + database schema | 5 min |
-| 3b | Platform Architect | Design infrastructure & DevOps | 5 min |
-| 3c | UI Designer | Create design system | 3 min |
-| 4a | Backend Engineer | Generate API server | 12 min |
-| 4b | Frontend Engineer | Generate React components | 12 min |
-| 4c | Infrastructure Engineer | Generate Docker + CI/CD | 8 min |
-| 4d | Automation Tester | Generate test suite | 10 min |
-| 4e | Customer Support | Generate documentation | 8 min |
-| 5 | E2E Tester | Validate end-to-end workflows | 8 min |
-| 6 | Reviewer | Security audit + QA gate | 5 min |
-
-**Phases 3 & 4 run in parallel** (no token overhead).
-
----
-
-## Documentation
-
-- **[ORCHESTRATION.md](./docs/ORCHESTRATION.md)** — Complete workflow guide
-  - State machine diagram
-  - Phase dependencies & validation gates
-  - Troubleshooting & recovery
-  - Performance tuning
-  - Security considerations
-
-- **[IMPLEMENTATION.md](./docs/IMPLEMENTATION.md)** — How to run locally
-  - Running single agents
-  - Debugging workflows
-  - Common issues & fixes
-  - Environment setup checklist
-
-- **[CONFIGURATION.md](./docs/CONFIGURATION.md)** — Schema reference
-  - `project.config.json` schema
-  - MCP server setup guide
-  - Environment variables
-  - Example configurations
-
----
-
-## Project Structure
-
-```
-software-factory/
-├── README.md (this file)
-├── package.json
-├── tsconfig.json
-├── project.config.json          # Your project specification
-│
-├── .factory/                    # Orchestrator engine
-│   ├── orchestrator.ts         # Multi-agent orchestrator
-│   ├── state.ts                # Workflow state management
-│   ├── cli.ts                  # CLI commands
-│   ├── README.md               # Orchestrator details
-│   └── workflows/              # State files (gitignored)
-│
-├── .github/workflows/
-│   └── factory-start.yml        # GitHub Actions trigger
-│
-├── .claude/
-│   ├── CLAUDE.md               # Factory workflow definition
-│   ├── settings.json           # Claude Code config
-│   │
-│   ├── agents/
-│   │   ├── product-manager.md
-│   │   ├── analyzer.md
-│   │   ├── software-architect.md
-│   │   ├── platform-architect.md
-│   │   ├── ui-designer.md
-│   │   ├── backend-engineer.md
-│   │   ├── frontend-engineer.md
-│   │   ├── infrastructure-engineer.md
-│   │   ├── automation-tester.md
-│   │   ├── e2e-tester.md
-│   │   ├── customer-support.md
-│   │   └── reviewer.md
-│   │
-│   └── skills/
-│       ├── testing-patterns.md
-│       ├── ui-design-system.md
-│       ├── documentation-patterns.md
-│       ├── backend-patterns.md
-│       ├── frontend-patterns.md
-│       ├── infra-patterns.md
-│       ├── task-isolation.md
-│       └── review-loop.md
-│
-├── scripts/
-│   ├── credentials.sh.template
-│   └── validate-mcp.sh
-│
-└── docs/
-    ├── ORCHESTRATION.md        # Workflow guide
-    ├── IMPLEMENTATION.md       # Setup & debugging
-    ├── CONFIGURATION.md        # Schema reference
-    └── mcp-setup-guide.md      # MCP details
+```bash
+npm install ajv chalk
+npm install -D typescript ts-node @types/node
 ```
 
----
+### 3. Set what needs a human
+
+Edit `.factory/policy.json` `protected_paths` for the project (deploy, auth, migrations, CI, secrets). The review also treats these as R3.
+
+### 4. Create the labels
+
+`ai-review.yml` adds labels but does not create them, and a missing label fails silently:
+
+```bash
+gh label create risk:r0 --color 0E8A16 --force;  gh label create risk:r1 --color 1D76DB --force
+gh label create risk:r2 --color FBCA04 --force;  gh label create risk:r3 --color D93F0B --force
+gh label create ai-review:pass --color 0E8A16 --force
+gh label create ai-review:changes --color FBCA04 --force
+gh label create ai-review:blocked --color D93F0B --force
+```
+
+(`policy:auto` and `policy:manual` are created by `policy-check.yml`.)
+
+### 5. Give Actions a Claude credential
+
+Pick one. The workflow exports exactly one credential per run, in this order, so an API key can never silently shadow an account token.
+
+| Order | Credential | Set with | Billed to |
+|---|---|---|---|
+| 1 | The PR author's own account | `claude setup-token`, then `gh secret set CLAUDE_OAUTH_<LOGIN>` and map it (below) | That person's Claude plan allowance |
+| 2 | A shared account | `gh secret set CLAUDE_CODE_OAUTH_TOKEN` | That account's allowance |
+| 3 | Anthropic API key (optional fallback) | `gh secret set ANTHROPIC_API_KEY` | Anthropic Console, metered |
+| none | nothing set | | The PR gets `policy:manual`, no review runs |
+
+```bash
+claude setup-token                                   # run as the writer; copy the token it prints
+gh secret set CLAUDE_OAUTH_ALICE                     # paste it
+gh variable set REVIEW_ACCOUNT_MAP --body '{"alice":"CLAUDE_OAUTH_ALICE"}'   # GitHub login -> secret name
+```
+
+Check your plan's terms on automated use before relying on an account token in CI. Tokens expire: plan a rotation.
+
+### 6. Variables (all optional)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AI_REVIEW_MODE` | `shadow` | `shadow`: comment and `risk:*` label only. `enforce`: also `ai-review:*` and `policy:manual` by verdict |
+| `AI_REVIEW_ENABLED` | on | Set to `false` to stop all reviews (kill switch) |
+| `AI_REVIEW_DAILY_CAP` | `20` | Reviews per UTC day, protects personal allowances |
+| `CLAUDE_CODE_VERSION` | `2.1.292` | Pinned CLI version; keep in step with `templates/workspace/versions.env` |
+| `AI_REVIEW_MONTHLY_USD` | `25` | **Not enforced yet.** The workflow passes it but nothing reads it |
+
+Start in `shadow` and stay there for about 30 days of real PRs before trusting verdicts.
+
+### 7. Verify
+
+Open a draft PR, then mark it ready, from a branch by a mapped login with a small code change.
+
+| Check | Expect |
+|---|---|
+| Actions run | `AI Review` ran, the credential step picked the account (log shows `REVIEW_RUNNER=cli`), no secret printed |
+| PR | One comment titled `AI review (R1, attempt 1)` with the hidden `ai-review head=... attempt=1` marker, and the `risk:r1` label |
+| Artifact | `review-result-<pr>-<sha>` containing `review-result.json` (`status: complete`) |
+| Push again | A second comment with `attempt 2`; the older run is cancelled |
+| Docs-only PR | Tier R0, no model call, status `complete` |
+| PR by an unmapped login with no shared token | `policy:manual`, no review |
+| Draft PR | Skipped |
+| `AI_REVIEW_ENABLED=false` | Skipped |
+
+### 8. What most likely breaks first
+
+Each of these fails closed (the PR gets `status: failed_closed` and a human decides), so a miss costs a retry, not a bad merge.
+
+- **CLI output shape.** The `cli` runner reads the `result` field of `claude -p --output-format json`. With `--json-schema` the structured answer may arrive in another field (such as `structured_output`) and `result` may be empty. Symptom: every lens fails with "review output is not valid JSON". Fix is in `.factory/review/runners.ts` and `parseCliResult`.
+- **Flags.** The pinned CLI must accept `--tools ""`, `--json-schema` and `--append-system-prompt`. Symptom: the CLI exits non-zero in the job log.
+- **Secret selection.** `secrets[fromJSON(vars.REVIEW_ACCOUNT_MAP)[login]]` must resolve to empty for an unmapped login. If the job errors at the expression, simplify it to a fixed secret name.
+- **Allowance exhausted.** The review fails closed. Reduce `AI_REVIEW_DAILY_CAP` or add the API key fallback.
+- **`api` runner** is the least checked: plain `fetch` to the Messages API, never called live.
+
+To use the API key instead of an account, set only `ANTHROPIC_API_KEY` and leave the other two unset.
+
+## Using the pieces on an existing project
+
+`docs/ADOPTING.md` holds a prompt you paste into Claude Code inside an existing project. It surveys the project, then adopts one practice per PR: trunk-based flow, merge policy, Kanban limits, release candidates.
+
+## Governance reference
+
+- **Merge policy** (`.factory/policy.json`, [docs/POLICY.md](docs/POLICY.md)): read from the base branch so a PR cannot loosen its own rules. Protected paths always need a human. Strictest rule wins. Anything unclear fails closed. Docs-only PRs may auto-merge.
+- **Board** (`.factory/board.json`, [docs/PROJECT-BOARD.md](docs/PROJECT-BOARD.md)): Backlog, Ready, In progress (WIP 1), In review (WIP 2), Done. The GitHub Project itself is created in the UI.
+- **Releases for apps the factory builds**: release candidate branch from `main`, promoted through `www-test`, `www-demo`, `www-prod` pointers, tagged, merged back. See `.claude/skills/release-process.md` and `templates/release/`. This repo has no releases; `main` is the product.
+- **Repo settings** that cannot live in code: allow merge commits only, auto-delete head branches. Branch protection is off (free private repo), so the rules are enforced by workflows, labels and hooks.
+
+## Hybrid pipeline: writers and verifiers
+
+[docs/HYBRID-PIPELINE.md](docs/HYBRID-PIPELINE.md) is the plan: persistent writer workspaces (a VPS running Claude Code in tmux, each writer on their own subscription) separated from ephemeral verification in Actions. Parts built:
+
+- Writer workspace scripts in `templates/workspace/` (pinned Node and Claude Code, `doctor.sh`, a pre-push guard that blocks `main`, force pushes and deletes). Not yet run on a real VPS.
+- Guardrail prompts in `templates/ai-review/prompts/` and the reviewer in `.factory/review/`.
+- Writer skills: `.claude/skills/task-isolation.md` (worktree per task, scope check against open PRs) and `.claude/skills/review-loop.md` (capped fix loop on `review-result.json`, three rounds then `needs-human`).
+- Monorepo layout and per-service policy: [docs/MONOREPO.md](docs/MONOREPO.md), `templates/monorepo/`.
+
+Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium effort for everything else.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `npm run build` | Type-check (`tsc`) |
+| `npm test` | All tests, mock invoker, no model calls |
+| `npm run factory:start -- "<brief>" [--until <agent>]` | Start a workflow |
+| `npm run factory:list` / `factory:status <id>` / `factory:watch <id>` | Inspect workflows |
+| `npm run factory:retry <id>` | Resume a failed or paused workflow |
+| `npm run policy:check -- --base origin/main --head HEAD --branch "$(git branch --show-current)"` | What the merge policy says about your branch |
+| `npm run gate:check -- --base origin/main --head HEAD --branch <b> --title "<t>" --body-file body.md` | Run the PR text check locally |
 
 ## Configuration
 
-### project.config.json
+| Variable | Default | Purpose |
+|---|---|---|
+| `FACTORY_AGENT_MODEL` | `claude-sonnet-5-5` | Model for pipeline agents |
+| `FACTORY_AGENT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh`, `max` |
+| `FACTORY_AGENT_TIMEOUT_MS` | 600000 | Per-agent timeout |
+| `FACTORY_MAX_TOKENS` | 600000 | Pause before the next stage once reached; `0` disables |
+| `FACTORY_IGNORE_WIP` | unset | `1` starts work even when WIP limits are full |
+| `FACTORY_DATA_DIR` | repo root | Where `workflows/` (state) and `logs/` are written |
 
-```json
-{
-  "name": "MySaaS",
-  "description": "Multi-tenant SaaS application",
-  "type": "saas",
-  "stack": "ts-react-node",
-  "features": ["user-auth", "multi-tenant", "payments", "api"],
-  
-  "mcp_servers": {
-    "github": {
-      "type": "built-in",
-      "required": true,
-      "config": { "token": "env:GITHUB_TOKEN" }
-    },
-    "postgres": {
-      "type": "postgres",
-      "required": true,
-      "config": { "host": "localhost", "auth": "env:DB_PASSWORD" }
-    },
-    "stripe": {
-      "type": "http",
-      "required": true,
-      "endpoint": "https://stripe-mcp.example.com",
-      "auth": "env:STRIPE_MCP_KEY"
-    }
-  },
+Project specification lives in `project.config.json` (schema: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
 
-  "backend": {
-    "language": "typescript",
-    "runtime": "node",
-    "framework": "express",
-    "orm": "prisma",
-    "auth": "jwt"
-  },
-
-  "frontend": {
-    "framework": "react",
-    "language": "typescript",
-    "styling": "tailwind",
-    "state_management": "tanstack-query"
-  },
-
-  "infrastructure": {
-    "hosting": "vercel",
-    "database_hosting": "render-postgres"
-  },
-
-  "deployment": {
-    "ci_cd": "github-actions",
-    "environments": ["dev", "staging", "production"],
-    "monitoring": "datadog"
-  }
-}
-```
-
-**See [CONFIGURATION.md](./docs/CONFIGURATION.md) for full schema.**
-
-### Credentials (scripts/credentials.sh)
-
-```bash
-#!/bin/bash
-export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
-export DB_PASSWORD="postgres://user:password@localhost:5432/mydb"
-export STRIPE_MCP_KEY="sk_test_xxxxxxxxxxxx"
-export SLACK_BOT_TOKEN="xoxb-xxxxxxxxxxxx"
-```
-
-**⚠️ Never commit this file** — add to `.gitignore`
-
----
-
-## Running the Factory
-
-### Option A: Local (Recommended - Works Today)
-
-```bash
-# 1. Install Claude Code CLI
-#    https://claude.ai/code
-
-# 2. Configure credentials
-cp scripts/credentials.sh.template scripts/credentials.sh
-# Edit with real API keys
-source scripts/credentials.sh
-
-# 3. Validate setup
-npm run validate-setup
-./scripts/validate-mcp.sh
-
-# 4. Start workflow
-npm run factory:start "Build real-time chat app" 42
-
-# 5. Monitor progress
-npm run factory:watch wf-id
-```
-
-### Option B: Via GitHub (Future - Not Yet Supported)
-
-```bash
-# 1. Configure GitHub Secrets
-#    - CLAUDE_API_KEY
-#    - STRIPE_MCP_KEY
-#    - DB_PASSWORD
-#    - SLACK_BOT_TOKEN
-#    - SUPABASE_KEY
-
-# 2. Create GitHub issue with project brief
-# 3. Add "ready-to-build" label
-# 4. Orchestrator runs automatically (when blockers resolved)
-# 5. Monitor progress in companion PR
-
-# ⚠️ See Limitations section — GitHub Actions support coming soon
-```
-
-### Option C: Single Agent (Debugging - Local Only)
-
-```bash
-# Run just the Product Manager
-claude "Run product-manager agent only"
-
-# Run just the Backend Engineer
-claude "Run backend-engineer agent with architect output"
-
-# See all available agents
-ls .claude/agents
-```
-
----
-
-## Validating Setup
-
-```bash
-# Check Node.js & npm
-node --version  # Should be v18+
-npm --version   # Should be v9+
-
-# Validate credentials
-source scripts/credentials.sh
-echo $GITHUB_TOKEN  # Should not be empty
-
-# Validate MCP servers
-./scripts/validate-mcp.sh
-# All servers should show ✅
-
-# Validate project config
-npm run validate-setup
-```
-
----
-
-## Key Concepts
-
-### Validation Gates
-
-Each phase must return `{ valid: true }` before proceeding:
+## Layout
 
 ```
-Phase output → Orchestrator checks valid flag
-├─ YES → Save state, continue
-└─ NO → Pause workflow, await fix & retry
+.factory/            orchestrator, contracts, policy engine, board, review/, gate/, tests
+.claude/             CLAUDE.md (orchestrator rules), agents/, skills/
+.github/workflows/   factory-test, policy-check, pr-lint, board-sync (+ factory-start, factory-deploy: not wired)
+templates/           ai-review/, workspace/, monorepo/, release/  (copied into other projects)
+docs/                POLICY, PROJECT-BOARD, HYBRID-PIPELINE, MONOREPO, ADOPTING, ORCHESTRATION, CONFIGURATION, ...
+scripts/             validate-setup, validate-mcp, setup-mcp, credentials template
+TODO.md              what is left, with decisions recorded
 ```
 
-### Parallel Execution
+## Documents
 
-Phases 3 (Architects) & 4 (Builders) run simultaneously:
-- Software Architect + Platform Architect (parallel)
-- All 5 builders (parallel, zero token cost)
-
-### State Persistence
-
-Workflow state saved after every phase in `.factory/workflows/`:
-```json
-{
-  "id": "wf-1704067200000-abc123",
-  "status": "running|completed|failed",
-  "phases": [...],
-  "artifacts": [...],
-  "timeline": [...]
-}
-```
-
-Allows **retry from any point** without re-running earlier phases.
-
-### MCP Server Auto-Wiring
-
-Orchestrator automatically:
-1. Validates credentials from `scripts/credentials.sh`
-2. Registers MCP servers via Claude Code
-3. Provides available tools to each agent
-
----
-
-## Troubleshooting
-
-### Workflow Fails at MCP Setup
-
-**Error:** `STRIPE_MCP_KEY not in environment`
-
-**Fix:**
-```bash
-# Update credentials.sh with real key
-export STRIPE_MCP_KEY="sk_test_xxx"
-
-# Source it
-source scripts/credentials.sh
-
-# Retry workflow
-npm run factory:retry wf-id
-```
-
-### Builder Throws TypeScript Error
-
-**Cause:** Architect output missing type definitions
-
-**Fix:**
-```bash
-# Retry from architect phase
-npm run factory:retry wf-id --from-phase=software-architect
-```
-
-### Workflow Stuck (No Progress)
-
-```bash
-# Check current status
-npm run factory:status wf-id
-
-# If a phase failed or stalled, resume the same workflow (validated phases are kept)
-npm run factory:retry wf-id
-```
-
-**See [IMPLEMENTATION.md](./docs/IMPLEMENTATION.md#common-issues--fixes) for more troubleshooting.**
-
----
-
-## Extending the Factory
-
-### Add a New Agent
-
-```bash
-# 1. Create agent file
-cat > .claude/agents/my-agent.md << 'EOF'
-# My Agent
-...
-EOF
-
-# 2. Reference in .claude/CLAUDE.md workflow
-```
-
-### Add a New MCP Server
-
-```bash
-# 1. Update project.config.json
-# 2. Update scripts/credentials.sh
-# 3. Test with: ./scripts/validate-mcp.sh
-```
-
-### Customize for Your Team
-
-Edit `.claude/CLAUDE.md` to add:
-- Brand guidelines
-- Code style preferences
-- Security policies
-- Deployment targets
-
----
-
-## Architecture Overview
-
-See **[ORCHESTRATION.md](./docs/ORCHESTRATION.md)** for:
-- Complete state machine diagram
-- Phase-by-phase invocation flow
-- Validation gate details
-- Error handling & recovery
-- Performance metrics
-
----
-
-## Requirements
-
-- **Node.js** 18+ (`node --version`)
-- **npm** 9+ (`npm --version`)
-- **Git** (for GitHub integration)
-- **Docker** (for infrastructure phase)
-- **PostgreSQL** (for database phase, can be managed)
-
----
-
-## Performance
-
-**Typical workflow:**
-- Phases 1-2 (sequential): 5 minutes
-- Phase 3 (architects, parallel): 5 minutes
-- Phase 4 (builders, parallel, zero cost): 12 minutes
-- Phases 5-6 (validation, sequential): 13 minutes
-- **Total: ~35 minutes**
-
-**Token usage:** ~150K-200K per complete workflow
-
----
-
-## Best Practices
-
-1. **Test step-by-step** — Start with Product Manager → Analyzer before full workflow
-2. **Review handoffs** — Check JSON output at each gate
-3. **Separate credentials** — Keep secrets in `.gitignore`d `credentials.sh`
-4. **Version MCP servers** — Pin versions in `settings.json` for consistency
-5. **Monitor parallel phases** — All builders can fail independently
-6. **Document customizations** — Update `.claude/CLAUDE.md` if modifying agents
-7. **Leverage parallelism** — Phases 3 & 4 cost zero extra tokens
-8. **Review Reviewer gate** — Always check before deploying
-
----
-
-## Development Workflow
-
-This project is **trunk-based**: `main` is the only long-lived branch.
-
-```
-main (trunk, always releasable)
-  ↑
-  ├─ feature/*      new features
-  ├─ fix/*          bug fixes
-  ├─ enhancement/*  improvements
-  └─ chore/*        refactoring, deps, docs, CI
-```
-
-### Quick Start for Contributors
-
-```bash
-# 1. Create a short-lived branch from main
-git checkout main
-git pull origin main
-git checkout -b feature/your-feature-name
-
-# 2. Make changes, test, commit
-npm run build && npm test
-git add .
-git commit -m "feat: your feature description"
-git push -u origin feature/your-feature-name
-
-# 3. Open a Pull Request targeting main; the merge policy labels it policy:auto or policy:manual
-```
-
-The factory has no release cadence. Apps it builds use release candidate branches promoted through `www-test` → `www-demo` → `www-prod` (see `.claude/skills/release-process.md`).
-
-**Guides:**
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — Branching guide & conventions
-- [MONOREPO.md](./docs/MONOREPO.md) — Chosen monorepo layout for services, and notes for splitting into several repos
-- [HYBRID-PIPELINE.md](./docs/HYBRID-PIPELINE.md) — Plan: persistent writer VPS plus ephemeral AI verification in GitHub Actions
-- [ADOPTING.md](./docs/ADOPTING.md) — Prompt for bringing the factory's practices into an existing project
-- [POLICY.md](./docs/POLICY.md) — Which PRs agents may auto-merge and which need a human (`.factory/policy.json`)
-
----
-
-## Next Steps
-
-1. **Read** [ORCHESTRATION.md](./docs/ORCHESTRATION.md) for complete workflow details
-2. **Follow** [IMPLEMENTATION.md](./docs/IMPLEMENTATION.md) to run locally
-3. **Review** [CONFIGURATION.md](./docs/CONFIGURATION.md) for schema reference
-4. **Contribute** — See [CONTRIBUTING.md](./CONTRIBUTING.md) for git flow guidelines
-5. **Edit** `.claude/CLAUDE.md` for your custom workflow
-
----
+| Doc | For |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branching, commits, PRs |
+| [docs/POLICY.md](docs/POLICY.md) | Merge policy |
+| [docs/PROJECT-BOARD.md](docs/PROJECT-BOARD.md) | Kanban template and WIP limits |
+| [docs/HYBRID-PIPELINE.md](docs/HYBRID-PIPELINE.md) | Writer and verifier plan, risk tiers, cost, rollout |
+| [docs/MONOREPO.md](docs/MONOREPO.md) | Monorepo layout and splitting into repos |
+| [docs/ADOPTING.md](docs/ADOPTING.md) | Bring the practices into an existing project |
+| [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md), [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Pipeline internals and debugging |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md), [docs/mcp-setup-guide.md](docs/mcp-setup-guide.md) | Project config and MCP servers |
+| [docs/FACTORY_GAP_ANALYSIS.md](docs/FACTORY_GAP_ANALYSIS.md) | What the factory still lacks |
+| [TODO.md](TODO.md) | Open work |
 
 ## License
 
-MIT — Use freely, modify, distribute.
-
----
-
-**Questions?** Check [ORCHESTRATION.md](./docs/ORCHESTRATION.md) or run `npm run factory:list`.
-
+MIT
