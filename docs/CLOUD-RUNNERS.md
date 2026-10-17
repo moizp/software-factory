@@ -80,11 +80,11 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 Slice 2 depends on Phase 2: until agents can commit into a worktree and open a draft PR, a long job can run stages and post their artifacts on the issue but cannot deliver code.
 
-## 5. Decisions needed
+## 5. Decisions (settled)
 
-1. **Oracle account type.** Reports differ on whether pay-as-you-go accounts are reclaimed or cut. A free account with a $0 card keeps Always Free resources; confirm in the console what the tenancy shows before building on 4 OCPU.
-2. **Self-hosted runner approach.** Recommended. The alternative is a custom worker loop on the VM that polls GitHub; it costs more code and gives less.
-3. **Buddy as a bonus lane only.** Recommended until its real wall-clock allowance is measured.
+1. **Oracle sized at 2 OCPU / 12 GB** for now. Two concurrent agent sessions at most; raise it only if the console shows more.
+2. **Self-hosted runner approach.** The Oracle VM is a self-hosted Actions runner; no custom polling worker.
+3. **Buddy is a bonus lane only.** Nothing depends on it until its real wall-clock allowance is measured.
 
 ## 6. Not verified
 
