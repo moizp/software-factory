@@ -3,7 +3,8 @@ import { loadBoard } from '../board';
 import {
   DEFAULT_BUDGET, Budget, Ledger, RouteInput, actionsRatio, buddyRatio, canTransition, concurrencyGroup,
   currentState, desiredLane, emptyLedger, heartbeat, isStale, parseLease, parseLedger, recordUsage, renderLease,
-  renderLedger, route, sweep, transition, writeLedger
+  renderLedger, route, sweep, transition, writeLedger, oracleFromHeartbeat, NEVER_SEEN_MINUTES, untilFromLabels,
+  DEFAULT_UNTIL, outcome, renderResultComment, renderWaitComment, renderClaimComment
 } from '../route';
 
 // The real template: In progress 1, In review 2.
@@ -214,5 +215,72 @@ describe('state labels', () => {
     expect(transition([], 'agent:ready')).toEqual({ add: ['agent:ready'], remove: [] });
     expect(() => transition([], 'agent:working')).toThrow('illegal');
     expect(() => transition(['agent:review'], 'agent:ready')).toThrow('illegal');
+  });
+});
+
+describe('oracleFromHeartbeat', () => {
+  const ago = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
+  it('is online within ten minutes of the last heartbeat', () => {
+    expect(oracleFromHeartbeat(ago(0), NOW)).toEqual({ state: 'online', unavailableMinutes: 0 });
+    expect(oracleFromHeartbeat(ago(10), NOW)).toEqual({ state: 'online', unavailableMinutes: 0 });
+  });
+  it('is offline with the elapsed minutes after that', () => {
+    expect(oracleFromHeartbeat(ago(11), NOW)).toEqual({ state: 'offline', unavailableMinutes: 11 });
+    expect(oracleFromHeartbeat(ago(125), NOW).unavailableMinutes).toBe(125);
+  });
+  it('treats a missing, unreadable or future value safely', () => {
+    expect(oracleFromHeartbeat(null, NOW).unavailableMinutes).toBe(NEVER_SEEN_MINUTES);
+    expect(oracleFromHeartbeat('garbage', NOW).state).toBe('offline');
+    expect(oracleFromHeartbeat(ago(-5), NOW).state).toBe('online');
+  });
+  it('feeds the router: no heartbeat means long work waits instead of starting', () => {
+    const none = oracleFromHeartbeat(null, NOW);
+    expect(route(input({ issue: withLabels('task:pipeline'), oracle: none })).action).toBe('wait');
+    expect(route(input({ issue: withLabels('task:pipeline'), oracle: oracleFromHeartbeat(ago(3), NOW) })).action).toBe('start');
+  });
+});
+
+describe('report', () => {
+  const state: any = {
+    id: 'wf-1', issueBrief: 'b', issueNumber: 7, startedAt: '', updatedAt: '', currentPhase: 'software-architect',
+    status: 'paused', artifacts: [], config: {}, notes: [], tokensUsed: 1234,
+    phases: [
+      { phase: 'product-manager', valid: true, timestamp: '' },
+      { phase: 'analyzer', valid: false, timestamp: '', error: 'x'.repeat(300) }
+    ]
+  };
+  it('reads the stop point from a label and ignores unknown agents', () => {
+    expect(untilFromLabels(['until:analyzer'])).toBe('analyzer');
+    expect(untilFromLabels(['until:not-an-agent'])).toBe(DEFAULT_UNTIL);
+    expect(untilFromLabels(['until:__proto__'])).toBe(DEFAULT_UNTIL);
+    expect(untilFromLabels([])).toBe(DEFAULT_UNTIL);
+  });
+  it('maps outcomes to labels', () => {
+    expect(outcome({ state: { ...state, status: 'paused' }, jobResult: 'success' })).toEqual({ label: 'agent:review', ok: true });
+    expect(outcome({ state: { ...state, status: 'completed' }, jobResult: 'success' }).ok).toBe(true);
+    expect(outcome({ state: { ...state, status: 'failed' }, jobResult: 'success' })).toEqual({ label: 'agent:failed', ok: false });
+    expect(outcome({ state, jobResult: 'failure' }).label).toBe('agent:failed');
+    expect(outcome({ state: null, jobResult: 'success' }).label).toBe('agent:failed');
+    expect(outcome({ state, jobResult: 'cancelled' }).label).toBe('agent:failed');
+  });
+  it('renders a result with the phase table and trims long errors', () => {
+    const md = renderResultComment({ state, lane: 'long', seconds: 61.4, jobResult: 'success', runUrl: 'https://x/run/1', until: 'analyzer' });
+    expect(md).toContain('Pipeline stopped after `analyzer`');
+    expect(md).toContain('| product-manager | valid |');
+    expect(md).toContain('| analyzer | invalid: ');
+    expect(md).not.toContain('x'.repeat(130));
+    expect(md).toContain('Lane long, 61 s');
+    expect(md).toContain('tokens used: 1234');
+  });
+  it('renders a failure with no state', () => {
+    const md = renderResultComment({ state: null, lane: 'short', seconds: 5, jobResult: 'failure', runUrl: 'u', until: 'analyzer' });
+    expect(md).toContain('did not finish');
+    expect(md).toContain('no workflow state found');
+    expect(md).toContain('label the issue `agent:ready` to retry');
+  });
+  it('explains waits and claims', () => {
+    expect(renderWaitComment(['a', 'b'])).toContain('- a\n- b');
+    const d: any = { action: 'start', lane: 'short', reasons: ['why'], concurrencyGroup: 'g', addLabels: [], removeLabels: [] };
+    expect(renderClaimComment(d, 'analyzer')).toContain('**short** lane');
   });
 });

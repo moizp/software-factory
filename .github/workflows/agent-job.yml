@@ -1,0 +1,80 @@
+name: Agent Job
+
+# Runs the pipeline for one claimed issue. Called by route.yml. Two jobs so the Oracle job never references a
+# secret: the hosted job gets Claude credentials, the Oracle job uses the writer's local login on the runner.
+# Only the pipeline step sees credentials (see .github/actions/agent-run).
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        type: string
+        required: true
+      lane:
+        type: string
+        required: true
+      group:
+        type: string
+        required: true
+      until:
+        type: string
+        required: true
+      lease_comment:
+        type: string
+        required: true
+      author:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  hosted:
+    if: ${{ inputs.lane == 'short' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: ${{ inputs.group }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      # Pinned so runs behave the same each time (keep in step with templates/workspace/versions.env).
+      - run: npm install -g "@anthropic-ai/claude-code@${{ vars.CLAUDE_CODE_VERSION || '2.1.292' }}"
+
+      - uses: ./.github/actions/agent-run
+        with:
+          issue: ${{ inputs.issue }}
+          lane: short
+          until: ${{ inputs.until }}
+          lease_comment: ${{ inputs.lease_comment }}
+          gh_token: ${{ github.token }}
+          # Order: the issue author's own account, a shared account, then the API key. REVIEW_ACCOUNT_MAP is the
+          # same repo variable the AI review uses, such as {"alice":"CLAUDE_OAUTH_ALICE"}.
+          author_token: ${{ secrets[fromJSON(vars.REVIEW_ACCOUNT_MAP || '{}')[inputs.author]] }}
+          shared_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  oracle:
+    if: ${{ inputs.lane == 'long' }}
+    runs-on: [self-hosted, oracle]
+    timeout-minutes: 240
+    concurrency:
+      group: ${{ inputs.group }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: ./.github/actions/agent-run
+        with:
+          issue: ${{ inputs.issue }}
+          lane: long
+          until: ${{ inputs.until }}
+          lease_comment: ${{ inputs.lease_comment }}
+          gh_token: ${{ github.token }}

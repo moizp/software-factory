@@ -23,7 +23,7 @@ Be clear about what is proven.
 | PR text check (`pr-lint.yml`) | Merged; its first real run is the next PR |
 | AI review code (`.factory/review/`) | Built and unit-tested. **Never run in GitHub Actions or against the live API.** Setup below is how to test it |
 | Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike exists on branch `spike/phase2-check` |
-| Unattended runs in the cloud | Not built. Plan: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md). Run the pipeline locally for now |
+| Unattended runs in the cloud | Router and workflows written (`route.yml`, `agent-job.yml`), never run in Actions; the Oracle runner and Buddy lane are not built. Plan: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) |
 
 ## How it fits together
 
@@ -223,7 +223,7 @@ Project specification lives in `project.config.json` (schema: [docs/CONFIGURATIO
 ```
 .factory/            orchestrator, contracts, policy engine, board, review/, gate/, tests
 .claude/             CLAUDE.md (orchestrator rules), agents/, skills/
-.github/workflows/   factory-test, policy-check, pr-lint, board-sync (+ factory-deploy: only echoes)
+.github/workflows/   factory-test, policy-check, pr-lint, board-sync, route, agent-job (+ factory-deploy: only echoes)
 templates/           ai-review/, workspace/, monorepo/, release/  (copied into other projects)
 docs/                POLICY, PROJECT-BOARD, HYBRID-PIPELINE, MONOREPO, ADOPTING, ORCHESTRATION, CONFIGURATION, ...
 scripts/             validate-setup, validate-mcp, setup-mcp, credentials template
