@@ -69,6 +69,8 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 ## 4. What to build (one PR each)
 
+Built so far: slice 0 (the vulnerable workflow removed) and slice 1 (`.factory/route/`). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
+
 | # | Slice | Notes |
 |---|---|---|
 | 0 | Remove the injection in `factory-start.yml` | It interpolates the issue title into a shell script. The workflow cannot run today (no `claude`), so replace it with `route` below rather than patch it |
