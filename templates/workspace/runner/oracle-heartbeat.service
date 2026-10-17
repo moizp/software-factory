@@ -1,0 +1,10 @@
+[Unit]
+Description=Tell the router this Oracle runner is healthy
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=runner
+EnvironmentFile=/etc/factory/oracle.env
+EnvironmentFile=-%h/.config/factory/heartbeat.env
+ExecStart=/opt/factory/runner/heartbeat.sh
