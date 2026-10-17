@@ -325,7 +325,7 @@ Plan: `docs/HYBRID-PIPELINE.md`. Templates: `templates/workspace/` (writer VPS) 
 - [x] Decided: main branch protection stays off (R0 auto-merge first, R1 after 30 days of shadow evidence); API cap $25 per month; monorepo with notes for several repos (`docs/MONOREPO.md`, `templates/monorepo/`)
 - [x] Writer-side skills: `task-isolation.md` (worktree, scope check against open PRs, multi-agent rules) and `review-loop.md` (capped fix loop, stale-review check), adapted from michaelshimeles/skills
 - [ ] Phase A addition: `review-result.json` carries `head_sha`, `attempt`, `status`; port the freshness check (review tied to the current head) from the greploop helper (MIT)
-- [ ] Gate A addition: zero-token prose lint on PR title, body and commit messages (em dashes, filler, chatbot phrases) and an `Evidence` section check scaled by risk tier
+- [x] Gate A addition: zero-token PR text check (`.factory/gate/`, `.github/workflows/pr-lint.yml`): attribution lines fail; em dashes, filler and puffery warn; a Testing section is expected from R1, a concrete check from R2, a Rollback section from R3
 - [ ] Service resolver `.factory/services.ts` (reads `services.json`: changed files to services and dependents, cross-service floor for risk tier) with tests
 - [ ] Gate A matrix per changed service; reviewer appends each service's `REVIEW.md`
 - [ ] Board: add a `Service` field and, later, per-service WIP lanes
