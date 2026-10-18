@@ -37,6 +37,8 @@ export interface ResultInput {
   jobResult: 'success' | 'failure' | 'cancelled';
   runUrl: string;
   until: AgentName;
+  /** The handoff file text; shown in a collapsed block when the run failed. */
+  handoff?: string | null;
 }
 
 /** True when the run stopped because an agent asked a person something. */
@@ -56,7 +58,7 @@ export function outcome(input: Pick<ResultInput, 'state' | 'jobResult'>): { labe
 }
 
 export function renderResultComment(input: ResultInput): string {
-  const { state, lane, seconds, jobResult, runUrl, until } = input;
+  const { state, lane, seconds, jobResult, runUrl, until, handoff } = input;
   const { ok } = outcome(input);
   const head = ok && isWaitingForAnswer(state)
     ? 'Pipeline paused: an agent asked a question (next comment). The issue is `needs-human` until someone answers.'
@@ -75,5 +77,6 @@ export function renderResultComment(input: ResultInput): string {
     : ok
     ? 'To continue, label the issue `agent:ready` again with a later `until:<agent>` label.'
     : 'Fix the cause, then label the issue `agent:ready` to retry.');
+  if (!ok && handoff) lines.push('', '<details><summary>Handoff for the next session</summary>', '', handoff.trim(), '', '</details>');
   return lines.join('\n');
 }

@@ -743,6 +743,14 @@ An agent that cannot proceed without a decision only a person can make should no
 
 Markers are trusted only on comments written by `github-actions[bot]`; a marker pasted by a person is ignored.
 
+## Handoff files
+
+Whenever a workflow ends without completing (waiting for an answer or plan approval, the token budget, an `--until` stop, a failure, or a job that died), the orchestrator writes `workflows/<id>.handoff.md` beside the state. It is built from the saved state, so it costs no tokens. Front matter: workflow, issue, status, branch, commit, `written_at` and the `resume` command. Sections: why it stopped, the task, a status row per phase, the open question, decisions already made, artifacts, the last eight notes, and numbered next steps matched to the reason (an answer, a raised token budget, a fix then `factory retry`). A completed workflow deletes its handoff.
+
+The file travels with the state as the Actions artifact; on a routed run that failed, the result comment on the issue also carries it in a collapsed block. A job the sweep requeued picks up the state of the run that died (see `docs/CLOUD-RUNNERS.md`). `factory retry <id> --until <agent>` is how a resumed run keeps its stop.
+
+For interactive writer sessions, `/handoff` writes `HANDOFF.md` on the task branch and `/resume-handoff` continues from it; the format is `.claude/skills/handoff.md`. A PR that contains a root `HANDOFF.md` fails the PR text check, so the note never reaches `main`.
+
 ## Approving the plan
 
 The architect returns an `implementation_plan` next to its design: 2 to 8 phases, each with `name`, `goal`, `files` (relative paths), `automated_checks` (commands) and `manual_checks` (things only a person can judge). Every phase needs at least one check. A plan that does not parse (no files, an absolute path, a phase with no checks) is rejected like any other contract break and the architect is asked again.
