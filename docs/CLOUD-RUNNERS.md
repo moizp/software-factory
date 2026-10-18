@@ -69,7 +69,7 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 ## 4. What to build (one PR each)
 
-Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`) and slice 2 (the workflows below). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
+Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`), slice 2 (the workflows below) and slice 3 (the Oracle runner scripts). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
 
 | # | Slice | Notes |
 |---|---|---|
@@ -100,6 +100,25 @@ Behaviour to know:
 
 To try it: create the label `agent:ready`, open an issue, label it with `agent:ready` and `task:review`, and watch the Actions tab. For the long lane, slice 3 must be done first.
 
+### Slice 3: setting up the Oracle VM
+
+Files are in `templates/workspace/runner/`. Everything on the VM is outbound only: no inbound port is opened.
+
+1. Create an Ampere A1 instance (Ubuntu 24.04, arm64, 2 OCPU / 12 GB). Keep the default security list closed except SSH from your address.
+2. Clone this repo, then run `templates/workspace/bootstrap.sh`. It installs Node, Claude Code, the git guard and standard settings.
+3. As a sudo user: `templates/workspace/runner/install-runner.sh --repo owner/name` (add `--dry-run` first to read the plan). It downloads the Actions runner, checks the published checksum, registers it with the label `oracle`, installs the service and installs the heartbeat timer. Registration uses `RUNNER_TOKEN` or `gh` logged in as a repo admin.
+4. As the `runner` user: run `claude` once and log in (`/login`) with the account that should pay for long jobs.
+5. As the `runner` user: create `~/.config/factory/heartbeat.env` (mode 600) with `GH_TOKEN=` set to a fine-grained token for this repo only with **Variables read and write** and nothing else.
+6. Run `templates/workspace/runner/check-runner.sh`. After the first timer run the repository variable `ORACLE_LAST_SEEN` should exist and keep moving.
+7. Record the runner version the installer printed as `RUNNER_VERSION` in `versions.env`.
+
+How the heartbeat works: every five minutes `heartbeat.sh` sets `ORACLE_LAST_SEEN` to the current time, but only when the runner service is active, `claude` runs, no API key is in the environment and the disk has room. The router treats a heartbeat under ten minutes old as online, so one missed beat is tolerated and a broken machine stops receiving long jobs within ten minutes.
+
+Things to know:
+- Jobs on this runner use the `runner` user's Claude login. Anything a workflow on `main` runs there can use that account, so keep the repo private and the collaborator list short. The workflows never run pull request code on it.
+- The runner keeps itself up to date (GitHub refuses very old runners). Claude Code does not (`DISABLE_AUTOUPDATER=1`); change its version in `versions.env`.
+- Idle reclamation: Oracle may reclaim an instance that stays under about 20% CPU, network and memory for 7 days. A runner that waits for jobs is exactly that. If it happens, the heartbeat stops and long jobs wait. Mitigation: upgrade the tenancy to pay-as-you-go (no charge while you stay inside the Always Free limits), which is commonly reported to remove reclamation. Not verified.
+
 ## 5. Decisions (settled)
 
 1. **Oracle sized at 2 OCPU / 12 GB** for now. Two concurrent agent sessions at most; raise it only if the console shows more.
@@ -113,4 +132,5 @@ To try it: create the label `agent:ready`, open an issue, label it with `agent:r
 - That `runs-on: [self-hosted, oracle]` queues cleanly when the runner is offline (jobs wait, then time out).
 - Buddy's webhook response shape and maximum run time.
 - Cost and token use of long agent jobs on a personal Claude plan.
+- Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
 - Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.
