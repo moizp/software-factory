@@ -84,6 +84,8 @@ route.yml (hosted, about a minute, no model) → .factory/route/ picks a lane, c
 job runs `factory start <issue text> --until <agent>` with a 10 minute heartbeat, then hands the issue back:
 agent:review (stopped where asked) or agent:failed, with a comment, the workflow state as an artifact, and the ledger charged
   ▼
+an agent that needs a decision asks on the issue (needs-human); a `/answer ...` comment from someone with write access resumes it (answer.yml)
+  ▼
 sweep.yml, daily: a job with no heartbeat for 30 minutes is cancelled and requeued once, then sent to needs-human
 ```
 

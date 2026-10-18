@@ -19,6 +19,7 @@ case "$*" in
   *lease-id*) echo 55 ;;
   *"route/cli.ts until"*) echo analyzer ;;
   *find-burst*) echo 9 ;;
+  *"route/cli.ts resume"*) exit \${RESUME_EXIT:-3} ;;
   *"route/cli.ts finish"*) echo "finish START_EPOCH=$START_EPOCH JOB_RESULT=$JOB_RESULT LANE=$LANE RUN_URL=$RUN_URL" >> "${log}" ;;
   *"cli.ts start"*) echo "creds OAUTH=\${CLAUDE_CODE_OAUTH_TOKEN:-} API=\${ANTHROPIC_API_KEY:-} GITHUB_TOKEN=\${GITHUB_TOKEN:-}" >> "${log}"; exit ${opts.pipelineExit ?? 0} ;;
 esac
@@ -86,6 +87,20 @@ describe('run-pipeline.sh', () => {
     const r = runPipeline(bad.env({ ...base, LANE: 'long', ANTHROPIC_API_KEY: 'sk-x' }));
     expect(r.status).toBe(1);
     expect(r.stdout).toContain('remove it');
+  });
+  it('resumes from an answer instead of starting again, and starts normally when there is none', () => {
+    const resumed = sandbox();
+    expect(runPipeline(resumed.env({ ...base, SHARED_TOKEN: 's', RESUME_EXIT: '0' })).status).toBe(0);
+    expect(resumed.calls().some(c => c.includes('[start]'))).toBe(false);
+    expect(resumed.calls().some(c => c.includes('[resume]'))).toBe(true);
+
+    const failed = sandbox();
+    expect(runPipeline(failed.env({ ...base, SHARED_TOKEN: 's', RESUME_EXIT: '1' })).status).toBe(1);
+    expect(failed.calls().some(c => c.includes('[start]'))).toBe(false);
+
+    const fresh = sandbox();
+    expect(runPipeline(fresh.env({ ...base, SHARED_TOKEN: 's' })).status).toBe(0);
+    expect(fresh.calls().some(c => c.includes('[start]'))).toBe(true);
   });
   it('fails when claude is missing', () => {
     const s = sandbox({ noClaude: true });

@@ -76,6 +76,7 @@ runs:
         LANE: ${{ inputs.lane }}
         UNTIL: ${{ inputs.until }}
         LEASE_COMMENT_ID: ${{ inputs.lease_comment }}
+        RUN_ID: ${{ github.run_id }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: npx ts-node .factory/route/cli.ts finish
 

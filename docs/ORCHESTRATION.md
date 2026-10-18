@@ -733,4 +733,12 @@ An agent that cannot proceed without a decision only a person can make should no
 - The workflow pauses (`status: paused`), the phase's gate stays invalid, and the question is stored in `humanRequests` in the workflow state. `factory status <id>` shows it.
 - `factory answer <id> "<answer>"` checks the answer against the format (`yes_no` accepts yes, no, y, n, approve, reject; `multiple_choice` accepts the option number or its exact text), records it, and resumes: completed phases are kept and the asking agent runs again with `humanAnswers: [{question, answer}]` in its input. `factory retry <id>` refuses while a question is open.
 - A phase may ask at most 3 questions; after that it fails, because an agent that keeps asking is stuck.
-- Showing the question on the GitHub issue and resuming from a reply comment is the next step (item A1 in `docs/HUMANLAYER-IDEAS.md`); today the answer is given with the command above.
+
+**On a GitHub issue (cloud lanes).** When a routed run pauses with a question, the job's last step moves the issue from `agent:working` to `needs-human` and posts the question in a comment. The comment carries a hidden marker with the workflow id, the question and the Actions run whose artifact holds the saved state.
+
+1. A person with write access replies with a comment that starts with `/answer`, for example `/answer 2` or `/answer yes, but keep the old API`. `answer.yml` checks the commenter's permission and checks the text against the question's format (a bad answer gets a reply and the question stays open).
+2. It records the answer in a comment (also with a marker), moves the issue to `agent:ready` and starts `route.yml`, so lane choice, budget and the lease work as for any other job.
+3. The job restores the workflow state from the earlier run's artifact (kept 14 days) and runs `factory answer`, which resumes the paused workflow up to the same `until:` stop. If the artifact is gone, or the question came from the Buddy lane (which keeps none), the pipeline starts again with the question and answer added to the brief.
+4. A finished resume posts a "used" comment, so a later `agent:ready` starts fresh. A failed resume keeps the answer: label the issue `agent:ready` again to retry it.
+
+Markers are trusted only on comments written by `github-actions[bot]`; a marker pasted by a person is ignored.

@@ -263,6 +263,17 @@ describe('report', () => {
     expect(outcome({ state: null, jobResult: 'success' }).label).toBe('agent:failed');
     expect(outcome({ state, jobResult: 'cancelled' }).label).toBe('agent:failed');
   });
+  it('sends a run that asked a question to needs-human, not to review', () => {
+    const asked = { ...state, humanRequests: [{ id: 'analyzer-1', phase: 'analyzer', askedAt: '', request: { intent: 'clarify', question: 'Which?', urgency: 'medium', format: 'free_text' } }] };
+    expect(outcome({ state: asked, jobResult: 'success' })).toEqual({ label: 'needs-human', ok: true });
+    expect(outcome({ state: asked, jobResult: 'failure' }).label).toBe('agent:failed');
+    const answered = { ...asked, humanRequests: [{ ...asked.humanRequests[0], answer: { value: 'x', answeredAt: '' } }] };
+    expect(outcome({ state: answered, jobResult: 'success' }).label).toBe('agent:review');
+    const md = renderResultComment({ state: asked, lane: 'short', seconds: 5, jobResult: 'success', runUrl: 'https://x/run/1', until: 'analyzer' });
+    expect(md).toContain('an agent asked a question');
+    expect(md).toContain('/answer');
+    expect(md).not.toContain('A person decides what happens next');
+  });
   it('renders a result with the phase table and trims long errors', () => {
     const md = renderResultComment({ state, lane: 'long', seconds: 61.4, jobResult: 'success', runUrl: 'https://x/run/1', until: 'analyzer' });
     expect(md).toContain('Pipeline stopped after `analyzer`');

@@ -129,3 +129,16 @@ export function cancelRun(id: string): void {
 export function dispatchRoute(n: number): void {
   gh(['workflow', 'run', 'route.yml', '-f', `issue=${n}`]);
 }
+
+/** Every comment on the issue with its author, oldest first. */
+export function listComments(n: number): Array<{ id: number; body: string; author: string }> {
+  const out = gh(['api', `repos/${repo()}/issues/${n}/comments`, '--paginate', '--jq',
+    '.[] | {id, body, author: .user.login} | tojson']);
+  return out.split('\n').filter(Boolean).map(l => JSON.parse(l) as { id: number; body: string; author: string });
+}
+
+/** Downloads one artifact of a run into `dir`. Returns false when it is gone (expired or never kept). */
+export function downloadRunArtifact(run: string, name: string, dir: string): boolean {
+  if (!/^\d+$/.test(run)) return false;
+  try { gh(['run', 'download', run, '-n', name, '-D', dir]); return true; } catch { return false; }
+}

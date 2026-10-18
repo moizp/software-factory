@@ -31,10 +31,15 @@ command -v claude >/dev/null || { echo "claude CLI not found on this machine"; e
 ( while true; do sleep "${HEARTBEAT_SECONDS:-600}"; npx ts-node .factory/route/cli.ts beat || true; done ) </dev/null >/dev/null 2>&1 &
 HEARTBEAT=$!
 
-# Issue text is data: it goes into one quoted argument, never into the script.
-BRIEF="$(gh issue view "$ISSUE_NUMBER" --json title,body --jq '.title + "\n\n" + .body')"
-FACTORY_IGNORE_WIP=1 npx ts-node .factory/cli.ts start "$BRIEF" "$ISSUE_NUMBER" --until "$UNTIL"
+# An issue that was waiting on a person's answer resumes from it (exit 3 means there is none). Issue text is data:
+# it is read by the CLI and passed as one argument, never placed in a script.
+npx ts-node .factory/route/cli.ts resume
 RESULT=$?
+if [ "$RESULT" -eq 3 ]; then
+  BRIEF="$(gh issue view "$ISSUE_NUMBER" --json title,body --jq '.title + "\n\n" + .body')"
+  FACTORY_IGNORE_WIP=1 npx ts-node .factory/cli.ts start "$BRIEF" "$ISSUE_NUMBER" --until "$UNTIL"
+  RESULT=$?
+fi
 pkill -P "$HEARTBEAT" 2>/dev/null || true
 kill "$HEARTBEAT" 2>/dev/null || true
 exit "$RESULT"
