@@ -2,6 +2,9 @@
   "name": "software-factory",
   "version": "1.0.0",
   "description": "Multi-agent software factory orchestration engine",
+  "engines": {
+    "node": ">=20.19.0 <21 || >=22.12.0"
+  },
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

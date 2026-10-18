@@ -35,16 +35,18 @@ echo "  Software Factory Setup Validation"
 echo "=================================================="
 echo ""
 
-# 1. Check Node.js version (>=18)
+# 1. Check Node.js version (20.19+ or 22.12+). The CLI loads packages that are ES modules (chalk, @octokit/rest)
+#    through require(), which these versions allow by default and older ones (including 18) do not.
 echo "Checking Node.js version..."
 if ! command -v node &> /dev/null; then
     log_fail "Node.js is not installed"
 else
-    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -ge 18 ]; then
-        log_pass "Node.js $(node -v) installed (>= 18 required)"
+    NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
+    NODE_MINOR=$(node -p "process.versions.node.split('.')[1]")
+    if [ "$NODE_MAJOR" -ge 23 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 12 ]; } || { [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -ge 19 ]; }; then
+        log_pass "Node.js $(node -v) installed (20.19+ or 22.12+ required)"
     else
-        log_fail "Node.js version $(node -v) < 18 (>= 18 required)"
+        log_fail "Node.js $(node -v) is too old or unsupported (20.19+ or 22.12+ required)"
     fi
 fi
 echo ""

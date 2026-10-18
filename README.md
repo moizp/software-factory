@@ -50,7 +50,7 @@ Rules the flow enforces: `main` is the only long-lived branch, short-lived `feat
 
 ## Quick start: run the pipeline locally
 
-Needs Node 18+ and the `claude` CLI logged in. Runs use your Claude plan (default model `claude-sonnet-5-5`, effort `medium`).
+Needs Node 20.19+ or 22.12+ (the CLI loads ES module packages through `require()`, which Node 18 and older 20 and 22 releases refuse) and the `claude` CLI logged in. Runs use your Claude plan (default model `claude-sonnet-5-5`, effort `medium`).
 
 ```bash
 git clone https://github.com/moizp/software-factory && cd software-factory
