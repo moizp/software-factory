@@ -1,5 +1,6 @@
 import { WorkflowState } from '../state';
 import { AgentName, isAgentName } from '../pipeline';
+import { pendingExchange } from '../human';
 import { Lane, RouteDecision } from './types';
 
 /** Where a routed pipeline run stops unless the issue says otherwise: cheap, and before any code is written. */
@@ -38,17 +39,28 @@ export interface ResultInput {
   until: AgentName;
 }
 
-/** The label the issue moves to. A run that stopped at `until` is handed to a person with `agent:review`. */
-export function outcome(input: Pick<ResultInput, 'state' | 'jobResult'>): { label: 'agent:review' | 'agent:failed'; ok: boolean } {
+/** True when the run stopped because an agent asked a person something. */
+export function isWaitingForAnswer(state: WorkflowState | null): boolean {
+  return state?.status === 'paused' && pendingExchange(state.humanRequests) !== undefined;
+}
+
+/**
+ * The label the issue moves to. A run that stopped at `until` is handed to a person with `agent:review`; a run
+ * waiting on an answer goes to `needs-human`, which the `/answer` comment turns back into `agent:ready`.
+ */
+export function outcome(input: Pick<ResultInput, 'state' | 'jobResult'>): { label: 'agent:review' | 'agent:failed' | 'needs-human'; ok: boolean } {
   const s = input.state?.status;
   const ok = input.jobResult === 'success' && (s === 'completed' || s === 'paused');
+  if (ok && isWaitingForAnswer(input.state)) return { label: 'needs-human', ok };
   return { label: ok ? 'agent:review' : 'agent:failed', ok };
 }
 
 export function renderResultComment(input: ResultInput): string {
   const { state, lane, seconds, jobResult, runUrl, until } = input;
   const { ok } = outcome(input);
-  const head = ok
+  const head = ok && isWaitingForAnswer(state)
+    ? 'Pipeline paused: an agent asked a question (next comment). The issue is `needs-human` until someone answers.'
+    : ok
     ? `Pipeline stopped after \`${until}\` (${state?.status}). A person decides what happens next.`
     : `Pipeline did not finish (job ${jobResult}${state ? `, workflow ${state.status}` : ', no workflow state found'}).`;
   const lines = [head, '', `Lane ${lane}, ${Math.round(seconds)} s, [run log](${runUrl}).`];
@@ -58,7 +70,9 @@ export function renderResultComment(input: ResultInput): string {
       lines.push(`| ${p.phase} | ${p.valid ? 'valid' : `invalid${p.error ? `: ${p.error.slice(0, 120)}` : ''}`} |`);
     }
   }
-  lines.push('', ok
+  lines.push('', ok && isWaitingForAnswer(state)
+    ? 'Answer with `/answer <your answer>` in a comment; the pipeline then resumes by itself.'
+    : ok
     ? 'To continue, label the issue `agent:ready` again with a later `until:<agent>` label.'
     : 'Fix the cause, then label the issue `agent:ready` to retry.');
   return lines.join('\n');

@@ -11,7 +11,7 @@ import {
 } from './state';
 import { FactoryOrchestrator } from './orchestrator';
 import { invokeClaudeAgent } from './claude-bridge';
-import { AgentName } from './pipeline';
+import { AgentName, isAgentName } from './pipeline';
 import { pendingExchange, recordAnswer, renderQuestion, validateAnswer } from './human';
 
 function printHeader(text: string): void {
@@ -202,7 +202,7 @@ async function cmdRetry(workflowId: string): Promise<void> {
   console.log(chalk.green(`✓ Retry completed: ${finalState.id}`));
 }
 
-async function cmdAnswer(workflowId: string, answerText: string): Promise<void> {
+async function cmdAnswer(workflowId: string, answerText: string, until?: AgentName): Promise<void> {
   const state = loadWorkflowState(workflowId);
 
   if (!state) {
@@ -234,7 +234,8 @@ async function cmdAnswer(workflowId: string, answerText: string): Promise<void> 
     answered.issueBrief,
     answered.issueNumber,
     answered.config,
-    answered
+    answered,
+    { until }
   );
 
   printWorkflowDetail(finalState);
@@ -295,10 +296,15 @@ const command = args[0];
 
       case 'answer':
         if (args.length < 3) {
-          console.error(chalk.red('Usage: factory answer <workflow-id> <answer>'));
+          console.error(chalk.red('Usage: factory answer <workflow-id> <answer> [--until <agent>]'));
           process.exit(1);
         }
-        await cmdAnswer(args[1], args.slice(2).join(' '));
+        {
+          // The flag counts only at the very end and only with a real agent name, so a person's answer is never cut up.
+          const trailing = args.length >= 5 && args[args.length - 2] === '--until' && isAgentName(args[args.length - 1]);
+          const rest = trailing ? args.slice(0, -2) : args;
+          await cmdAnswer(rest[1], rest.slice(2).join(' '), trailing ? (args[args.length - 1] as AgentName) : undefined);
+        }
         break;
 
       default:
@@ -309,7 +315,7 @@ const command = args[0];
         console.error(chalk.gray('  factory list'));
         console.error(chalk.gray('  factory watch <workflow-id>'));
         console.error(chalk.gray('  factory retry <workflow-id>'));
-        console.error(chalk.gray('  factory answer <workflow-id> <answer>'));
+        console.error(chalk.gray('  factory answer <workflow-id> <answer> [--until <agent>]'));
         process.exit(1);
     }
   } catch (error) {

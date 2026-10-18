@@ -37,6 +37,7 @@ every lane reports back the same way: labels, comments, branch, PR  →  GitHub
 agent:ready ─▶ agent:working ─▶ agent:review ─▶ done
                    │                 │
                    ├─ agent:failed   └─ needs-human
+                   ├─ agent asked a question ─▶ needs-human ─ /answer ─▶ agent:ready
                    └─ lease expired ─▶ back to agent:ready (once), then needs-human
 ```
 
@@ -166,6 +167,7 @@ A job waiting in the queue for a long time counts as dead after 30 minutes witho
 - That `runs-on: [self-hosted, oracle]` queues cleanly when the runner is offline (jobs wait, then time out).
 - Buddy's webhook response shape and maximum run time.
 - Cost and token use of long agent jobs on a personal Claude plan.
+- The `/answer` flow (`answer.yml`, `route-cli answer` and `resume`) is tested with a fake `gh` and has never run in Actions. Unknown: that `gh run download` of another run's artifact works with `actions: read` and the default token, that the artifact keeps the `workflows/` folder layout when `logs/` is missing (the restore searches the download for the file, so either layout should work), that the `issue_comment` event for a comment made by a collaborator carries the labels in `github.event.issue.labels`, and that `gh workflow run` started from `answer.yml` is accepted with `actions: write`.
 - Slice 5 has never run in Actions. In particular: that `gh workflow run` works with `GITHUB_TOKEN` and `actions: write`, that `gh run cancel` accepts the route run id stored in the lease, and that the lease comment query (`last // empty`) behaves with `--paginate` on issues with many comments.
 - Slice 4 has never run on Buddy. Unknown: the exact JSON the webhook accepts for variables (`burst.sh` has a fallback that finds the issue by labels), whether the Free plan's runner image has `gh` and Node 20, the maximum run time of a free pipeline, and what a GB-minute costs on the runner you get.
 - Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
