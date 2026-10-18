@@ -12,6 +12,7 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
 import { FailureMarker, addUsage, classifyFailure, maxRepairs, trimProblem, withRepair } from './repair';
 import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy-engine';
 import { Board, evaluateWip, loadBoardIfPresent } from './board';
@@ -29,6 +30,8 @@ interface AgentResponse {
   }>;
   usage?: Usage;
   failure?: FailureMarker;
+  /** A typed question for a person; honoured only together with valid: false. */
+  needs_human?: unknown;
 }
 
 type AgentInvoker = (
@@ -163,6 +166,11 @@ export class FactoryOrchestrator {
       } catch (error) {
         validationError = error instanceof Error ? error.message : String(error);
       }
+      // A question for a person must be well formed, or the agent is asked to fix it like any other bad reply.
+      if (validationError === null && response && response.valid === false && response.needs_human !== undefined) {
+        const parsed = parseRequest(response.needs_human);
+        if (!parsed.ok) validationError = `needs_human is not valid: ${parsed.error}`;
+      }
 
       const verdict = classifyFailure(response, validationError);
       if (verdict.kind !== 'repairable') {
@@ -175,6 +183,28 @@ export class FactoryOrchestrator {
       this.logger.warn(`Phase ${phase}: reply rejected (${trimProblem(verdict.problem, 160)}). Asking again (${attempts}/${allowed}).`);
       current = withRepair(input, attempts, verdict.problem);
     }
+  }
+
+  /** The agent's question for a person, if it asked one (already checked by invokeAndValidate). */
+  private humanRequestFrom(response: AgentResponse): HumanRequest | null {
+    if (!response || response.valid !== false || response.needs_human === undefined) return null;
+    const parsed = parseRequest(response.needs_human);
+    return parsed.ok ? parsed.request : null;
+  }
+
+  /**
+   * Records a question and pauses. The phase's gate stays invalid so that resuming runs it again, now with the answer.
+   * An agent that keeps asking is stuck, so after MAX_QUESTIONS_PER_PHASE questions the phase fails instead.
+   */
+  private pauseForHuman(state: WorkflowState, phase: Phase, request: HumanRequest, usage?: Usage): WorkflowState {
+    if (questionsAsked(state.humanRequests, phase) >= MAX_QUESTIONS_PER_PHASE) {
+      const failed = updatePhase(state, phase, false, undefined, `Asked more than ${MAX_QUESTIONS_PER_PHASE} questions without finishing`, usage);
+      return addNote(failed, `Phase ${phase} kept asking for help and was stopped after ${MAX_QUESTIONS_PER_PHASE} questions`);
+    }
+    const exchange = newExchange(phase, request, state.humanRequests);
+    let paused = updatePhase(state, phase, false, undefined, `Waiting for a person: ${request.question}`, usage);
+    paused = { ...paused, status: 'paused', humanRequests: [...(state.humanRequests ?? []), exchange] };
+    return addNote(paused, `Phase ${phase} asked a person (${request.urgency} urgency): ${request.question}`);
   }
 
   private validateSetup(): ValidationResult {
@@ -242,6 +272,11 @@ export class FactoryOrchestrator {
         this.logger.error(`Agent response validation failed for ${agentName}: ${checked.validationError}`);
         const tried = checked.attempts > 1 ? ` (after ${checked.attempts} attempts)` : '';
         return updatePhase(state, phase, false, undefined, `${checked.validationError}${tried}`, rawResponse?.usage);
+      }
+
+      const asked = this.humanRequestFrom(rawResponse);
+      if (asked) {
+        return this.pauseForHuman(state, phase, asked, rawResponse.usage);
       }
 
       const response = normalizeResponse(rawResponse, agentName);
@@ -327,6 +362,12 @@ export class FactoryOrchestrator {
         continue;
       }
 
+      const asked = this.humanRequestFrom(rawResponse);
+      if (asked) {
+        updatedState = this.pauseForHuman(updatedState, phase, asked, rawResponse.usage);
+        continue;
+      }
+
       const response = normalizeResponse(rawResponse, phases[i].agentName);
 
       updatedState = updatePhase(
@@ -405,6 +446,11 @@ export class FactoryOrchestrator {
       await this.enforceWipLimits();
     }
 
+    const waiting = pendingExchange(resumeFrom?.humanRequests);
+    if (resumeFrom && waiting) {
+      throw new Error(`Workflow ${resumeFrom.id} is waiting for an answer to: ${waiting.request.question} (answer it with: factory answer ${resumeFrom.id} "<answer>")`);
+    }
+
     let state: WorkflowState;
     if (resumeFrom) {
       state = this.prepareResume(resumeFrom);
@@ -460,6 +506,15 @@ export class FactoryOrchestrator {
             this.buildInput(state, stage.agents[0])
           );
       saveWorkflowState(state);
+
+      const question = pendingExchange(state.humanRequests);
+      if (question) {
+        state = addNote(state, `Paused: waiting for a person to answer. Answer with: factory answer ${state.id} "<answer>"`);
+        state.status = 'paused';
+        saveWorkflowState(state);
+        this.logger.info(`Workflow ${state.id} paused for a person: ${question.request.question}`);
+        return state;
+      }
 
       const failed = stage.agents.filter(agent => !this.getLatestGateFor(state, agent)?.valid);
       if (failed.length > 0) {
@@ -643,7 +698,14 @@ export class FactoryOrchestrator {
   }
 
   /** Input handed to each agent; payloads come from earlier phases' artifacts. */
+  /** The input for an agent, plus any decisions a person already made for its phase. */
   private buildInput(state: WorkflowState, agent: AgentName): Record<string, unknown> {
+    const base = this.buildBaseInput(state, agent);
+    const humanAnswers = answersFor(state.humanRequests, agent);
+    return humanAnswers.length > 0 ? { ...base, humanAnswers } : base;
+  }
+
+  private buildBaseInput(state: WorkflowState, agent: AgentName): Record<string, unknown> {
     const pm = this.getLatestArtifactByPhase(state, 'product-manager');
     const analyzer = this.getLatestArtifactByPhase(state, 'analyzer');
     const architect = this.getLatestArtifactByPhase(state, 'software-architect');

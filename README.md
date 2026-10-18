@@ -241,6 +241,7 @@ Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium 
 | `npm run factory:start -- "<brief>" [--until <agent>]` | Start a workflow |
 | `npm run factory:list` / `factory:status <id>` / `factory:watch <id>` | Inspect workflows |
 | `npm run factory:retry <id>` | Resume a failed or paused workflow |
+| `npm run factory:answer -- <id> "<answer>"` | Answer the question an agent asked a person; the workflow then continues from that agent |
 | `npm run policy:check -- --base origin/main --head HEAD --branch "$(git branch --show-current)"` | What the merge policy says about your branch |
 | `npm run gate:check -- --base origin/main --head HEAD --branch <b> --title "<t>" --body-file body.md` | Run the PR text check locally |
 

@@ -708,3 +708,29 @@ See also:
 - [CONFIGURATION.md](./CONFIGURATION.md) — Schema reference
 - `.claude/CLAUDE.md` — Agent roles and workflow
 - `.factory/README.md` — Orchestrator components
+
+## Asking a person
+
+An agent that cannot proceed without a decision only a person can make should not guess. It returns:
+
+```json
+{
+  "phase": "analyzer",
+  "valid": false,
+  "needs_human": {
+    "intent": "choose",
+    "question": "Which database should the app use?",
+    "context": "The brief says 'a relational database' but names none.",
+    "urgency": "medium",
+    "format": "multiple_choice",
+    "choices": ["Postgres", "MySQL", "SQLite"]
+  }
+}
+```
+
+- Only `question` is required. `intent` defaults to `clarify`, `urgency` to `medium`, `format` to `free_text`. `multiple_choice` needs 2 to 8 different choices. A `needs_human` next to `valid: true` is ignored.
+- A badly formed question is treated like any bad reply: the agent is re-asked once with what was wrong (see `FACTORY_MAX_REPAIRS`).
+- The workflow pauses (`status: paused`), the phase's gate stays invalid, and the question is stored in `humanRequests` in the workflow state. `factory status <id>` shows it.
+- `factory answer <id> "<answer>"` checks the answer against the format (`yes_no` accepts yes, no, y, n, approve, reject; `multiple_choice` accepts the option number or its exact text), records it, and resumes: completed phases are kept and the asking agent runs again with `humanAnswers: [{question, answer}]` in its input. `factory retry <id>` refuses while a question is open.
+- A phase may ask at most 3 questions; after that it fails, because an agent that keeps asking is stuck.
+- Showing the question on the GitHub issue and resuming from a reply comment is the next step (item A1 in `docs/HUMANLAYER-IDEAS.md`); today the answer is given with the command above.

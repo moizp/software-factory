@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgentName } from './pipeline';
 import { workflowsDir } from './paths';
+import type { HumanExchange } from './human';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
@@ -47,6 +48,8 @@ export interface WorkflowState {
   notes: string[];
   /** Total tokens used across all phases and resumes, for the budget guard */
   tokensUsed?: number;
+  /** Questions agents have put to a person, with the answers received. At most one is unanswered. */
+  humanRequests?: HumanExchange[];
 }
 
 
