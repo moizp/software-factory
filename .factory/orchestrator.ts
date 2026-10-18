@@ -12,6 +12,7 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { FailureMarker, addUsage, classifyFailure, maxRepairs, trimProblem, withRepair } from './repair';
 import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy-engine';
 import { Board, evaluateWip, loadBoardIfPresent } from './board';
 import * as fs from 'fs';
@@ -27,6 +28,7 @@ interface AgentResponse {
     content: Record<string, unknown>;
   }>;
   usage?: Usage;
+  failure?: FailureMarker;
 }
 
 type AgentInvoker = (
@@ -131,6 +133,50 @@ export class FactoryOrchestrator {
     throw lastError || new Error(`${operationName} failed after ${this.retryConfig.maxRetries} retries`);
   }
 
+  /**
+   * Calls the agent and checks its reply against the contract. If the reply is unusable (not readable JSON, or it
+   * breaks the contract) the agent is asked again, up to FACTORY_MAX_REPAIRS times, with a short note of what was
+   * wrong. A reply where the agent itself declines (valid: false with a reason) is returned as is. Usage from every
+   * attempt is added up, so re-asks count against the token budget.
+   */
+  private async invokeAndValidate(
+    state: WorkflowState,
+    phase: Phase,
+    agentName: string,
+    input: Record<string, unknown>
+  ): Promise<{ response: AgentResponse; validationError: string | null; attempts: number }> {
+    const allowed = maxRepairs();
+    let usage: Usage | undefined;
+    let current = input;
+
+    for (let attempts = 1; ; attempts++) {
+      const raw = await this.retryWithBackoff(
+        () => this.invokeAgent(state, agentName, current),
+        `phase ${phase}`
+      );
+      usage = addUsage(usage, raw?.usage);
+      const response = raw && attempts > 1 ? { ...raw, usage } : raw;
+
+      let validationError: string | null = null;
+      try {
+        validateAgentResponse(response, agentName);
+      } catch (error) {
+        validationError = error instanceof Error ? error.message : String(error);
+      }
+
+      const verdict = classifyFailure(response, validationError);
+      if (verdict.kind !== 'repairable') {
+        return { response, validationError, attempts };
+      }
+      if (attempts > allowed) {
+        // Still unusable after every allowed re-ask: report it as a failed reply, with the number of tries.
+        return { response, validationError: verdict.problem, attempts };
+      }
+      this.logger.warn(`Phase ${phase}: reply rejected (${trimProblem(verdict.problem, 160)}). Asking again (${attempts}/${allowed}).`);
+      current = withRepair(input, attempts, verdict.problem);
+    }
+  }
+
   private validateSetup(): ValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -188,18 +234,14 @@ export class FactoryOrchestrator {
     this.logger.info(`Starting phase: ${phase}`);
 
     try {
-      const rawResponse = await this.retryWithBackoff(
-        () => this.invokeAgent(state, agentName, input),
-        `phase ${phase}`
-      );
+      const checked = await this.invokeAndValidate(state, phase, agentName, input);
+      const rawResponse = checked.response;
 
-      // Validate agent response against its contract
-      try {
-        validateAgentResponse(rawResponse, agentName);
-      } catch (validationError) {
-        this.logger.error(`Agent response validation failed for ${agentName}: ${validationError}`);
-        const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
-        return updatePhase(state, phase, false, undefined, errorMsg, rawResponse?.usage);
+      // The reply is still unusable after any re-asks
+      if (checked.validationError !== null) {
+        this.logger.error(`Agent response validation failed for ${agentName}: ${checked.validationError}`);
+        const tried = checked.attempts > 1 ? ` (after ${checked.attempts} attempts)` : '';
+        return updatePhase(state, phase, false, undefined, `${checked.validationError}${tried}`, rawResponse?.usage);
       }
 
       const response = normalizeResponse(rawResponse, agentName);
@@ -221,6 +263,10 @@ export class FactoryOrchestrator {
             artifact.content
           );
         }
+      }
+
+      if (checked.attempts > 1) {
+        updatedState = addNote(updatedState, `Phase ${phase} needed ${checked.attempts} attempts: the first reply was rejected and the agent was asked again`);
       }
 
       if (!response.valid) {
@@ -254,10 +300,14 @@ export class FactoryOrchestrator {
 
     const results = await Promise.all(
       phases.map(({ phase, agentName, input }) =>
-        this.invokeAgent(state, agentName, input).catch(error => ({
-          phase,
-          valid: false,
-          error: error instanceof Error ? error.message : String(error)
+        this.invokeAndValidate(state, phase, agentName, input).catch(error => ({
+          response: {
+            phase,
+            valid: false,
+            error: error instanceof Error ? error.message : String(error)
+          } as AgentResponse,
+          validationError: null as string | null,
+          attempts: 1
         }))
       )
     );
@@ -265,16 +315,15 @@ export class FactoryOrchestrator {
     let updatedState = state;
 
     for (let i = 0; i < results.length; i++) {
-      const rawResponse = results[i] as AgentResponse;
+      const checked = results[i] as { response: AgentResponse; validationError: string | null; attempts: number };
+      const rawResponse = checked.response;
       const { phase } = phases[i];
 
-      // Validate agent response against its contract
-      try {
-        validateAgentResponse(rawResponse, phases[i].agentName);
-      } catch (validationError) {
-        this.logger.error(`Parallel agent response validation failed for ${phase}: ${validationError}`);
-        const errorMsg = validationError instanceof Error ? validationError.message : String(validationError);
-        updatedState = updatePhase(updatedState, phase, false, undefined, errorMsg, rawResponse?.usage);
+      // The reply is still unusable after any re-asks
+      if (checked.validationError !== null) {
+        this.logger.error(`Parallel agent response validation failed for ${phase}: ${checked.validationError}`);
+        const tried = checked.attempts > 1 ? ` (after ${checked.attempts} attempts)` : '';
+        updatedState = updatePhase(updatedState, phase, false, undefined, `${checked.validationError}${tried}`, rawResponse?.usage);
         continue;
       }
 
@@ -297,6 +346,10 @@ export class FactoryOrchestrator {
             artifact.content
           );
         }
+      }
+
+      if (checked.attempts > 1) {
+        updatedState = addNote(updatedState, `Phase ${phase} needed ${checked.attempts} attempts: the first reply was rejected and the agent was asked again`);
       }
 
       if (!response.valid) {
