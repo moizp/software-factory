@@ -15,7 +15,7 @@ export interface AgentContract {
 export const AGENT_CONTRACTS = {
   'product-manager': { requiredPayload: ['product', 'features'] },
   'analyzer': { requiredPayload: ['analysis'] },
-  'software-architect': { requiredPayload: ['architecture', 'api_specification'] },
+  'software-architect': { requiredPayload: ['architecture', 'api_specification', 'implementation_plan'] },
   'backend-engineer': { requiredPayload: ['generated_files'] },
   'frontend-engineer': { requiredPayload: ['generated_files'] },
   'infrastructure-engineer': { requiredPayload: ['generated_files'] },

@@ -1,6 +1,7 @@
 import Ajv, { ValidateFunction } from 'ajv';
 import envelopeSchema from './contracts/envelope.schema.json';
 import { AGENT_CONTRACTS, isAgentName } from './pipeline';
+import { parsePlan, stubPlan } from './plan';
 
 /** Keys that belong to the envelope, not to an agent's payload. */
 const ENVELOPE_KEYS = new Set([
@@ -41,10 +42,20 @@ function getValidator(agentName: string): ValidateFunction {
 /** Returns human-readable contract violations; empty when the response conforms. */
 export function validateContract(response: unknown, agentName: string): string[] {
   const validate = getValidator(agentName);
-  if (validate(response)) {
-    return [];
+  if (!validate(response)) {
+    return (validate.errors || []).map(e => `${e.instancePath || '(root)'} ${e.message}`);
   }
-  return (validate.errors || []).map(e => `${e.instancePath || '(root)'} ${e.message}`);
+  return payloadProblems(response, agentName);
+}
+
+/** Checks of a payload's content, beyond the presence of its keys. Only for a valid reply. */
+function payloadProblems(response: unknown, agentName: string): string[] {
+  const r = response as Record<string, unknown>;
+  if (agentName === 'software-architect' && r.valid === true) {
+    const plan = parsePlan(r.implementation_plan);
+    if (!plan.ok) return [plan.error];
+  }
+  return [];
 }
 
 /**
@@ -82,7 +93,7 @@ export function stubPayload(agentName: string, data: unknown = {}): Record<strin
   const payload: Record<string, unknown> = {};
   if (isAgentName(agentName)) {
     for (const key of AGENT_CONTRACTS[agentName].requiredPayload) {
-      payload[key] = { agent: agentName, data };
+      payload[key] = key === 'implementation_plan' ? stubPlan() : { agent: agentName, data };
     }
   }
   return payload;

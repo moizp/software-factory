@@ -13,6 +13,10 @@ import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
+import {
+  PLAN_INTENT, PLAN_PHASE, automatedChecks, builtPaths, consumePlanChanges, parsePlan, planDeviations, planReview,
+  renderDeviations, renderPlanSummary
+} from './plan';
 import { FailureMarker, addUsage, classifyFailure, maxRepairs, trimProblem, withRepair } from './repair';
 import { Policy, Decision, evaluatePolicy, loadPolicy } from './policy-engine';
 import { Board, evaluateWip, loadBoardIfPresent } from './board';
@@ -205,6 +209,52 @@ export class FactoryOrchestrator {
     let paused = updatePhase(state, phase, false, undefined, `Waiting for a person: ${request.question}`, usage);
     paused = { ...paused, status: 'paused', humanRequests: [...(state.humanRequests ?? []), exchange] };
     return addNote(paused, `Phase ${phase} asked a person (${request.urgency} urgency): ${request.question}`);
+  }
+
+  /** Plan approval is on with FACTORY_PLAN_APPROVAL=1 or `"plan_approval": true` in the workflow config. */
+  private planApprovalRequired(state: WorkflowState): boolean {
+    return /^(1|true)$/i.test(process.env.FACTORY_PLAN_APPROVAL ?? '') || state.config?.plan_approval === true;
+  }
+
+  /**
+   * Puts the architect's plan to a person as a question and pauses. The answer "approve" lets the build start; anything
+   * else is taken as changes to make and the architect runs again with it. Rounds are limited like any other question.
+   */
+  private askForPlanApproval(state: WorkflowState): WorkflowState {
+    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan);
+    if (!plan.ok) {
+      const failed = addNote(state, `Plan approval impossible: ${plan.error}`);
+      return { ...failed, status: 'failed' };
+    }
+    if (questionsAsked(state.humanRequests, PLAN_PHASE) >= MAX_QUESTIONS_PER_PHASE) {
+      const failed = addNote(state, `The plan was not approved after ${MAX_QUESTIONS_PER_PHASE} rounds of questions; stopped`);
+      return { ...failed, status: 'failed' };
+    }
+    const exchange = newExchange(PLAN_PHASE, {
+      intent: PLAN_INTENT,
+      question: 'Approve this implementation plan, or say what should change? Answer "approve" to start the build.',
+      context: renderPlanSummary(plan.plan),
+      urgency: 'medium',
+      format: 'free_text'
+    }, state.humanRequests);
+    this.logger.info(`Workflow ${state.id} paused: waiting for the plan to be approved`);
+    const paused: WorkflowState = { ...state, status: 'paused', humanRequests: [...(state.humanRequests ?? []), exchange] };
+    return addNote(paused, `Paused: the implementation plan needs approval. Answer with: factory answer ${state.id} "approve" (or say what to change)`);
+  }
+
+  /** The plan's files compared with what the builders produced, as one line for the workflow notes. Null without a plan. */
+  private planDeviationNote(state: WorkflowState): string | null {
+    const check = this.planCheck(state);
+    if (!check) return null;
+    return `Plan check: ${renderDeviations(check.deviations)}`;
+  }
+
+  private planCheck(state: WorkflowState): { deviations: ReturnType<typeof planDeviations>; automated_checks: string[] } | null {
+    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan);
+    if (!plan.ok) return null;
+    const builders: AgentName[] = ['backend-engineer', 'frontend-engineer', 'infrastructure-engineer'];
+    const outputs = state.artifacts.filter(a => builders.includes(a.phase as AgentName)).map(a => a.content);
+    return { deviations: planDeviations(plan.plan, builtPaths(outputs)), automated_checks: automatedChecks(plan.plan) };
   }
 
   private validateSetup(): ValidationResult {
@@ -478,47 +528,58 @@ export class FactoryOrchestrator {
       }
     }
 
-    // Execute stages in order; stages already satisfied (resume) are skipped
+    // Execute stages in order; stages already satisfied (resume) are not run again, but the checks after a stage still apply
     for (const stage of STAGES) {
       if (this.isStageDone(state, stage)) {
         this.logger.info(`Skipping completed stage: ${stage.id}`);
-        continue;
-      }
+      } else {
+        const budget = this.tokenBudget();
+        if (budget > 0 && (state.tokensUsed ?? 0) >= budget) {
+          state = addNote(state, `Token budget reached before stage ${stage.id}: ${state.tokensUsed}/${budget}. Raise FACTORY_MAX_TOKENS and run: factory retry ${state.id}`);
+          state.status = 'paused';
+          saveWorkflowState(state);
+          this.logger.warn(`Token budget reached (${state.tokensUsed}/${budget}); workflow paused`);
+          return state;
+        }
 
-      const budget = this.tokenBudget();
-      if (budget > 0 && (state.tokensUsed ?? 0) >= budget) {
-        state = addNote(state, `Token budget reached before stage ${stage.id}: ${state.tokensUsed}/${budget}. Raise FACTORY_MAX_TOKENS and run: factory retry ${state.id}`);
-        state.status = 'paused';
+        state = stage.mode === 'parallel'
+          ? await this.executeParallelPhases(
+              state,
+              stage.agents.map(agent => ({ phase: agent, agentName: agent, input: this.buildInput(state, agent) }))
+            )
+          : await this.executeSequentialPhase(
+              state,
+              stage.agents[0],
+              stage.agents[0],
+              this.buildInput(state, stage.agents[0])
+            );
         saveWorkflowState(state);
-        this.logger.warn(`Token budget reached (${state.tokensUsed}/${budget}); workflow paused`);
-        return state;
+
+        const question = pendingExchange(state.humanRequests);
+        if (question) {
+          state = addNote(state, `Paused: waiting for a person to answer. Answer with: factory answer ${state.id} "<answer>"`);
+          state.status = 'paused';
+          saveWorkflowState(state);
+          this.logger.info(`Workflow ${state.id} paused for a person: ${question.request.question}`);
+          return state;
+        }
+
+        const failed = stage.agents.filter(agent => !this.getLatestGateFor(state, agent)?.valid);
+        if (failed.length > 0) {
+          return this.failWorkflow(state, stage, failed);
+        }
+
+        if (stage.id === 'build') {
+          const note = this.planDeviationNote(state);
+          if (note) state = addNote(state, note);
+        }
       }
 
-      state = stage.mode === 'parallel'
-        ? await this.executeParallelPhases(
-            state,
-            stage.agents.map(agent => ({ phase: agent, agentName: agent, input: this.buildInput(state, agent) }))
-          )
-        : await this.executeSequentialPhase(
-            state,
-            stage.agents[0],
-            stage.agents[0],
-            this.buildInput(state, stage.agents[0])
-          );
-      saveWorkflowState(state);
-
-      const question = pendingExchange(state.humanRequests);
-      if (question) {
-        state = addNote(state, `Paused: waiting for a person to answer. Answer with: factory answer ${state.id} "<answer>"`);
-        state.status = 'paused';
+      // A person approves the plan before anything is built (when plan approval is on)
+      if ((stage.agents as string[]).includes(PLAN_PHASE) && this.planApprovalRequired(state) && planReview(state.humanRequests) === 'none') {
+        state = this.askForPlanApproval(state);
         saveWorkflowState(state);
-        this.logger.info(`Workflow ${state.id} paused for a person: ${question.request.question}`);
         return state;
-      }
-
-      const failed = stage.agents.filter(agent => !this.getLatestGateFor(state, agent)?.valid);
-      if (failed.length > 0) {
-        return this.failWorkflow(state, stage, failed);
       }
 
       if (options.until && (stage.agents as string[]).includes(options.until)) {
@@ -659,8 +720,10 @@ export class FactoryOrchestrator {
 
   /** Keep only validated work; failed gates and their artifacts are re-run. */
   private prepareResume(previous: WorkflowState): WorkflowState {
+    // A plan sent back for changes is revised: the architect's work is dropped so it runs again with the answer
+    const sentBack = planReview(previous.humanRequests) === 'changes';
     const okPhases = new Set(
-      AGENT_NAMES.filter(agent => this.getLatestGateFor(previous, agent)?.valid === true)
+      AGENT_NAMES.filter(agent => this.getLatestGateFor(previous, agent)?.valid === true && !(sentBack && agent === PLAN_PHASE))
     );
     const dropped = previous.phases.filter(p => !okPhases.has(p.phase as AgentName)).length;
 
@@ -668,6 +731,7 @@ export class FactoryOrchestrator {
       ...previous,
       status: 'running',
       updatedAt: new Date().toISOString(),
+      humanRequests: sentBack ? consumePlanChanges(previous.humanRequests) : previous.humanRequests,
       phases: previous.phases.filter(p => okPhases.has(p.phase as AgentName) && p.valid),
       artifacts: previous.artifacts.filter(a => okPhases.has(a.phase as AgentName))
     };
@@ -735,7 +799,7 @@ export class FactoryOrchestrator {
           productManagerOutput: pm
         };
       case 'reviewer':
-        return { allArtifacts: state.artifacts };
+        return { allArtifacts: state.artifacts, planCheck: this.planCheck(state) };
       case 'customer-support':
         return { allArtifacts: state.artifacts, brief: state.issueBrief };
     }

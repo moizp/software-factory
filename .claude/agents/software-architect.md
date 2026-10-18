@@ -18,6 +18,7 @@ Create a complete software architectural specification including:
 5. Error handling strategy
 6. Code organization & patterns
 7. Feature settings (tables, code registry, admin API) per `.claude/skills/feature-settings.md`
+8. Implementation plan (below): the part a person reads and approves before anything is built
 
 ## What You Produce
 
@@ -312,6 +313,16 @@ backend/
 └── tsconfig.json
 ```
 
+## Implementation Plan
+
+`implementation_plan` is what a person reviews. Keep it short enough to read in a few minutes: 2 to 8 phases, each a step that leaves the project working.
+
+- `name`, and a one-line `goal`.
+- `files`: every file the phase creates or changes, as relative paths. The builders' `generated_files` are compared with this list afterwards, so it must be complete and use the paths the builders will use.
+- `automated_checks`: commands that show the phase is done (`npm test`, `npx tsc --noEmit`, a `curl` against the running app). Real commands only.
+- `manual_checks`: what a person must look at because no command can (a screen, a wording, a policy decision).
+- Every phase needs at least one check. If a person answers your plan with changes, they arrive under `humanAnswers`; revise the plan, do not just acknowledge.
+
 ## Output Format
 
 Return **ONLY** this JSON structure:
@@ -392,6 +403,17 @@ Return **ONLY** this JSON structure:
     "encryption": "TLS 1.3 in transit, bcrypt for passwords",
     "secrets": ["JWT_SECRET", "STRIPE_SECRET"],
     "rate_limiting": "100 requests/minute per IP"
+  },
+  "implementation_plan": {
+    "phases": [
+      {
+        "name": "Auth and users",
+        "goal": "People can register and log in",
+        "files": ["src/server.ts", "src/routes/auth.ts", "prisma/schema.prisma"],
+        "automated_checks": ["npx prisma validate", "npm test -- auth"],
+        "manual_checks": ["Password rules match the product requirements"]
+      }
+    ]
   },
   "data_flow": {
     "user_login": [

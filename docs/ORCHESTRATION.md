@@ -742,3 +742,13 @@ An agent that cannot proceed without a decision only a person can make should no
 4. A finished resume posts a "used" comment, so a later `agent:ready` starts fresh. A failed resume keeps the answer: label the issue `agent:ready` again to retry it.
 
 Markers are trusted only on comments written by `github-actions[bot]`; a marker pasted by a person is ignored.
+
+## Approving the plan
+
+The architect returns an `implementation_plan` next to its design: 2 to 8 phases, each with `name`, `goal`, `files` (relative paths), `automated_checks` (commands) and `manual_checks` (things only a person can judge). Every phase needs at least one check. A plan that does not parse (no files, an absolute path, a phase with no checks) is rejected like any other contract break and the architect is asked again.
+
+**Review before the build.** With `FACTORY_PLAN_APPROVAL=1` (or `"plan_approval": true` in the workflow config) the workflow pauses right after the architecture stage and asks a person, using the same mechanism as an agent's question (see "Asking a person"): the plan is the question, in a readable summary. Answer `approve` to start the build. Any other answer is read as changes to make: the architect runs again with it under `humanAnswers`, and the revised plan is put to the person again. After 3 rounds the workflow fails. On a GitHub issue this is `needs-human` plus an `/answer approve` comment; on a terminal it is `factory answer <id> "approve"`. On the cloud lanes set the repository variable `FACTORY_PLAN_APPROVAL=1`.
+
+`--until` and approval: the approval question comes before the `--until` stop. With the default `until:software-architect` a routed run ends once the plan is approved. To let an approval start the build, label the issue with a later stop, such as `until:reviewer`.
+
+**Check after the build.** After the build stage the orchestrator compares the plan's files with the builders' `generated_files` and records the result in the workflow notes (`Plan check: Planned but not built (...). Built but not in the plan (...)`). The reviewer receives it as `planCheck` together with the plan's `automated_checks`. Agents run without tools, so the commands are not executed by the factory; the reviewer lists them as "not run" unless a tester's output shows them passing. Running them in CI is not built yet.
