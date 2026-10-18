@@ -69,7 +69,7 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 ## 4. What to build (one PR each)
 
-Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`), slice 2 (the workflows below), slice 3 (the Oracle runner scripts) and slice 4 (the Buddy burst lane). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
+Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`), slice 2 (the workflows below), slice 3 (the Oracle runner scripts), slice 4 (the Buddy burst lane) and slice 5 (the daily sweep). All slices are now written; none has run for real. The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
 
 | # | Slice | Notes |
 |---|---|---|
@@ -140,6 +140,19 @@ Things to know:
 - Buddy freezes a free workspace after 60 days without use (reported). An unused bonus lane may need a manual run now and then.
 - `BUDDY_RUNNER_GB` defaults to 4, a guess.
 
+### Slice 5: the daily sweep
+
+`.github/workflows/sweep.yml` runs once a day (and on demand) and does three things through `route-cli sweep`:
+1. **Dead jobs.** For every open issue labelled `agent:working` it reads the lease comment. A heartbeat older than 30 minutes, or no readable lease, means the job is dead (it crashed, never got a runner, or lost its network). The sweep cancels the Actions run, puts the issue back to `agent:ready`, clears its `lane:*` label and re-dispatches `route.yml` for it, **once**. The restart count lives in the lease marker, so the next claim carries it, and a second stale lease sends the issue to `needs-human` instead of looping. A missing lease goes straight to `needs-human`. Jobs on the Buddy lane are never cancelled by id, because a Buddy execution id is not a GitHub run id.
+2. **Usage report.** Month-to-date hosted minutes, Buddy GB-minutes and Oracle hours go in the run's job summary.
+3. **Ledger check.** If the `agent-ledger` marker in the ledger issue is damaged, one warning comment explains how to repair it. Until then the router treats the hosted pool as used up (this part already existed in slice 1).
+
+Cost: when nothing is in flight the workflow ends after one API call, about a minute of hosted time a day. A manual run always goes through, to read the usage report.
+
+Because label events caused by `GITHUB_TOKEN` do not start workflows, the sweep re-dispatches `route.yml` itself. That run is made by `github-actions[bot]`, which the router accepts as a sender (only a workflow on the default branch can act as it; anyone who could trigger such a workflow already has write access).
+
+A job waiting in the queue for a long time counts as dead after 30 minutes without a heartbeat, but with a daily sweep it can sit for up to a day before it is noticed.
+
 ## 5. Decisions (settled)
 
 1. **Oracle sized at 2 OCPU / 12 GB** for now. Two concurrent agent sessions at most; raise it only if the console shows more.
@@ -153,6 +166,7 @@ Things to know:
 - That `runs-on: [self-hosted, oracle]` queues cleanly when the runner is offline (jobs wait, then time out).
 - Buddy's webhook response shape and maximum run time.
 - Cost and token use of long agent jobs on a personal Claude plan.
+- Slice 5 has never run in Actions. In particular: that `gh workflow run` works with `GITHUB_TOKEN` and `actions: write`, that `gh run cancel` accepts the route run id stored in the lease, and that the lease comment query (`last // empty`) behaves with `--paginate` on issues with many comments.
 - Slice 4 has never run on Buddy. Unknown: the exact JSON the webhook accepts for variables (`burst.sh` has a fallback that finds the issue by labels), whether the Free plan's runner image has `gh` and Node 20, the maximum run time of a free pipeline, and what a GB-minute costs on the runner you get.
 - Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
 - Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.
