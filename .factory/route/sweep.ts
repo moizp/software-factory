@@ -1,5 +1,6 @@
 import { actionsRatio, buddyRatio } from './ledger';
 import { Lease, SweepAction, renderLease } from './lease';
+import { renderRequeueMarker } from './ask';
 import { Budget, Ledger, Permission } from './types';
 
 /** Workflows started with GITHUB_TOKEN (the sweep re-dispatching a requeued issue) run as this actor. */
@@ -33,9 +34,10 @@ export function escalatedLeaseBody(reason: string, now: Date): string {
   return `Agent lease expired at ${now.toISOString()} (${reason}). Sent to a person; no marker kept.`;
 }
 
-export function renderSweepComment(action: SweepAction): string {
+/** `deadRun` is the Actions run of the job that died, when it has one: the next job resumes from that run's saved state. */
+export function renderSweepComment(action: SweepAction, deadRun?: string): string {
   return action.action === 'requeue'
-    ? `The agent job for this issue stopped sending heartbeats (${action.reason}). It was cancelled and the issue is back to \`agent:ready\`; routing runs again now (restart ${action.restarts}).`
+    ? `The agent job for this issue stopped sending heartbeats (${action.reason}). It was cancelled and the issue is back to \`agent:ready\`; routing runs again now (restart ${action.restarts}).${deadRun ? `\n\n${renderRequeueMarker(deadRun)}` : ''}`
     : `The agent job for this issue stopped sending heartbeats (${action.reason}). It was cancelled and not retried again. A person needs to look: check the run log, then label the issue \`agent:ready\` to try once more.`;
 }
 

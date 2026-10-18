@@ -12,6 +12,7 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { saveHandoff } from './handoff';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
 import {
   PLAN_INTENT, PLAN_PHASE, automatedChecks, builtPaths, consumePlanChanges, parsePlan, planDeviations, planReview,
@@ -458,7 +459,24 @@ export class FactoryOrchestrator {
     return updatedState;
   }
 
+  /** Runs the workflow. A workflow that ends without completing leaves a handoff file beside its state. */
   async executeWorkflow(
+    issueBrief: string,
+    issueNumber?: number,
+    config?: Record<string, unknown>,
+    resumeFrom?: WorkflowState,
+    options: { until?: AgentName } = {}
+  ): Promise<WorkflowState> {
+    const state = await this.runWorkflow(issueBrief, issueNumber, config, resumeFrom, options);
+    try {
+      saveHandoff(state);
+    } catch (error) {
+      this.logger.warn(`Could not write the handoff file: ${error}`);
+    }
+    return state;
+  }
+
+  private async runWorkflow(
     issueBrief: string,
     issueNumber?: number,
     config?: Record<string, unknown>,

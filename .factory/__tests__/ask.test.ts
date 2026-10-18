@@ -1,6 +1,6 @@
 import {
   AnswerMarker, BOT_LOGIN, IssueComment, askState, briefWithAnswer, parseAnswer, parseAnswerCommand, parseQuestion,
-  renderAnswerComment, renderQuestionComment, renderResumedComment
+  renderAnswerComment, renderQuestionComment, renderRequeueMarker, renderResumedComment
 } from '../route';
 import { HumanExchange, validateAnswer } from '../human';
 
@@ -89,6 +89,19 @@ describe('askState', () => {
   });
   it('skips a damaged bot marker and keeps looking', () => {
     expect(askState([q, bot(15, '<!-- agent-answer AAAA -->')]).kind).toBe('question');
+  });
+});
+
+describe('requeue markers', () => {
+  const rq = (id: number, run = '4242') => bot(id, `The job died.\n\n${renderRequeueMarker(run)}`);
+  it('name the run to resume from, until they are used', () => {
+    expect(askState([rq(5)])).toEqual({ kind: 'requeue', run: '4242' });
+    expect(askState([rq(5), bot(6, renderResumedComment({ exchange: 'requeue-4242' }))]).kind).toBe('none');
+  });
+  it('only count when the bot wrote them and the run is a number', () => {
+    expect(askState([person(5, renderRequeueMarker('4242'))]).kind).toBe('none');
+    expect(askState([rq(5, 'abc')]).kind).toBe('none');
+    expect(askState([rq(5, '1; rm -rf')]).kind).toBe('none');
   });
 });
 

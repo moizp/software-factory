@@ -58,3 +58,7 @@ round += 1; round > 3, or same finding twice? ─▶ STOP: add needs-human
 ## Report (final message and PR comment)
 
 PR URL, reviewed `head_sha`, rounds used, current verdict, checks run, findings fixed, findings rejected with reasons, findings left. State plainly whether the run ended in success, timeout, cap or degraded review. A capped or timed-out run is not complete.
+
+## When the loop stops early
+
+A capped, timed-out or degraded run (the `needs-human` cases above) ends with a handoff, so the person or session that takes over starts from facts: write it with `/handoff` (format in `.claude/skills/handoff.md`), listing the open findings by file and line, the rounds used, the checks last run and what was tried. Do not commit it to the PR unless asked; paste the Next steps into the PR comment instead.

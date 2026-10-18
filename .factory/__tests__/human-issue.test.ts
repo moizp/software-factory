@@ -2,7 +2,7 @@ import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { BOT_LOGIN, renderAnswerComment, renderQuestionComment, renderResumedComment } from '../route';
+import { BOT_LOGIN, renderAnswerComment, renderQuestionComment, renderRequeueMarker, renderResumedComment, renderSweepComment } from '../route';
 import { HumanExchange } from '../human';
 
 /**
@@ -19,7 +19,7 @@ const exchange: HumanExchange = {
 
 type Comment = { id: number; body: string; author: string };
 
-function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: string; artifact?: boolean }) {
+function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: string; artifact?: boolean; stateId?: string }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'human-issue-'));
   const bin = path.join(dir, 'bin');
   const work = path.join(dir, 'work');
@@ -30,6 +30,11 @@ function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: str
   fs.writeFileSync(commentsFile, opts.comments.map(c => JSON.stringify(c)).join('\n'));
   const issueJson = JSON.stringify({ number: 7, labels: opts.labels.map(name => ({ name })), author: { login: 'alice' }, body: 'Build a thing', title: 'A thing' });
 
+  const stateId = opts.stateId ?? 'wf-1';
+  const stateJson = JSON.stringify({ id: stateId, issueNumber: 7, updatedAt: '2026-10-18T10:00:00Z' });
+  const download = opts.artifact === false
+    ? 'exit 1'
+    : `dir=""; while [ $# -gt 0 ]; do [ "$1" = "-D" ] && dir="$2"; shift; done; mkdir -p "$dir/workflows"; echo '${stateJson}' > "$dir/workflows/${stateId}.json"`;
   const write = (name: string, body: string) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   write('gh', `
 case "$*" in
@@ -42,7 +47,7 @@ case "$*" in
   "workflow run"*) echo "gh $*" >> "${log}" ;;
   "run download"*)
     echo "gh $*" >> "${log}"
-    ${opts.artifact === false ? 'exit 1' : 'dir=""; while [ $# -gt 0 ]; do [ "$1" = "-D" ] && dir="$2"; shift; done; mkdir -p "$dir/workflows"; echo "{}" > "$dir/workflows/wf-1.json"'} ;;
+    ${download} ;;
   *) echo "unexpected gh $*" >> "${log}"; exit 1 ;;
 esac
 `);
@@ -152,5 +157,48 @@ describe('route-cli resume', () => {
     const r = s.run('resume', { CHILD_EXIT: '1' });
     expect(r.status).toBe(1);
     expect(s.calls().some(c => c.startsWith('POST'))).toBe(false);
+  });
+});
+
+describe('route-cli resume after a requeue', () => {
+  const requeued = (run = '4242'): Comment => ({
+    id: 40, author: BOT_LOGIN,
+    body: renderSweepComment({ issue: 7, action: 'requeue', restarts: 1, reason: 'no heartbeat' }, run)
+  });
+
+  it('restores the newest state of the issue from the dead run and retries it', () => {
+    const s = sandbox({ comments: [requeued()], labels: ['agent:working', 'until:analyzer'], stateId: 'wf-9' });
+    const r = s.run('resume');
+    expect(r.status).toBe(0);
+    const calls = s.calls();
+    expect(calls.find(c => c.startsWith('gh run download'))).toContain('run download 4242 -n workflow-state-issue-7-4242');
+    const npx = calls.find(c => c.startsWith('npx'))!;
+    expect(npx).toContain('[retry] [wf-9] [--until] [analyzer]');
+    expect(npx).toContain('FACTORY_IGNORE_WIP=1');
+    expect(fs.existsSync(path.join(s.work, 'workflows', 'wf-9.json'))).toBe(true);
+    expect(calls.find(c => c.startsWith('POST'))).toContain('carried on from the state saved by run 4242');
+  });
+
+  it('starts fresh, and marks the requeue used, when the dead run left no state', () => {
+    const s = sandbox({ comments: [requeued()], labels: ['agent:working'], artifact: false });
+    expect(s.run('resume').status).toBe(3);
+    const calls = s.calls();
+    expect(calls.some(c => c.startsWith('npx'))).toBe(false);
+    expect(calls.find(c => c.startsWith('POST'))).toContain('No saved state was found for run 4242');
+  });
+
+  it('leaves the requeue unused when the retry fails, so a relabel tries again', () => {
+    const s = sandbox({ comments: [requeued()], labels: ['agent:working'], stateId: 'wf-9' });
+    expect(s.run('resume', { CHILD_EXIT: '1' }).status).toBe(1);
+    expect(s.calls().some(c => c.startsWith('POST'))).toBe(false);
+  });
+
+  it('a requeue that was already used, or came from a person, is not acted on', () => {
+    const used: Comment = { id: 50, author: BOT_LOGIN, body: renderResumedComment({ exchange: 'requeue-4242' }) };
+    expect(sandbox({ comments: [requeued(), used], labels: [] }).run('resume').status).toBe(3);
+    const forged: Comment = { ...requeued('999'), author: 'mallory' };
+    const s = sandbox({ comments: [forged], labels: [] });
+    expect(s.run('resume').status).toBe(3);
+    expect(s.calls()).toEqual([]);
   });
 });

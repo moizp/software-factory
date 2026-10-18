@@ -61,3 +61,7 @@ git branch -d <prefix>/<task>      # -d works because merges are merge commits
 ## Proportionality
 
 Pick the parts that apply. Docs-only changes need content and link checks, not runtime evidence. Code changes need the repo's checks and evidence of the behavior changed (see the PR template). Do not manufacture steps the change does not need.
+
+## Handing a task to another session
+
+If the task will continue in another session or on another machine, write a handoff before you stop (`/handoff`, format in `.claude/skills/handoff.md`) and commit it to the task branch only. A session picking a task up starts with `/resume-handoff`, and works in the same worktree and branch the file names. Delete `HANDOFF.md` before the PR is merged.

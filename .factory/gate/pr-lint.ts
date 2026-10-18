@@ -35,6 +35,11 @@ export function lintPr(input: PrLintInput): PrLintReport {
     for (const v of lintProse(text)) (v.severity === 'error' ? errors : warnings).push(describe(where, v));
   }
 
+  // A handoff note moves work between sessions on a branch. It must not reach main.
+  if (input.files.includes('HANDOFF.md')) {
+    errors.push('handoff-file: HANDOFF.md is a working note for moving a task between sessions; delete it from the branch before merging');
+  }
+
   const add = (i: EvidenceIssue) => warnings.push(`${i.rule}: ${i.message}`);
   checkEvidence(input.body, tier).forEach(add);
 

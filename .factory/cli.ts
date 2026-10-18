@@ -164,7 +164,7 @@ async function cmdWatch(workflowId: string, interval: number = 5000): Promise<vo
   });
 }
 
-async function cmdRetry(workflowId: string): Promise<void> {
+async function cmdRetry(workflowId: string, until?: AgentName): Promise<void> {
   const state = loadWorkflowState(workflowId);
 
   if (!state) {
@@ -195,7 +195,8 @@ async function cmdRetry(workflowId: string): Promise<void> {
     state.issueBrief,
     state.issueNumber,
     state.config,
-    state
+    state,
+    { until }
   );
 
   printWorkflowDetail(finalState);
@@ -288,10 +289,13 @@ const command = args[0];
 
       case 'retry':
         if (args.length < 2) {
-          console.error(chalk.red('Usage: factory retry <workflow-id>'));
+          console.error(chalk.red('Usage: factory retry <workflow-id> [--until <agent>]'));
           process.exit(1);
         }
-        await cmdRetry(args[1]);
+        {
+          const trailing = args.length === 4 && args[2] === '--until' && isAgentName(args[3]);
+          await cmdRetry(args[1], trailing ? (args[3] as AgentName) : undefined);
+        }
         break;
 
       case 'answer':
@@ -314,7 +318,7 @@ const command = args[0];
         console.error(chalk.gray('  factory status <workflow-id>'));
         console.error(chalk.gray('  factory list'));
         console.error(chalk.gray('  factory watch <workflow-id>'));
-        console.error(chalk.gray('  factory retry <workflow-id>'));
+        console.error(chalk.gray('  factory retry <workflow-id> [--until <agent>]'));
         console.error(chalk.gray('  factory answer <workflow-id> <answer> [--until <agent>]'));
         process.exit(1);
     }

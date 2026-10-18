@@ -36,8 +36,8 @@ export interface IssueComment {
   author: string;
 }
 
-type Kind = 'question' | 'answer' | 'resumed';
-const MARKER = /<!-- agent-(question|answer|resumed) ([A-Za-z0-9+/=]+) -->/;
+type Kind = 'question' | 'answer' | 'resumed' | 'requeue';
+const MARKER = /<!-- agent-(question|answer|resumed|requeue) ([A-Za-z0-9+/=]+) -->/;
 
 function encode(kind: Kind, data: object): string {
   return `<!-- agent-${kind} ${Buffer.from(JSON.stringify(data), 'utf-8').toString('base64')} -->`;
@@ -79,8 +79,13 @@ export function renderAnswerComment(marker: AnswerMarker): string {
   ].join('\n');
 }
 
-export function renderResumedComment(marker: ResumedMarker): string {
-  return `The answer to question \`${marker.exchange}\` was used; the pipeline ran on from it.\n\n${encode('resumed', marker)}`;
+export function renderResumedComment(marker: ResumedMarker, text?: string): string {
+  return `${text ?? `The answer to question \`${marker.exchange}\` was used; the pipeline ran on from it.`}\n\n${encode('resumed', marker)}`;
+}
+
+/** Added to the sweep's comment when it puts a dead job back in the queue: the run whose saved state the next job can use. */
+export function renderRequeueMarker(run: string): string {
+  return encode('requeue', { run });
 }
 
 /** `/answer <text>` at the start of a comment. Everything after the command, across lines, is the answer. */
@@ -115,6 +120,7 @@ export function parseAnswer(body: string): AnswerMarker | null {
 /** The newest trusted marker decides: a question is open, an answer is waiting to be used, or neither. */
 export type AskState =
   | { kind: 'none' }
+  | { kind: 'requeue'; run: string }
   | { kind: 'question'; question: QuestionMarker }
   | { kind: 'answer'; answer: AnswerMarker };
 
@@ -124,7 +130,10 @@ export function askState(comments: IssueComment[]): AskState {
     const d = decode(c.body);
     if (!d) continue;
     if (d.kind === 'resumed') return { kind: 'none' };
-    if (d.kind === 'question') {
+    if (d.kind === 'requeue') {
+      const run = str(d.data.run);
+      if (run !== null && /^\d+$/.test(run)) return { kind: 'requeue', run };
+    } else if (d.kind === 'question') {
       const question = parseQuestion(c.body);
       if (question) return { kind: 'question', question };
     } else {

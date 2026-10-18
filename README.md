@@ -86,7 +86,7 @@ agent:review (stopped where asked) or agent:failed, with a comment, the workflow
   ▼
 an agent that needs a decision asks on the issue (needs-human); a `/answer ...` comment from someone with write access resumes it (answer.yml)
   ▼
-sweep.yml, daily: a job with no heartbeat for 30 minutes is cancelled and requeued once, then sent to needs-human
+sweep.yml, daily: a job with no heartbeat for 30 minutes is cancelled and requeued once (the next job resumes from the state the dead one saved), then sent to needs-human
 ```
 
 How a routed run behaves: the pipeline stops at the agent named by an `until:<agent>` label (default `software-architect`) and produces artifacts, not code, because writing code into worktrees is not built yet. It runs without `GITHUB_TOKEN`, so it cannot open or merge PRs. `AGENTS_ENABLED=false` stops everything.
@@ -229,7 +229,7 @@ To use the API key instead of an account, set only `ANTHROPIC_API_KEY` and leave
 
 - Writer workspace scripts in `templates/workspace/` (pinned Node and Claude Code, `doctor.sh`, a pre-push guard that blocks `main`, force pushes and deletes). Not yet run on a real VPS.
 - Guardrail prompts in `templates/ai-review/prompts/` and the reviewer in `.factory/review/`.
-- Writer commands (`.claude/commands/`, also installed to `~/.claude/commands/` by `bootstrap.sh`): `/commit` (checks, explicit staging, a one-line conventional message validated by `npm run gate:commit`), `/describe-pr` (title and body with What, Why, Out of scope, Risk, Testing and Rollback, validated by `npm run gate:check`), `/iterate-plan` (change a plan after feedback without starting the build), `/debug` (cause and a failing test before any fix). They encode the rules in `CONTRIBUTING.md` so a mistake shows before `pr-lint` finds it. Their tool lists use Claude Code's permission syntax and have not been run in a live session.
+- Writer commands (`.claude/commands/`, also installed to `~/.claude/commands/` by `bootstrap.sh`): `/commit` (checks, explicit staging, a one-line conventional message validated by `npm run gate:commit`), `/describe-pr` (title and body with What, Why, Out of scope, Risk, Testing and Rollback, validated by `npm run gate:check`), `/iterate-plan` (change a plan after feedback without starting the build), `/debug` (cause and a failing test before any fix), `/handoff` and `/resume-handoff` (write and continue from a `HANDOFF.md` note when a task moves between sessions; the PR text check fails a PR that still contains it). They encode the rules in `CONTRIBUTING.md` so a mistake shows before `pr-lint` finds it. Their tool lists use Claude Code's permission syntax and have not been run in a live session.
 - Writer skills: `.claude/skills/task-isolation.md` (worktree per task, scope check against open PRs) and `.claude/skills/review-loop.md` (capped fix loop on `review-result.json`, three rounds then `needs-human`).
 - Monorepo layout and per-service policy: [docs/MONOREPO.md](docs/MONOREPO.md), `templates/monorepo/`.
 

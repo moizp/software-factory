@@ -5,6 +5,7 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import { loadBoard } from '../board';
 import { pendingExchange, validateAnswer } from '../human';
+import { handoffBody, readHandoff } from '../handoff';
 import { workflowsDir } from '../paths';
 import { listWorkflowStates } from '../state';
 import {
@@ -131,7 +132,8 @@ function finish(): void {
     const t = transition(labels, label);
     editLabels(n, t.add, t.remove);
   }
-  postComment(n, renderResultComment({ state, lane, seconds, jobResult, runUrl: env('RUN_URL'), until }));
+  const handoff = state ? readHandoff(state.id) : null;
+  postComment(n, renderResultComment({ state, lane, seconds, jobResult, runUrl: env('RUN_URL'), until, handoff: handoff ? handoffBody(handoff) : null }));
   const waiting = state && label === 'needs-human' ? pendingExchange(state.humanRequests) : undefined;
   if (state && waiting) {
     // The Buddy lane keeps no artifact, so its question carries no run and the answer restarts from the brief.
@@ -177,35 +179,63 @@ function answer(): void {
   dispatchRoute(n);
 }
 
-function findFile(dir: string, name: string): string | null {
+/** Every .json file under `dir`, parsed; unreadable ones are skipped. */
+function stateFiles(dir: string): Array<{ file: string; state: { id: string; issueNumber?: number; updatedAt?: string } }> {
+  const out: Array<{ file: string; state: { id: string; issueNumber?: number; updatedAt?: string } }> = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      const found = findFile(full, name);
-      if (found) return found;
-    } else if (entry.name === name) return full;
+    if (entry.isDirectory()) out.push(...stateFiles(full));
+    else if (entry.name.endsWith('.json')) {
+      try {
+        const state = JSON.parse(fs.readFileSync(full, 'utf-8'));
+        if (state && typeof state.id === 'string') out.push({ file: full, state });
+      } catch { /* not a workflow state */ }
+    }
   }
-  return null;
+  return out;
 }
 
-/** Brings back the workflow state saved by the run that asked. False when it is gone or unreadable. */
-function restoreState(run: string, issue: number, workflow: string): boolean {
+/**
+ * Brings back the workflow state saved by an earlier run and returns the workflow id, or null when it is gone or
+ * unreadable. With `workflow` it must be that workflow; without, the newest state of this issue is used.
+ */
+function restoreState(run: string, issue: number, workflow?: string): string | null {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-state-'));
   try {
-    if (!downloadRunArtifact(run, `workflow-state-issue-${issue}-${run}`, tmp)) return false;
-    const file = findFile(tmp, `${workflow}.json`);
-    if (!file) return false;
+    if (!downloadRunArtifact(run, `workflow-state-issue-${issue}-${run}`, tmp)) return null;
+    const found = stateFiles(tmp)
+      .filter(f => (workflow ? f.state.id === workflow : f.state.issueNumber === issue))
+      .sort((a, b) => (b.state.updatedAt ?? '').localeCompare(a.state.updatedAt ?? ''))[0];
+    if (!found) return null;
     fs.mkdirSync(workflowsDir(), { recursive: true });
-    fs.copyFileSync(file, path.join(workflowsDir(), `${workflow}.json`));
-    return true;
+    fs.copyFileSync(found.file, path.join(workflowsDir(), `${found.state.id}.json`));
+    return found.state.id;
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 }
 
+/** A job that died and was requeued: carry on from the state it saved instead of starting over. Exits 3 when there is none. */
+function resumeAfterRequeue(n: number, run: string): never {
+  const until = untilFromLabels(readIssue(n).labels);
+  const workflow = restoreState(run, n);
+  if (!workflow) {
+    console.log(`no saved state from the earlier run ${run}: starting fresh`);
+    postComment(n, renderResumedComment({ exchange: `requeue-${run}` }, `No saved state was found for run ${run}; the pipeline starts again from the beginning.`));
+    process.exit(3);
+  }
+  console.log(`resuming workflow ${workflow} from the run that died (${run})`);
+  const r = spawnSync('npx', ['ts-node', path.join(__dirname, '..', 'cli.ts'), 'retry', workflow, '--until', until], {
+    stdio: 'inherit', env: { ...process.env, FACTORY_IGNORE_WIP: '1' }
+  });
+  if (r.status === 0) postComment(n, renderResumedComment({ exchange: `requeue-${run}` }, `The pipeline carried on from the state saved by run ${run}.`));
+  process.exit(r.status ?? 1);
+}
+
 function resume(): void {
   const n = parseInt(env('ISSUE_NUMBER'), 10);
   const ask = askState(listComments(n));
+  if (ask.kind === 'requeue') resumeAfterRequeue(n, ask.run);
   if (ask.kind !== 'answer') process.exit(3);
   const a = ask.answer;
 
@@ -215,7 +245,7 @@ function resume(): void {
   const cli = path.join(__dirname, '..', 'cli.ts');
 
   let args: string[];
-  if (restoreState(a.run, n, a.workflow)) {
+  if (restoreState(a.run, n, a.workflow) !== null) {
     console.log(`resuming workflow ${a.workflow} with the answer to ${a.exchange}`);
     args = [cli, 'answer', a.workflow, a.value, '--until', until];
   } else {
@@ -267,7 +297,9 @@ function sweepAll(): void {
         ? requeuedLeaseBody(lease, action.restarts)
         : escalatedLeaseBody(action.reason, now));
     }
-    postComment(action.issue, renderSweepComment(action));
+    // The dead job's run id lets the next job resume from its saved state (the Buddy lane has no Actions run to read).
+    const deadRun = lease && lease.lane !== 'burst' && /^\d+$/.test(lease.job) ? lease.job : undefined;
+    postComment(action.issue, renderSweepComment(action, deadRun));
     console.log(`#${action.issue}: ${action.action} (${action.reason})`);
     if (action.action === 'requeue') dispatchRoute(action.issue);
   }
