@@ -69,7 +69,7 @@ Budget ledger: every job appends `lane, seconds` to a pinned ledger issue. `rout
 
 ## 4. What to build (one PR each)
 
-Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`), slice 2 (the workflows below) and slice 3 (the Oracle runner scripts). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
+Built so far: slice 0 (the vulnerable workflow removed), slice 1 (`.factory/route/`), slice 2 (the workflows below), slice 3 (the Oracle runner scripts) and slice 4 (the Buddy burst lane). The router is pure code with no network calls: `route(input)` returns `start` (with the lane, the concurrency group `agent-issue-<n>`, and the labels to add and remove), `wait` or `ignore`, each with reasons. Defaults live in `DEFAULT_BUDGET` (2,000 hosted minutes with a soft limit at 80%, Buddy off, 15 minute Oracle grace period). Unlabelled work defaults to the long lane so it costs no hosted minutes, and an unreadable ledger is treated as a used-up hosted pool.
 
 | # | Slice | Notes |
 |---|---|---|
@@ -119,6 +119,27 @@ Things to know:
 - The runner keeps itself up to date (GitHub refuses very old runners). Claude Code does not (`DISABLE_AUTOUPDATER=1`); change its version in `versions.env`.
 - Idle reclamation: Oracle may reclaim an instance that stays under about 20% CPU, network and memory for 7 days. A runner that waits for jobs is exactly that. If it happens, the heartbeat stops and long jobs wait. Mitigation: upgrade the tenancy to pay-as-you-go (no charge while you stay inside the Always Free limits), which is commonly reported to remove reclamation. Not verified.
 
+### Slice 4: the Buddy burst lane (bonus)
+
+Off until `BUDDY_ENABLED=true`. The router sends a job to `burst` only when asked for it with `lane:burst`, or when a long job has waited more than 15 minutes for Oracle and Buddy has budget left (under 90% of its GB-minutes).
+
+How it runs:
+1. `route.yml` claims the issue as usual, then its `burst` job calls `.factory/route/trigger-buddy.sh`, which POSTs the issue number to the pipeline's webhook (`BUDDY_WEBHOOK_URL`, a GitHub secret). If that call fails, the claim is released as `agent:failed` with a comment.
+2. The Buddy pipeline has one action, `bash .factory/route/burst.sh`, so the logic stays in the repo. It installs dependencies, finds the lease comment, runs the pipeline through the same `run-pipeline.sh` the other lanes use (one credential, no `GITHUB_TOKEN`, 10 minute heartbeat), then hands the issue back and charges the ledger in GB-minutes.
+3. If the webhook did not carry the issue number, `burst.sh` takes the oldest open issue labelled `agent:working` and `lane:burst`.
+
+Setup, once:
+1. Create a Buddy workspace and project and connect this repo (default branch `main`).
+2. Create a pipeline triggered by webhook only (the Free plan has no trigger conditions or remote YAML, so configure it in the UI). Actions: a Bash action that makes sure `gh` and Claude Code are installed (`npm install -g @anthropic-ai/claude-code@2.1.292`), then a Bash action running `bash .factory/route/burst.sh`.
+3. Pipeline variables: `GH_TOKEN` (secret; fine-grained, this repo only, Issues read and write), `GITHUB_REPOSITORY` (`owner/name`), and `CLAUDE_CODE_OAUTH_TOKEN` (secret; from `claude setup-token`) or `ANTHROPIC_API_KEY` (secret).
+4. Copy the pipeline's webhook URL into the GitHub secret `BUDDY_WEBHOOK_URL`. Set repository variables `BUDDY_ENABLED=true` and `BUDDY_RUNNER_GB` (the memory of the Buddy runner, so GB-minutes are counted correctly).
+5. Try it: open an issue labelled `agent:ready`, `lane:burst` and `task:review`.
+
+Things to know:
+- Nothing depends on this lane. With it off, long work waits for Oracle and short work stays on hosted Actions.
+- Buddy freezes a free workspace after 60 days without use (reported). An unused bonus lane may need a manual run now and then.
+- `BUDDY_RUNNER_GB` defaults to 4, a guess.
+
 ## 5. Decisions (settled)
 
 1. **Oracle sized at 2 OCPU / 12 GB** for now. Two concurrent agent sessions at most; raise it only if the console shows more.
@@ -132,5 +153,6 @@ Things to know:
 - That `runs-on: [self-hosted, oracle]` queues cleanly when the runner is offline (jobs wait, then time out).
 - Buddy's webhook response shape and maximum run time.
 - Cost and token use of long agent jobs on a personal Claude plan.
+- Slice 4 has never run on Buddy. Unknown: the exact JSON the webhook accepts for variables (`burst.sh` has a fallback that finds the issue by labels), whether the Free plan's runner image has `gh` and Node 20, the maximum run time of a free pipeline, and what a GB-minute costs on the runner you get.
 - Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
 - Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.
