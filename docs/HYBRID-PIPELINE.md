@@ -69,7 +69,7 @@ Files: `templates/workspace/` (copy to every VPS; all idempotent).
 | File | Purpose |
 |---|---|
 | `versions.env` | Single source of truth: Node and Claude Code versions, tmux minimum, disk minimum |
-| `bootstrap.sh [agent-name]` | Installs pinned Node (checksum-verified tarball, x64 or arm64), pinned Claude Code, tmux, git, jq, ripgrep, gh; writes the environment; installs git defaults, the pre-push guard and Claude settings; creates a mode-600 secrets file; runs the doctor |
+| `bootstrap.sh [agent-name]` | Installs pinned Node (checksum-verified tarball, x64 or arm64), pinned Claude Code, tmux, git, jq, ripgrep, gh; writes the environment; installs git defaults, the pre-push guard, Claude settings and the writer commands from `.claude/commands/` (`/commit`, `/describe-pr`, `/iterate-plan`, `/debug`; it replaces same-named files, and `doctor.sh` reports a missing or edited copy); creates a mode-600 secrets file; runs the doctor |
 | `doctor.sh` | Reports drift; exit code is the number of failed checks. Fails if `ANTHROPIC_API_KEY` is set (it would silently bill the metered API instead of the subscription) |
 | `agent-session.sh <agent> <repo> <branch> [brief]` | Starts or re-attaches a tmux session named `agent-<name>` on a feature branch; refuses `main`, `release/*`, `www-*` |
 | `git-hooks/pre-push` | Blocks pushes to `main`/`master`/`release/*`/`www-*`, deletions and force pushes |

@@ -65,6 +65,16 @@ else
   install -m 0644 "$DIR/claude-settings.json" "$HOME/.claude/settings.json"
 fi
 
+log "Writer commands (~/.claude/commands)"
+COMMANDS_SRC="$DIR/../../.claude/commands"
+if [ -d "$COMMANDS_SRC" ]; then
+  mkdir -p "$HOME/.claude/commands"
+  # Owned by the repo: a file with the same name is replaced so every writer has the same commands.
+  for f in "$COMMANDS_SRC"/*.md; do install -m 0644 "$f" "$HOME/.claude/commands/$(basename "$f")"; done
+else
+  echo "    no .claude/commands next to the workspace scripts (run this from a clone of the repo); skipped"
+fi
+
 log "tmux config"
 [ -f "$HOME/.tmux.conf" ] || printf 'set -g history-limit 200000\nset -g mouse on\n' > "$HOME/.tmux.conf"
 

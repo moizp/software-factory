@@ -22,7 +22,8 @@
     "test:coverage": "jest --coverage",
     "orchestrator:test": "ts-node .factory/test.ts",
     "policy:check": "ts-node .factory/policy-cli.ts",
-    "gate:check": "ts-node .factory/gate/cli.ts"
+    "gate:check": "ts-node .factory/gate/cli.ts",
+    "gate:commit": "ts-node .factory/gate/commit-cli.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",
