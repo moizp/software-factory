@@ -99,3 +99,33 @@ export function findBurstIssue(): number | null {
     '--limit', '20', '--json', 'number'])) as Array<{ number: number }>;
   return found.length ? Math.min(...found.map(i => i.number)) : null;
 }
+
+/** Open issues in the working state. */
+export function workingIssues(): number[] {
+  const found = JSON.parse(gh(['issue', 'list', '--state', 'open', '--label', 'agent:working', '--limit', '100', '--json', 'number'])) as Array<{ number: number }>;
+  return found.map(i => i.number);
+}
+
+/** The newest lease comment on the issue with its text, or null. */
+export function readLeaseComment(n: number): { id: number; body: string } | null {
+  const out = gh(['api', `repos/${repo()}/issues/${n}/comments`, '--paginate', '--jq',
+    '[.[] | select(.body | contains("<!-- agent-lease")) | {id, body}] | last // empty']);
+  const line = out.split('\n').filter(Boolean).pop();
+  return line ? (JSON.parse(line) as { id: number; body: string }) : null;
+}
+
+export function hasCommentWith(n: number, text: string): boolean {
+  const out = gh(['api', `repos/${repo()}/issues/${n}/comments`, '--paginate', '--jq', `[.[] | select(.body | contains("${text}"))] | length`]);
+  return out.split('\n').some(l => parseInt(l, 10) > 0);
+}
+
+/** Cancels a workflow run; a run that already ended is fine. */
+export function cancelRun(id: string): void {
+  if (!/^\d+$/.test(id)) return;
+  try { gh(['run', 'cancel', id]); } catch { /* already finished */ }
+}
+
+/** Runs route.yml for an issue (workflow_dispatch works with GITHUB_TOKEN; label events it caused would not). */
+export function dispatchRoute(n: number): void {
+  gh(['workflow', 'run', 'route.yml', '-f', `issue=${n}`]);
+}

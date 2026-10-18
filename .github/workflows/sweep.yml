@@ -1,0 +1,51 @@
+name: Agent Sweep
+
+# Once a day: finds issues stuck in agent:working whose lease comment stopped updating (the job died, or never got a
+# runner), cancels the run, puts the issue back in the queue ONCE, then sends it to a person. Also reports month-to-date
+# usage and warns if the usage ledger is damaged. On days with nothing in flight it ends after one cheap API call, so it
+# costs about a minute of hosted time a day. See docs/CLOUD-RUNNERS.md.
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: agent-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    if: ${{ vars.AGENTS_ENABLED != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUDDY_ENABLED: ${{ vars.BUDDY_ENABLED }}
+      BUDDY_RUNNER_GB: ${{ vars.BUDDY_RUNNER_GB }}
+    steps:
+      - name: Is anything in flight?
+        id: busy
+        run: echo "count=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --label agent:working --limit 1 --json number --jq length)" >> "$GITHUB_OUTPUT"
+
+      # A manual run always goes ahead, so the usage report can be read on demand.
+      - if: ${{ steps.busy.outputs.count != '0' || github.event_name == 'workflow_dispatch' }}
+        uses: actions/checkout@v4
+
+      - if: ${{ steps.busy.outputs.count != '0' || github.event_name == 'workflow_dispatch' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - if: ${{ steps.busy.outputs.count != '0' || github.event_name == 'workflow_dispatch' }}
+        run: npm ci
+
+      - if: ${{ steps.busy.outputs.count != '0' || github.event_name == 'workflow_dispatch' }}
+        run: npx ts-node .factory/route/cli.ts sweep

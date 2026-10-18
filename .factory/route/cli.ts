@@ -4,13 +4,17 @@ import * as path from 'path';
 import { loadBoard } from '../board';
 import { listWorkflowStates } from '../state';
 import {
-  collaboratorPermission, editComment, editLabels, findBurstIssue, findLeaseComment, ledgerIssue, postComment, readIssue,
-  setIssueBody, variable, wipCounts
+  cancelRun, collaboratorPermission, dispatchRoute, editComment, editLabels, findBurstIssue, findLeaseComment, hasCommentWith,
+  ledgerIssue, postComment, readIssue, readLeaseComment, setIssueBody, variable, wipCounts, workingIssues
 } from './github';
 import { budgetFromEnv } from './budget';
 import { transition, currentState } from './labels';
 import { parseLedger, recordUsage, writeLedger } from './ledger';
-import { renderLease } from './lease';
+import { SweepItem, parseLease, renderLease, sweep } from './lease';
+import {
+  LANE_LABELS, LEDGER_WARNING_MARKER, escalatedLeaseBody, renderLedgerWarning, renderSweepComment, renderUsage,
+  requeuedLeaseBody, restartsForNextClaim, senderPermission
+} from './sweep';
 import { oracleFromHeartbeat } from './oracle';
 import { outcome, renderClaimComment, renderResultComment, renderWaitComment, untilFromLabels } from './report';
 import { route } from './route';
@@ -24,6 +28,7 @@ import { Lane } from './types';
  *   beat    refresh the lease comment while a job runs
  *   finish  hand the issue back (review or failed), report, and charge the ledger
  *   lease-id, until, find-burst  print one value for burst.sh on the Buddy lane
+ *   sweep   daily: cancel and requeue (once) or escalate jobs whose lease went stale, report usage, check the ledger
  */
 
 function env(name: string): string {
@@ -61,7 +66,7 @@ function decide(): void {
 
   const decision = route({
     enabled: process.env.AGENTS_ENABLED !== 'false',
-    sender: { login: actor, permission: collaboratorPermission(actor) },
+    sender: { login: actor, permission: senderPermission(actor, collaboratorPermission) },
     issue: { number: n, labels: issue.labels },
     oracle: oracleFromHeartbeat(variable('ORACLE_LAST_SEEN'), now),
     ledger: parseLedger(ledgerInfo.body, now),
@@ -85,7 +90,10 @@ function decide(): void {
   const until = untilFromLabels(issue.labels);
   editLabels(n, decision.addLabels, decision.removeLabels);
   postComment(n, renderClaimComment(decision, until));
-  const leaseId = postComment(n, leaseBody(decision.lane, env('RUN_ID'), 0, now));
+  // A requeued issue carries its restart count in the old lease comment.
+  const previous = readLeaseComment(n);
+  const restarts = restartsForNextClaim(previous ? parseLease(previous.body) : null);
+  const leaseId = postComment(n, leaseBody(decision.lane, env('RUN_ID'), restarts, now));
   charge('route', 60, now);
 
   output('lane', decision.lane);
@@ -139,10 +147,51 @@ function findBurst(): void {
   console.log(n);
 }
 
-const commands: Record<string, () => void> = { decide, beat, finish, 'lease-id': leaseId, until, 'find-burst': findBurst };
+function sweepAll(): void {
+  const now = new Date();
+  const leases = new Map<number, { id: number; body: string } | null>();
+  const items: SweepItem[] = workingIssues().map(issue => {
+    const found = readLeaseComment(issue);
+    leases.set(issue, found);
+    return { issue, lease: found ? parseLease(found.body) : null };
+  });
+
+  for (const action of sweep(items, now)) {
+    const found = leases.get(action.issue) ?? null;
+    const lease = found ? parseLease(found.body) : null;
+    // The Buddy lane's lease holds a Buddy execution id, which is not a GitHub run id: never cancel on it.
+    if (lease && lease.lane !== 'burst') cancelRun(lease.job);
+
+    const labels = readIssue(action.issue).labels;
+    const t = transition(labels, action.action === 'requeue' ? 'agent:ready' : 'needs-human');
+    editLabels(action.issue, t.add, [...t.remove, ...LANE_LABELS.filter(l => labels.includes(l))]);
+    if (found) {
+      editComment(found.id, action.action === 'requeue' && lease
+        ? requeuedLeaseBody(lease, action.restarts)
+        : escalatedLeaseBody(action.reason, now));
+    }
+    postComment(action.issue, renderSweepComment(action));
+    console.log(`#${action.issue}: ${action.action} (${action.reason})`);
+    if (action.action === 'requeue') dispatchRoute(action.issue);
+  }
+
+  const ledgerInfo = ledgerIssue();
+  const ledger = parseLedger(ledgerInfo.body, now);
+  if (ledger === null && !hasCommentWith(ledgerInfo.number, LEDGER_WARNING_MARKER)) {
+    postComment(ledgerInfo.number, renderLedgerWarning());
+  }
+  const usage = renderUsage(ledger, budgetFromEnv(process.env));
+  console.log(usage);
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${usage}\n`);
+  charge('route', 60, now);
+}
+
+const commands: Record<string, () => void> = {
+  decide, beat, finish, 'lease-id': leaseId, until, 'find-burst': findBurst, sweep: sweepAll
+};
 const cmd = commands[process.argv[2] ?? ''];
 if (!cmd) {
-  console.error('Usage: route-cli decide | beat | finish | lease-id | until | find-burst');
+  console.error('Usage: route-cli decide | beat | finish | lease-id | until | find-burst | sweep');
   process.exit(2);
 }
 try {
