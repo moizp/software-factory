@@ -44,6 +44,17 @@ else
   bad "$settings missing or lacks the standard deny rules"
 fi
 
+commands_src="$DIR/../../.claude/commands"
+if [ -d "$commands_src" ]; then
+  stale=""
+  for f in "$commands_src"/*.md; do
+    cmp -s "$f" "$HOME/.claude/commands/$(basename "$f")" || stale="$stale /$(basename "$f" .md)"
+  done
+  [ -z "$stale" ] && ok "writer commands installed and current" || bad "writer commands missing or out of date:$stale (re-run bootstrap.sh)"
+else
+  info "no .claude/commands next to the workspace scripts: writer commands not checked"
+fi
+
 secrets="$HOME/.config/factory/secrets.env"
 if [ -f "$secrets" ]; then
   [ "$(stat -c %a "$secrets")" = "600" ] && ok "secrets file mode 600" || bad "$secrets must be mode 600"
