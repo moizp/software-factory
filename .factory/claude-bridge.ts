@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import * as os from 'os';
 import { WorkflowState, Phase, Usage } from './state';
 import { agentFilePath } from './pipeline';
+import { FailureMarker, RepairNote, trimProblem } from './repair';
 
 interface AgentResponse {
   phase: Phase;
@@ -15,7 +16,12 @@ interface AgentResponse {
     content: Record<string, unknown>;
   }>;
   usage?: Usage;
+  /** Set when the model's text could not be read as a response envelope (the orchestrator may re-ask once). */
+  failure?: FailureMarker;
 }
+
+/** The model answered, but not with a usable response object. Distinct from the CLI failing to run. */
+class MalformedOutputError extends Error {}
 
 interface AgentMarkdown {
   instructions: string;
@@ -72,15 +78,20 @@ function extractJsonFromResponse(response: string): Record<string, unknown> {
     }
   }
 
-  throw new Error(`Could not extract valid JSON from response (length: ${response.length})`);
+  throw new MalformedOutputError(`Could not extract valid JSON from response (length: ${response.length})`);
 }
 
-function createAgentPrompt(
+export function createAgentPrompt(
   agentMarkdown: AgentMarkdown,
   context: Record<string, unknown>
 ): string {
+  // A repair note is shown as its own section, not buried in the JSON context.
+  const { repair, ...rest } = context as Record<string, unknown> & { repair?: RepairNote };
   // Compact JSON: indentation is wasted tokens
-  const contextJson = JSON.stringify(context);
+  const contextJson = JSON.stringify(rest);
+  const repairSection = repair
+    ? `\n## YOUR PREVIOUS REPLY WAS REJECTED (attempt ${repair.attempt})\n\n${trimProblem(repair.problem)}\n\nReturn the complete JSON object again with that fixed. No apology and no explanation.\n\n---\n`
+    : '';
 
   return `${agentMarkdown.instructions}
 
@@ -93,7 +104,7 @@ ${contextJson}
 \`\`\`
 
 ---
-
+${repairSection}
 ## INSTRUCTIONS
 
 Process this input according to the instructions above. Return ONLY valid JSON output as specified in your "Output Format" section. Do not include any preamble, explanation, markdown formatting, or other text — output ONLY the JSON object.`;
@@ -280,8 +291,8 @@ export async function invokeClaudeAgent(
 
     // Validate response structure - type assertion after validation
     if (!jsonOutput.phase || typeof jsonOutput.valid !== 'boolean') {
-      throw new Error(
-        `Invalid agent response: missing phase or valid field. Got: ${JSON.stringify(jsonOutput)}`
+      throw new MalformedOutputError(
+        `Invalid agent response: missing phase or valid field. Got: ${trimProblem(JSON.stringify(jsonOutput), 300)}`
       );
     }
 
@@ -295,6 +306,7 @@ export async function invokeClaudeAgent(
       phase: agentName as Phase,
       valid: false,
       error: errorMsg,
+      ...(error instanceof MalformedOutputError ? { failure: 'malformed_output' as const } : {})
     };
   }
 }

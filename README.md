@@ -252,6 +252,7 @@ Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium 
 | `FACTORY_AGENT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh`, `max` |
 | `FACTORY_AGENT_TIMEOUT_MS` | 600000 | Per-agent timeout |
 | `FACTORY_MAX_TOKENS` | 600000 | Pause before the next stage once reached; `0` disables |
+| `FACTORY_MAX_REPAIRS` | `1` | Re-asks when an agent's reply is unreadable or breaks its contract (0 turns it off, 3 at most). A re-ask costs another model call and counts against `FACTORY_MAX_TOKENS` |
 | `FACTORY_IGNORE_WIP` | unset | `1` starts work even when WIP limits are full |
 | `FACTORY_DATA_DIR` | repo root | Where `workflows/` (state) and `logs/` are written |
 
