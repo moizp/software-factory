@@ -20,17 +20,17 @@ Be clear about what is proven.
 | Agents run by the pipeline | product-manager, analyzer, software-architect, backend-engineer, frontend-engineer, infrastructure-engineer, automation-tester, e2e-tester, reviewer, customer-support |
 | Agents described but not run | mcp-configurator, platform-architect, ui-designer (see `docs/FACTORY_GAP_ANALYSIS.md`) |
 | Merge policy, WIP guard, board sync | Works, used on this repo's own PRs |
-| PR text check (`pr-lint.yml`) | Merged; its first real run is the next PR |
+| PR text check (`pr-lint.yml`) | Works. Runs on every PR; superseded runs are cancelled by a concurrency group |
 | AI review code (`.factory/review/`) | Built and unit-tested. **Never run in GitHub Actions or against the live API.** Setup below is how to test it |
 | Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike exists on branch `spike/phase2-check` |
-| Unattended runs in the cloud | Router, workflows and a daily lease sweep written (`route.yml`, `agent-job.yml`, `sweep.yml`), never run in Actions; the Oracle runner scripts exist (`templates/workspace/runner/`) but have not run on a VM; the Buddy burst lane is written, off by default and never run. Plan: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) |
+| Cloud lanes (Actions, Oracle VM, Buddy.works) | All five slices are merged and unit-tested: router, `route.yml`, `agent-job.yml`, Oracle runner scripts, Buddy burst lane, daily `sweep.yml`. **None has run for real yet.** See [Cloud lanes](#cloud-lanes-running-agents-off-your-machine) |
 
 ## How it fits together
 
 ```
-brief
+brief (local command, or an issue labelled agent:ready → route.yml picks a lane)
   ▼
-PIPELINE (local, claude -p, one agent per stage)
+PIPELINE (claude -p, one agent per stage; local, hosted Actions, Oracle runner or Buddy)
 requirements → analysis → architecture → build ×3 parallel → test → e2e → review → docs
         each stage: JSON envelope validated, invalid = stop, `factory retry` resumes
   ▼
@@ -68,6 +68,45 @@ npm run factory:retry <workflow-id>                          # resume; validated
 `factory:start` runs `scripts/validate-setup.sh` first, which expects `GITHUB_TOKEN`, `DB_PASSWORD` and `STRIPE_MCP_KEY` in the environment. To skip that check: `npx ts-node .factory/cli.ts start "<brief>"`.
 
 Token control: `FACTORY_MAX_TOKENS` (default 600000, `0` disables) pauses before the next stage once reached. The orchestrator also refuses to start new work when the board's WIP limits are full (`FACTORY_IGNORE_WIP=1` overrides).
+
+## Cloud lanes: running agents off your machine
+
+GitHub is the control plane: issues, labels, comments and Actions are the only way the lanes talk to each other. Full design, costs and unknowns: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md).
+
+```
+issue labelled agent:ready (by someone with write access)
+  ▼
+route.yml (hosted, about a minute, no model) → .factory/route/ picks a lane, claims the issue, posts a lease comment
+  ├─ short  → hosted Actions (agent-job.yml, `hosted`)       review, gates, small jobs     2,000 min/month pool
+  ├─ long   → Oracle VM as a self-hosted runner (`oracle`)    full pipeline, long jobs      no minutes used
+  └─ burst  → Buddy.works through a webhook                   overflow, off by default
+  ▼
+job runs `factory start <issue text> --until <agent>` with a 10 minute heartbeat, then hands the issue back:
+agent:review (stopped where asked) or agent:failed, with a comment, the workflow state as an artifact, and the ledger charged
+  ▼
+sweep.yml, daily: a job with no heartbeat for 30 minutes is cancelled and requeued once, then sent to needs-human
+```
+
+How a routed run behaves: the pipeline stops at the agent named by an `until:<agent>` label (default `software-architect`) and produces artifacts, not code, because writing code into worktrees is not built yet. It runs without `GITHUB_TOKEN`, so it cannot open or merge PRs. `AGENTS_ENABLED=false` stops everything.
+
+First real run, in order of effort:
+
+1. **Hosted lane (no VM needed).**
+   - Create the labels `agent:ready` and `task:review`.
+   - Add a Claude token as a secret: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), or `CLAUDE_OAUTH_<LOGIN>` plus the variable `REVIEW_ACCOUNT_MAP`, or `ANTHROPIC_API_KEY`.
+   - Open an issue, label it `agent:ready` and `task:review`, and watch the Actions tab.
+2. **Oracle lane.** Follow the seven steps in [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) (`templates/workspace/runner/`). Until the VM sets `ORACLE_LAST_SEEN`, long jobs wait by design. Plan for 2 OCPU / 12 GB: Oracle reportedly halved the free Ampere allowance in June 2026.
+3. **Buddy lane.** Optional. Set `BUDDY_ENABLED=true`, `BUDDY_RUNNER_GB` and the secret `BUDDY_WEBHOOK_URL`, and configure the pipeline as described in the doc.
+
+| Setting | Where | Purpose |
+|---|---|---|
+| `AGENTS_ENABLED` | repo variable | `false` is the kill switch |
+| `REVIEW_ACCOUNT_MAP` | repo variable | `{"alice":"CLAUDE_OAUTH_ALICE"}`: whose Claude account pays for a job |
+| `ORACLE_LAST_SEEN` | repo variable, set by the VM | Heartbeat; the long lane needs it under 10 minutes old |
+| `BUDDY_ENABLED`, `BUDDY_RUNNER_GB` | repo variables | Turn on the burst lane; the runner's memory for GB-minute counting |
+| `BUDDY_WEBHOOK_URL` | repo secret | Starts the Buddy pipeline |
+| labels `lane:short`, `lane:long`, `lane:burst`, `task:<kind>`, `until:<agent>` | on the issue | Ask for a lane, a kind of work, a stop point |
+| issue labelled `agent:ledger` | created on first use | Monthly usage counters; do not edit by hand |
 
 ## Setup: AI review in another project
 
@@ -216,15 +255,18 @@ Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium 
 | `FACTORY_IGNORE_WIP` | unset | `1` starts work even when WIP limits are full |
 | `FACTORY_DATA_DIR` | repo root | Where `workflows/` (state) and `logs/` are written |
 
+Cloud lane settings are listed in [Cloud lanes](#cloud-lanes-running-agents-off-your-machine).
+
 Project specification lives in `project.config.json` (schema: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
 
 ## Layout
 
 ```
-.factory/            orchestrator, contracts, policy engine, board, review/, gate/, tests
+.factory/            orchestrator, contracts, policy engine, board, review/, gate/, route/ (lane router, leases, ledger, sweep), tests
 .claude/             CLAUDE.md (orchestrator rules), agents/, skills/
 .github/workflows/   factory-test, policy-check, pr-lint, board-sync, route, agent-job, sweep (+ factory-deploy: only echoes)
-templates/           ai-review/, workspace/, monorepo/, release/  (copied into other projects)
+.github/actions/     agent-run (shared steps of a routed job)
+templates/           ai-review/, workspace/ (incl. runner/ for the Oracle VM), monorepo/, release/  (copied into other projects)
 docs/                POLICY, PROJECT-BOARD, HYBRID-PIPELINE, MONOREPO, ADOPTING, ORCHESTRATION, CONFIGURATION, ...
 scripts/             validate-setup, validate-mcp, setup-mcp, credentials template
 TODO.md              what is left, with decisions recorded
@@ -238,6 +280,7 @@ TODO.md              what is left, with decisions recorded
 | [docs/POLICY.md](docs/POLICY.md) | Merge policy |
 | [docs/PROJECT-BOARD.md](docs/PROJECT-BOARD.md) | Kanban template and WIP limits |
 | [docs/HYBRID-PIPELINE.md](docs/HYBRID-PIPELINE.md) | Writer and verifier plan, risk tiers, cost, rollout |
+| [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) | Cloud lanes: routing, Oracle runner, Buddy, sweep, free-tier facts and unknowns |
 | [docs/MONOREPO.md](docs/MONOREPO.md) | Monorepo layout and splitting into repos |
 | [docs/ADOPTING.md](docs/ADOPTING.md) | Bring the practices into an existing project |
 | [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md), [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Pipeline internals and debugging |
