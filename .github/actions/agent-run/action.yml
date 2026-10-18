@@ -32,6 +32,10 @@ inputs:
     description: Anthropic API key fallback (hosted lane only)
     required: false
     default: ''
+  plan_approval:
+    description: Set to 1 to make a person approve the architect's plan before the build (repository variable FACTORY_PLAN_APPROVAL)
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -63,6 +67,7 @@ runs:
         AUTHOR_TOKEN: ${{ inputs.author_token }}
         SHARED_TOKEN: ${{ inputs.shared_token }}
         API_KEY: ${{ inputs.api_key }}
+        FACTORY_PLAN_APPROVAL: ${{ inputs.plan_approval }}
       run: |
         # The script picks one credential and runs the pipeline with the lease heartbeat; its exit code is the pipeline's.
         bash .factory/route/run-pipeline.sh && echo "JOB_RESULT=success" >> "$GITHUB_ENV"

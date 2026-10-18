@@ -23,6 +23,8 @@ export interface HumanExchange {
   request: HumanRequest;
   askedAt: string;
   answer?: { value: string; by?: string; answeredAt: string };
+  /** Set once the answer has been acted on (a plan sent back for changes was revised), so it is not acted on twice. */
+  consumed?: boolean;
 }
 
 /** A phase that keeps asking is stuck, not making progress: after this many questions it fails instead. */
