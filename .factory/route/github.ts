@@ -84,3 +84,18 @@ export function wipCounts(): { inProgress: number; inReview: number } {
 export function variable(name: string): string | null {
   try { return gh(['variable', 'get', name]) || null; } catch { return null; }
 }
+
+/** Id of the newest comment on the issue that carries an agent-lease marker, or null. */
+export function findLeaseComment(n: number): number | null {
+  const out = gh(['api', `repos/${repo()}/issues/${n}/comments`, '--paginate', '--jq',
+    '.[] | select(.body | contains("<!-- agent-lease")) | .id']);
+  const ids = out.split('\n').filter(Boolean);
+  return ids.length ? parseInt(ids[ids.length - 1], 10) : null;
+}
+
+/** Oldest open issue that was claimed for the burst lane, or null. Used when the webhook did not carry the issue number. */
+export function findBurstIssue(): number | null {
+  const found = JSON.parse(gh(['issue', 'list', '--state', 'open', '--label', 'agent:working', '--label', 'lane:burst',
+    '--limit', '20', '--json', 'number'])) as Array<{ number: number }>;
+  return found.length ? Math.min(...found.map(i => i.number)) : null;
+}

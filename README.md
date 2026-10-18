@@ -23,7 +23,7 @@ Be clear about what is proven.
 | PR text check (`pr-lint.yml`) | Merged; its first real run is the next PR |
 | AI review code (`.factory/review/`) | Built and unit-tested. **Never run in GitHub Actions or against the live API.** Setup below is how to test it |
 | Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike exists on branch `spike/phase2-check` |
-| Unattended runs in the cloud | Router and workflows written (`route.yml`, `agent-job.yml`), never run in Actions; the Oracle runner scripts exist (`templates/workspace/runner/`) but have not run on a VM; the Buddy lane is not built. Plan: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) |
+| Unattended runs in the cloud | Router and workflows written (`route.yml`, `agent-job.yml`), never run in Actions; the Oracle runner scripts exist (`templates/workspace/runner/`) but have not run on a VM; the Buddy burst lane is written, off by default and never run. Plan: [docs/CLOUD-RUNNERS.md](docs/CLOUD-RUNNERS.md) |
 
 ## How it fits together
 

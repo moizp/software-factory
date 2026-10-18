@@ -3,14 +3,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadBoard } from '../board';
 import { listWorkflowStates } from '../state';
-import { editComment, editLabels, collaboratorPermission, ledgerIssue, postComment, readIssue, setIssueBody, variable, wipCounts } from './github';
+import {
+  collaboratorPermission, editComment, editLabels, findBurstIssue, findLeaseComment, ledgerIssue, postComment, readIssue,
+  setIssueBody, variable, wipCounts
+} from './github';
+import { budgetFromEnv } from './budget';
 import { transition, currentState } from './labels';
 import { parseLedger, recordUsage, writeLedger } from './ledger';
 import { renderLease } from './lease';
 import { oracleFromHeartbeat } from './oracle';
 import { outcome, renderClaimComment, renderResultComment, renderWaitComment, untilFromLabels } from './report';
 import { route } from './route';
-import { DEFAULT_BUDGET, Lane } from './types';
+import { Lane } from './types';
 
 /**
  * Entry points for route.yml and agent-job.yml. Runs on the BASE branch checkout and treats issue text as
@@ -19,6 +23,7 @@ import { DEFAULT_BUDGET, Lane } from './types';
  *   decide  pick a lane for an issue and, on `start`, claim it (labels plus a lease comment)
  *   beat    refresh the lease comment while a job runs
  *   finish  hand the issue back (review or failed), report, and charge the ledger
+ *   lease-id, until, find-burst  print one value for burst.sh on the Buddy lane
  */
 
 function env(name: string): string {
@@ -44,7 +49,7 @@ function charge(charge: Lane | 'route', seconds: number, now: Date): void {
     console.warn('ledger marker is damaged: not updating it');
     return;
   }
-  setIssueBody(issue.number, writeLedger(issue.body, recordUsage(current, charge, seconds, DEFAULT_BUDGET, now)));
+  setIssueBody(issue.number, writeLedger(issue.body, recordUsage(current, charge, seconds, budgetFromEnv(process.env), now)));
 }
 
 function decide(): void {
@@ -60,7 +65,7 @@ function decide(): void {
     issue: { number: n, labels: issue.labels },
     oracle: oracleFromHeartbeat(variable('ORACLE_LAST_SEEN'), now),
     ledger: parseLedger(ledgerInfo.body, now),
-    budget: DEFAULT_BUDGET,
+    budget: budgetFromEnv(process.env),
     board: loadBoard(path.join(__dirname, '..', 'board.json')),
     wip: wipCounts(),
     now
@@ -118,10 +123,26 @@ function finish(): void {
   charge(lane, seconds, now);
 }
 
-const commands: Record<string, () => void> = { decide, beat, finish };
+function leaseId(): void {
+  const id = findLeaseComment(parseInt(env('ISSUE_NUMBER'), 10));
+  if (id === null) throw new Error('no lease comment');
+  console.log(id);
+}
+
+function until(): void {
+  console.log(untilFromLabels(readIssue(parseInt(env('ISSUE_NUMBER'), 10)).labels));
+}
+
+function findBurst(): void {
+  const n = findBurstIssue();
+  if (n === null) throw new Error('no claimed burst issue');
+  console.log(n);
+}
+
+const commands: Record<string, () => void> = { decide, beat, finish, 'lease-id': leaseId, until, 'find-burst': findBurst };
 const cmd = commands[process.argv[2] ?? ''];
 if (!cmd) {
-  console.error('Usage: route-cli decide | beat | finish');
+  console.error('Usage: route-cli decide | beat | finish | lease-id | until | find-burst');
   process.exit(2);
 }
 try {

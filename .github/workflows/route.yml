@@ -37,6 +37,8 @@ jobs:
       ACTOR: ${{ github.actor }}
       RUN_ID: ${{ github.run_id }}
       AGENTS_ENABLED: ${{ vars.AGENTS_ENABLED }}
+      BUDDY_ENABLED: ${{ vars.BUDDY_ENABLED }}
+      BUDDY_RUNNER_GB: ${{ vars.BUDDY_RUNNER_GB }}
     outputs:
       action: ${{ steps.decide.outputs.action }}
       lane: ${{ steps.decide.outputs.lane }}
@@ -59,7 +61,7 @@ jobs:
 
   agent:
     needs: route
-    if: ${{ needs.route.outputs.action == 'start' }}
+    if: ${{ needs.route.outputs.action == 'start' && needs.route.outputs.lane != 'burst' }}
     uses: ./.github/workflows/agent-job.yml
     with:
       issue: ${{ github.event.issue.number || inputs.issue }}
@@ -69,3 +71,26 @@ jobs:
       lease_comment: ${{ needs.route.outputs.lease_comment }}
       author: ${{ needs.route.outputs.author }}
     secrets: inherit
+
+  # Overflow lane: ask Buddy.works to run the pipeline. Buddy then works through GitHub only (labels, comments), like the
+  # other lanes. If the request fails, the claim is released as failed so the issue is not left looking busy.
+  burst:
+    needs: route
+    if: ${{ needs.route.outputs.action == 'start' && needs.route.outputs.lane == 'burst' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue }}
+      BUDDY_WEBHOOK_URL: ${{ secrets.BUDDY_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the Buddy pipeline
+        run: bash .factory/route/trigger-buddy.sh
+
+      - name: Release the claim if Buddy could not be started
+        if: ${{ failure() }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --remove-label agent:working --add-label agent:failed
+          gh issue comment "$ISSUE_NUMBER" --body "The Buddy.works pipeline could not be started (webhook call failed). Check the BUDDY_WEBHOOK_URL secret, then label the issue agent:ready to retry."
