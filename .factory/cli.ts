@@ -12,6 +12,7 @@ import {
 import { FactoryOrchestrator } from './orchestrator';
 import { invokeClaudeAgent } from './claude-bridge';
 import { AgentName } from './pipeline';
+import { pendingExchange, recordAnswer, renderQuestion, validateAnswer } from './human';
 
 function printHeader(text: string): void {
   console.log(chalk.bold.blue(`\n╔ ${text}`));
@@ -47,6 +48,14 @@ function printWorkflowDetail(state: WorkflowState): void {
         console.log(chalk.blue('║') + chalk.red(`    Error: ${phase.error}`));
       }
     }
+  }
+
+  const waiting = pendingExchange(state.humanRequests);
+  if (waiting) {
+    console.log(chalk.blue('║'));
+    console.log(chalk.blue('║') + chalk.bold.yellow(' Waiting for a person:'));
+    renderQuestion(waiting, state.id).split('\n').forEach(line => console.log(chalk.blue('║') + `  ${line}`));
+    console.log(chalk.blue('║') + chalk.gray(`  Answer with: factory answer ${state.id} "<answer>"`));
   }
 
   if (state.notes.length > 0) {
@@ -168,6 +177,13 @@ async function cmdRetry(workflowId: string): Promise<void> {
     return;
   }
 
+  const waiting = pendingExchange(state.humanRequests);
+  if (waiting) {
+    console.error(chalk.red(`✗ Workflow ${workflowId} is waiting for an answer to: ${waiting.request.question}`));
+    console.error(chalk.gray(`  Answer it with: factory answer ${workflowId} "<answer>"`));
+    process.exit(1);
+  }
+
   const failedGates = state.phases.filter(p => !p.valid);
   const failedPhase = failedGates[failedGates.length - 1]?.phase ?? state.currentPhase;
 
@@ -184,6 +200,45 @@ async function cmdRetry(workflowId: string): Promise<void> {
 
   printWorkflowDetail(finalState);
   console.log(chalk.green(`✓ Retry completed: ${finalState.id}`));
+}
+
+async function cmdAnswer(workflowId: string, answerText: string): Promise<void> {
+  const state = loadWorkflowState(workflowId);
+
+  if (!state) {
+    console.error(chalk.red(`✗ Workflow not found: ${workflowId}`));
+    process.exit(1);
+  }
+
+  const waiting = pendingExchange(state.humanRequests);
+  if (!waiting) {
+    console.error(chalk.red(`✗ Workflow ${workflowId} is not waiting for an answer`));
+    process.exit(1);
+  }
+
+  const checked = validateAnswer(waiting.request, answerText);
+  if (!checked.ok) {
+    console.error(chalk.red(`✗ ${checked.error}`));
+    console.error(renderQuestion(waiting, workflowId));
+    process.exit(1);
+  }
+
+  const updated = recordAnswer(state.humanRequests, checked.value, process.env.FACTORY_ANSWER_BY);
+  const answered = { ...state, humanRequests: updated ?? state.humanRequests };
+  saveWorkflowState(answered);
+  printHeader(`Answer recorded for ${state.id}: ${checked.value}`);
+
+  // The phase that asked runs again with the answer; completed phases are kept
+  const orchestrator = new FactoryOrchestrator(invokeClaudeAgent, true);
+  const finalState = await orchestrator.executeWorkflow(
+    answered.issueBrief,
+    answered.issueNumber,
+    answered.config,
+    answered
+  );
+
+  printWorkflowDetail(finalState);
+  console.log(chalk.green(`✓ Workflow ${finalState.id} ${finalState.status}`));
 }
 
 const args = process.argv.slice(2);
@@ -238,6 +293,14 @@ const command = args[0];
         await cmdRetry(args[1]);
         break;
 
+      case 'answer':
+        if (args.length < 3) {
+          console.error(chalk.red('Usage: factory answer <workflow-id> <answer>'));
+          process.exit(1);
+        }
+        await cmdAnswer(args[1], args.slice(2).join(' '));
+        break;
+
       default:
         console.error(chalk.red(`Unknown command: ${command}`));
         console.error(chalk.gray('\nUsage:'));
@@ -246,6 +309,7 @@ const command = args[0];
         console.error(chalk.gray('  factory list'));
         console.error(chalk.gray('  factory watch <workflow-id>'));
         console.error(chalk.gray('  factory retry <workflow-id>'));
+        console.error(chalk.gray('  factory answer <workflow-id> <answer>'));
         process.exit(1);
     }
   } catch (error) {

@@ -8,6 +8,7 @@
     "valid": { "type": "boolean" },
     "error": { "type": "string" },
     "blockers": { "type": "array" },
+    "needs_human": { "type": "object", "required": ["question"], "properties": { "question": { "type": "string" } } },
     "next_inputs": { "type": "object" },
     "output": { "type": "object" },
     "artifacts": {
@@ -26,7 +27,8 @@
   "then": {
     "anyOf": [
       { "required": ["error"], "properties": { "error": { "minLength": 1, "pattern": "\\S" } } },
-      { "required": ["blockers"], "properties": { "blockers": { "minItems": 1 } } }
+      { "required": ["blockers"], "properties": { "blockers": { "minItems": 1 } } },
+      { "required": ["needs_human"] }
     ]
   }
 }

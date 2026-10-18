@@ -4,7 +4,7 @@ import { AGENT_CONTRACTS, isAgentName } from './pipeline';
 
 /** Keys that belong to the envelope, not to an agent's payload. */
 const ENVELOPE_KEYS = new Set([
-  'phase', 'valid', 'error', 'blockers', 'next_inputs', 'output', 'artifacts', 'usage', 'failure'
+  'phase', 'valid', 'error', 'blockers', 'next_inputs', 'output', 'artifacts', 'usage', 'failure', 'needs_human'
 ]);
 
 const ajv = new Ajv({ allErrors: true, strict: false });

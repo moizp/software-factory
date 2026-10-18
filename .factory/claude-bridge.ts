@@ -107,7 +107,9 @@ ${contextJson}
 ${repairSection}
 ## INSTRUCTIONS
 
-Process this input according to the instructions above. Return ONLY valid JSON output as specified in your "Output Format" section. Do not include any preamble, explanation, markdown formatting, or other text — output ONLY the JSON object.`;
+Process this input according to the instructions above. Return ONLY valid JSON output as specified in your "Output Format" section. Do not include any preamble, explanation, markdown formatting, or other text — output ONLY the JSON object.
+
+If you cannot proceed without a decision only a person can make, do not guess. Return {"phase":"<your phase>","valid":false,"needs_human":{"intent":"clarify|approve|choose","question":"...","context":"...","urgency":"low|medium|high","format":"free_text|yes_no|multiple_choice","choices":["..."]}} (choices only for multiple_choice). If humanAnswers is in the input, a person already decided those points: follow them and do not ask again.`;
 }
 
 export const DEFAULT_AGENT_TIMEOUT_MS = 10 * 60 * 1000;
