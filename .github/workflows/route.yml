@@ -37,6 +37,7 @@ jobs:
       ACTOR: ${{ github.actor }}
       RUN_ID: ${{ github.run_id }}
       AGENTS_ENABLED: ${{ vars.AGENTS_ENABLED }}
+      FACTORY_REQUIRE_MISSION: ${{ vars.FACTORY_REQUIRE_MISSION }}
       BUDDY_ENABLED: ${{ vars.BUDDY_ENABLED }}
       BUDDY_RUNNER_GB: ${{ vars.BUDDY_RUNNER_GB }}
     outputs:

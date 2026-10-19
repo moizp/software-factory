@@ -12,6 +12,7 @@ import {
   cancelRun, collaboratorPermission, dispatchRoute, downloadRunArtifact, editComment, editLabels, findBurstIssue, findLeaseComment,
   hasCommentWith, ledgerIssue, listComments, postComment, readIssue, readLeaseComment, setIssueBody, variable, wipCounts, workingIssues
 } from './github';
+import { MissionGate, loadMission, parseDeclaration, requireMission } from '../mission';
 import { askState, briefWithAnswer, parseAnswerCommand, renderAnswerComment, renderQuestionComment, renderResumedComment } from './ask';
 import { budgetFromEnv } from './budget';
 import { NEEDS_HUMAN, READY, transition, currentState } from './labels';
@@ -65,6 +66,14 @@ function charge(charge: Lane | 'route', seconds: number, now: Date): void {
   setIssueBody(issue.number, writeLedger(issue.body, recordUsage(current, charge, seconds, budgetFromEnv(process.env), now)));
 }
 
+/** The project's MISSION.md as the router sees it. The route job runs on the default branch's checkout. */
+function missionGate(): MissionGate {
+  const load = loadMission();
+  if (!load.found) return { state: 'none', required: requireMission(process.env) };
+  if (!load.result.ok) return { state: 'unusable', errors: load.result.errors };
+  return { state: 'ok', behaviourChanges: load.result.mission.behaviourChanges.map(c => ({ id: c.id, name: c.name })) };
+}
+
 function decide(): void {
   const n = parseInt(env('ISSUE_NUMBER'), 10);
   const actor = env('ACTOR');
@@ -75,7 +84,8 @@ function decide(): void {
   const decision = route({
     enabled: process.env.AGENTS_ENABLED !== 'false',
     sender: { login: actor, permission: senderPermission(actor, collaboratorPermission) },
-    issue: { number: n, labels: issue.labels },
+    issue: { number: n, labels: issue.labels, declaration: parseDeclaration(issue.body) },
+    mission: missionGate(),
     oracle: oracleFromHeartbeat(variable('ORACLE_LAST_SEEN'), now),
     ledger: parseLedger(ledgerInfo.body, now),
     budget: budgetFromEnv(process.env),

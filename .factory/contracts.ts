@@ -1,7 +1,7 @@
 import Ajv, { ValidateFunction } from 'ajv';
 import envelopeSchema from './contracts/envelope.schema.json';
 import { AGENT_CONTRACTS, isAgentName } from './pipeline';
-import { alignmentProblems, Mission } from './mission';
+import { alignmentProblems, Declaration, Mission } from './mission';
 import { parsePlan, stubPlan } from './plan';
 
 /** Keys that belong to the envelope, not to an agent's payload. */
@@ -53,6 +53,8 @@ export function validateContract(response: unknown, agentName: string, context: 
 export interface ContractContext {
   /** The project's mission; when present, planning agents must say how their work serves it. */
   mission?: Mission;
+  /** What the brief says about the mission (Serves: and Mission exception: lines). */
+  declared?: Declaration;
 }
 
 /** Checks of a payload's content, beyond the presence of its keys. Only for a valid reply. */
@@ -63,7 +65,9 @@ function payloadProblems(response: unknown, agentName: string, context: Contract
     const plan = parsePlan(r.implementation_plan, context.mission ? { mission: context.mission } : {});
     if (!plan.ok) return [plan.error];
   }
-  if (agentName === 'product-manager' && context.mission) return alignmentProblems(context.mission, r);
+  if (agentName === 'product-manager' && context.mission) {
+    return alignmentProblems(context.mission, r, { serves: context.declared?.serves, exception: !!context.declared?.exception });
+  }
   return [];
 }
 

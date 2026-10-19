@@ -55,6 +55,7 @@ jobs:
           lease_comment: ${{ inputs.lease_comment }}
           gh_token: ${{ github.token }}
           plan_approval: ${{ vars.FACTORY_PLAN_APPROVAL }}
+          require_mission: ${{ vars.FACTORY_REQUIRE_MISSION }}
           # Order: the issue author's own account, a shared account, then the API key. REVIEW_ACCOUNT_MAP is the
           # same repo variable the AI review uses, such as {"alice":"CLAUDE_OAUTH_ALICE"}.
           author_token: ${{ secrets[fromJSON(vars.REVIEW_ACCOUNT_MAP || '{}')[inputs.author]] }}
@@ -81,3 +82,4 @@ jobs:
           lease_comment: ${{ inputs.lease_comment }}
           gh_token: ${{ github.token }}
           plan_approval: ${{ vars.FACTORY_PLAN_APPROVAL }}
+          require_mission: ${{ vars.FACTORY_REQUIRE_MISSION }}
