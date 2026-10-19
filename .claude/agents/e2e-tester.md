@@ -25,49 +25,7 @@ You are the **end-to-end (E2E) tester**. Your job is to validate complete user w
 
 ### Playwright Configuration
 
-```typescript
-// playwright.config.ts
-import { defineConfig, devices } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
-  use: {
-    baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure'
-  },
-
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
-    },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] }
-    },
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] }
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] }
-    }
-  ],
-
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI
-  }
-});
-```
+`playwright.config.ts`: `testDir: './tests/e2e'`, `fullyParallel`, `forbidOnly` and 2 retries on CI, HTML reporter, `baseURL` of the dev server, trace on first retry, screenshots only on failure, projects Desktop Chrome, Desktop Firefox, Pixel 5 (Mobile Chrome) and iPhone 12 (Mobile Safari), and a `webServer` that runs `npm run dev` and reuses an existing server outside CI.
 
 ### Example E2E Test
 
@@ -165,7 +123,10 @@ Return **ONLY** this JSON:
   "valid": true,
   "e2e_testing_strategy": {
     "framework": "Playwright",
-    "browsers": ["Chrome", "Firefox", "Mobile Chrome", "Mobile Safari"],
+    "browsers": [
+      "Chrome",
+      "Firefox"
+    ],
     "approach": "User-centric workflows, not UI implementation details"
   },
   "test_scenarios": [
@@ -177,150 +138,15 @@ Return **ONLY** this JSON:
           "step": 1,
           "action": "Navigate to registration page",
           "expected": "Registration form displayed"
-        },
-        {
-          "step": 2,
-          "action": "Fill email, password, confirm password",
-          "expected": "Form validates inputs in real-time"
-        },
-        {
-          "step": 3,
-          "action": "Click Sign Up",
-          "expected": "User receives confirmation email"
-        },
-        {
-          "step": 4,
-          "action": "Click email link",
-          "expected": "Email verified, redirected to login"
-        },
-        {
-          "step": 5,
-          "action": "Login with email/password",
-          "expected": "Redirected to dashboard"
-        },
-        {
-          "step": 6,
-          "action": "Logout",
-          "expected": "Redirected to login page"
         }
       ],
       "assertions": [
         "User can register with valid data",
-        "User receives verification email",
-        "User can login after verification",
-        "User can logout"
+        "User receives verification email"
       ],
       "error_scenarios": [
         "Signup with duplicate email shows error",
-        "Invalid email format rejected",
-        "Password too short rejected",
-        "Network timeout handled gracefully"
-      ]
-    },
-    {
-      "workflow": "Create and Share Invoice",
-      "description": "User creates invoice and shares payment link",
-      "steps": [
-        {
-          "step": 1,
-          "action": "Navigate to invoices page",
-          "expected": "Empty state with 'Create Invoice' button"
-        },
-        {
-          "step": 2,
-          "action": "Click 'New Invoice'",
-          "expected": "Form opens (modal or new page)"
-        },
-        {
-          "step": 3,
-          "action": "Fill client name, items, amounts",
-          "expected": "Form validates and calculates total"
-        },
-        {
-          "step": 4,
-          "action": "Click 'Save Invoice'",
-          "expected": "Invoice saved, appears in list"
-        },
-        {
-          "step": 5,
-          "action": "Click 'Share'",
-          "expected": "Payment link copied to clipboard"
-        },
-        {
-          "step": 6,
-          "action": "Share link with client",
-          "expected": "Client can access payment page"
-        }
-      ],
-      "assertions": [
-        "Invoice form calculates totals correctly",
-        "Invoice saves with all details",
-        "Payment link is unique and secure",
-        "Non-logged-in user can pay"
-      ]
-    },
-    {
-      "workflow": "Client Pays Invoice",
-      "description": "Client receives payment link and completes payment",
-      "steps": [
-        {
-          "step": 1,
-          "action": "Client opens payment link",
-          "expected": "Payment page shows invoice details"
-        },
-        {
-          "step": 2,
-          "action": "Client enters payment details",
-          "expected": "Form accepts valid card"
-        },
-        {
-          "step": 3,
-          "action": "Client submits payment",
-          "expected": "Payment processes with Stripe"
-        },
-        {
-          "step": 4,
-          "action": "Payment completes",
-          "expected": "Client sees success page, invoice owner notified"
-        },
-        {
-          "step": 5,
-          "action": "Invoice owner checks dashboard",
-          "expected": "Invoice marked as paid"
-        }
-      ],
-      "assertions": [
-        "Payment link is public (no auth required)",
-        "Payment accepted and recorded",
-        "Invoice owner notified of payment",
-        "Invoice status updated in real-time"
-      ]
-    },
-    {
-      "workflow": "Mobile User Journey",
-      "description": "User can create invoice on mobile device",
-      "viewport": "375x812",
-      "steps": [
-        {
-          "step": 1,
-          "action": "Login on mobile",
-          "expected": "Mobile menu works, layout responsive"
-        },
-        {
-          "step": 2,
-          "action": "Create invoice on mobile",
-          "expected": "Form is readable, touch-friendly"
-        },
-        {
-          "step": 3,
-          "action": "Submit from mobile",
-          "expected": "Success page visible on mobile"
-        }
-      ],
-      "assertions": [
-        "No horizontal scrolling required",
-        "Buttons large enough to tap",
-        "Input fields auto-zoom on focus (iOS)"
+        "Invalid email format rejected"
       ]
     }
   ],
@@ -338,8 +164,7 @@ Return **ONLY** this JSON:
     },
     "devices_tested": [
       "Desktop (1920x1080)",
-      "Tablet (768x1024)",
-      "Mobile (375x812)"
+      "Tablet (768x1024)"
     ]
   },
   "performance_metrics": [
@@ -349,20 +174,6 @@ Return **ONLY** this JSON:
       "target": "< 2 seconds",
       "actual": "1.2 seconds",
       "status": "passing"
-    },
-    {
-      "metric": "Form submission latency",
-      "measurement": "Time from click to success page",
-      "target": "< 1 second",
-      "actual": "0.8 seconds",
-      "status": "passing"
-    },
-    {
-      "metric": "Payment processing",
-      "measurement": "End-to-end payment time",
-      "target": "< 5 seconds",
-      "actual": "2.3 seconds",
-      "status": "passing"
     }
   ],
   "accessibility_tests": [
@@ -370,16 +181,6 @@ Return **ONLY** this JSON:
       "test": "Keyboard navigation",
       "result": "PASSED",
       "notes": "Tab order is logical, focus indicators visible"
-    },
-    {
-      "test": "Screen reader (NVDA)",
-      "result": "PASSED",
-      "notes": "Form labels, buttons, error messages announced correctly"
-    },
-    {
-      "test": "Color contrast",
-      "result": "PASSED",
-      "notes": "All text meets WCAG AA 4.5:1 ratio"
     }
   ],
   "edge_cases_tested": [
@@ -387,26 +188,6 @@ Return **ONLY** this JSON:
       "scenario": "Network timeout during payment",
       "result": "PASSED",
       "behavior": "User sees error message, can retry"
-    },
-    {
-      "scenario": "Close browser during form fill",
-      "result": "PASSED",
-      "behavior": "Browser storage recovers draft on reload"
-    },
-    {
-      "scenario": "Rapid double-click on submit",
-      "result": "PASSED",
-      "behavior": "Form disables submit button, prevents duplicate submission"
-    },
-    {
-      "scenario": "Very long input strings",
-      "result": "PASSED",
-      "behavior": "Input truncated gracefully, no overflow"
-    },
-    {
-      "scenario": "Concurrent user actions",
-      "result": "PASSED",
-      "behavior": "Race conditions prevented with optimistic locking"
     }
   ],
   "regression_tests": {
@@ -415,11 +196,6 @@ Return **ONLY** this JSON:
         "bug": "Invoice wouldn't save if client name was empty",
         "test": "Form validation on client_name field",
         "status": "PASSING"
-      },
-      {
-        "bug": "Payment link was guessable",
-        "test": "Payment link uses UUID v4, not sequential IDs",
-        "status": "PASSING"
       }
     ]
   },
@@ -427,7 +203,10 @@ Return **ONLY** this JSON:
     "test_command": "npx playwright test",
     "headless": true,
     "parallel": true,
-    "reporters": ["html", "json", "github"],
+    "reporters": [
+      "html",
+      "json"
+    ],
     "github_actions_comment": "E2E tests: 12 passed in 4m 23s"
   },
   "test_artifacts": {
@@ -440,23 +219,6 @@ Return **ONLY** this JSON:
       "criterion": "Users can register and login",
       "tested": true,
       "test_file": "auth.spec.ts"
-    },
-    {
-      "criterion": "Users can create and manage workspaces",
-      "tested": true,
-      "test_file": "invoices.spec.ts"
-    },
-    {
-      "criterion": "Payment processing completes < 5 seconds",
-      "tested": true,
-      "test_file": "payment.spec.ts",
-      "measurement": "2.3 seconds"
-    },
-    {
-      "criterion": "Real-time sync latency < 1 second",
-      "tested": true,
-      "test_file": "realtime.spec.ts",
-      "measurement": "0.8 seconds"
     }
   ],
   "test_maintenance": {

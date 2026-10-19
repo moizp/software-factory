@@ -12,7 +12,9 @@ import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { compactArtifacts, describePack, packContext } from './context';
 import { saveHandoff } from './handoff';
+import { contextBudget } from './prompts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
 import {
   PLAN_INTENT, PLAN_PHASE, automatedChecks, builtPaths, consumePlanChanges, parsePlan, planDeviations, planReview,
@@ -83,6 +85,8 @@ export class FactoryOrchestrator {
   private prNumber: number | null = null;
   private retryConfig: RetryConfig;
   private logger: Logger;
+  /** Notes about shortened inputs, added to the workflow state after the stage that used them. */
+  private contextNotes: string[] = [];
 
   constructor(invokeAgent: AgentInvoker, verbose: boolean = false, githubToken?: string, retryConfig?: Partial<RetryConfig>) {
     this.invokeAgent = invokeAgent;
@@ -210,6 +214,12 @@ export class FactoryOrchestrator {
     let paused = updatePhase(state, phase, false, undefined, `Waiting for a person: ${request.question}`, usage);
     paused = { ...paused, status: 'paused', humanRequests: [...(state.humanRequests ?? []), exchange] };
     return addNote(paused, `Phase ${phase} asked a person (${request.urgency} urgency): ${request.question}`);
+  }
+
+  private flushContextNotes(state: WorkflowState): WorkflowState {
+    const notes = this.contextNotes;
+    this.contextNotes = [];
+    return notes.reduce((s, n) => addNote(s, n), state);
   }
 
   /** Plan approval is on with FACTORY_PLAN_APPROVAL=1 or `"plan_approval": true` in the workflow config. */
@@ -571,6 +581,7 @@ export class FactoryOrchestrator {
               stage.agents[0],
               this.buildInput(state, stage.agents[0])
             );
+        state = this.flushContextNotes(state);
         saveWorkflowState(state);
 
         const question = pendingExchange(state.humanRequests);
@@ -784,7 +795,15 @@ export class FactoryOrchestrator {
   private buildInput(state: WorkflowState, agent: AgentName): Record<string, unknown> {
     const base = this.buildBaseInput(state, agent);
     const humanAnswers = answersFor(state.humanRequests, agent);
-    return humanAnswers.length > 0 ? { ...base, humanAnswers } : base;
+    const input = humanAnswers.length > 0 ? { ...base, humanAnswers } : base;
+    // The context pack: fixed key order, and shortened only when over the agent's cap (prompt-budgets.json)
+    const { context, meta } = packContext(input, contextBudget(agent));
+    const note = describePack(agent, meta);
+    if (note) {
+      this.logger.warn(note);
+      this.contextNotes.push(note);
+    }
+    return context;
   }
 
   private buildBaseInput(state: WorkflowState, agent: AgentName): Record<string, unknown> {
@@ -817,9 +836,9 @@ export class FactoryOrchestrator {
           productManagerOutput: pm
         };
       case 'reviewer':
-        return { allArtifacts: state.artifacts, planCheck: this.planCheck(state) };
+        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state) };
       case 'customer-support':
-        return { allArtifacts: state.artifacts, brief: state.issueBrief };
+        return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief };
     }
   }
 

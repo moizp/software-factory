@@ -195,6 +195,17 @@ function stateFiles(dir: string): Array<{ file: string; state: { id: string; iss
   return out;
 }
 
+function findNamed(dir: string, name: string): string | null {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findNamed(full, name);
+      if (found) return found;
+    } else if (entry.name === name) return full;
+  }
+  return null;
+}
+
 /**
  * Brings back the workflow state saved by an earlier run and returns the workflow id, or null when it is gone or
  * unreadable. With `workflow` it must be that workflow; without, the newest state of this issue is used.
@@ -209,6 +220,9 @@ function restoreState(run: string, issue: number, workflow?: string): string | n
     if (!found) return null;
     fs.mkdirSync(workflowsDir(), { recursive: true });
     fs.copyFileSync(found.file, path.join(workflowsDir(), `${found.state.id}.json`));
+    // The event log goes with it, so the resumed run keeps one unbroken history.
+    const log = findNamed(tmp, `${found.state.id}.events.jsonl`);
+    if (log) fs.copyFileSync(log, path.join(workflowsDir(), `${found.state.id}.events.jsonl`));
     return found.state.id;
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

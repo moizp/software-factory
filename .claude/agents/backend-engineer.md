@@ -79,121 +79,6 @@ Return **ONLY** this JSON:
       "language": "typescript",
       "lines": 120,
       "description": "Express app initialization, middleware setup"
-    },
-    {
-      "path": "src/middleware/auth.ts",
-      "language": "typescript",
-      "lines": 50,
-      "description": "JWT verification middleware"
-    },
-    {
-      "path": "src/middleware/errorHandler.ts",
-      "language": "typescript",
-      "lines": 40,
-      "description": "Global error handler"
-    },
-    {
-      "path": "src/routes/auth.ts",
-      "language": "typescript",
-      "lines": 80,
-      "description": "POST /auth/register, POST /auth/login, POST /auth/logout"
-    },
-    {
-      "path": "src/routes/users.ts",
-      "language": "typescript",
-      "lines": 60,
-      "description": "GET /users/me, PATCH /users/me"
-    },
-    {
-      "path": "src/routes/workspaces.ts",
-      "language": "typescript",
-      "lines": 100,
-      "description": "Workspace CRUD endpoints"
-    },
-    {
-      "path": "src/routes/payments.ts",
-      "language": "typescript",
-      "lines": 70,
-      "description": "POST /payments/setup-intent, POST /payments/webhook"
-    },
-    {
-      "path": "src/services/authService.ts",
-      "language": "typescript",
-      "lines": 80,
-      "description": "Authentication business logic"
-    },
-    {
-      "path": "src/services/userService.ts",
-      "language": "typescript",
-      "lines": 60,
-      "description": "User management business logic"
-    },
-    {
-      "path": "src/services/workspaceService.ts",
-      "language": "typescript",
-      "lines": 90,
-      "description": "Workspace operations"
-    },
-    {
-      "path": "src/services/paymentService.ts",
-      "language": "typescript",
-      "lines": 100,
-      "description": "Stripe integration and payment logic"
-    },
-    {
-      "path": "src/lib/jwt.ts",
-      "language": "typescript",
-      "lines": 40,
-      "description": "JWT token generation and verification"
-    },
-    {
-      "path": "src/lib/crypto.ts",
-      "language": "typescript",
-      "lines": 20,
-      "description": "Password hashing and validation"
-    },
-    {
-      "path": "src/lib/logger.ts",
-      "language": "typescript",
-      "lines": 30,
-      "description": "Structured logging"
-    },
-    {
-      "path": "src/types/index.ts",
-      "language": "typescript",
-      "lines": 60,
-      "description": "TypeScript types and interfaces"
-    },
-    {
-      "path": "prisma/schema.prisma",
-      "language": "prisma",
-      "lines": 80,
-      "description": "Database schema from architect"
-    },
-    {
-      "path": "package.json",
-      "language": "json",
-      "dependencies": [
-        "express",
-        "prisma",
-        "jsonwebtoken",
-        "bcrypt",
-        "stripe",
-        "dotenv"
-      ]
-    },
-    {
-      "path": "tsconfig.json",
-      "language": "json"
-    },
-    {
-      "path": ".env.example",
-      "language": "text"
-    },
-    {
-      "path": "README.md",
-      "language": "markdown",
-      "description": "Setup and API documentation"
     }
   ],
   "tests": {
@@ -202,11 +87,6 @@ Return **ONLY** this JSON:
         "file": "tests/unit/auth.test.ts",
         "test_count": 8,
         "coverage": "auth service functions"
-      },
-      {
-        "file": "tests/unit/crypto.test.ts",
-        "test_count": 4,
-        "coverage": "password hashing"
       }
     ],
     "integration_tests": [
@@ -214,21 +94,6 @@ Return **ONLY** this JSON:
         "file": "tests/integration/auth.integration.test.ts",
         "test_count": 12,
         "coverage": "auth endpoints with database"
-      },
-      {
-        "file": "tests/integration/users.integration.test.ts",
-        "test_count": 6,
-        "coverage": "user endpoints"
-      },
-      {
-        "file": "tests/integration/workspaces.integration.test.ts",
-        "test_count": 8,
-        "coverage": "workspace CRUD"
-      },
-      {
-        "file": "tests/integration/payments.integration.test.ts",
-        "test_count": 6,
-        "coverage": "payment endpoints and webhooks"
       }
     ],
     "total_tests": 44,
@@ -244,18 +109,6 @@ Return **ONLY** this JSON:
       "operation": "create_repository",
       "status": "executed",
       "result": "Repository created: my-saas-backend"
-    },
-    {
-      "server": "github",
-      "operation": "create_or_update_file",
-      "status": "executed",
-      "result": "Created 19 files"
-    },
-    {
-      "server": "github",
-      "operation": "push_files",
-      "status": "executed",
-      "result": "Pushed main branch with initial commit"
     }
   ],
   "deployed_code": {
@@ -267,26 +120,14 @@ Return **ONLY** this JSON:
   },
   "api_endpoints_implemented": [
     "POST /auth/register",
-    "POST /auth/login",
-    "POST /auth/logout",
-    "GET /users/me",
-    "PATCH /users/me",
-    "GET /workspaces",
-    "POST /workspaces",
-    "PATCH /workspaces/:id",
-    "DELETE /workspaces/:id",
-    "POST /payments/setup-intent",
-    "POST /payments/webhook"
+    "POST /auth/login"
   ],
   "database_setup": {
     "schema_initialized": true,
     "migrations_generated": true,
     "tables": [
       "User",
-      "Workspace",
-      "WorkspaceMember",
-      "Session",
-      "Invoice"
+      "Workspace"
     ],
     "migrations": [
       "prisma/migrations/20240115_initial/migration.sql"
@@ -322,7 +163,10 @@ Return **ONLY** this JSON:
   },
   "logging": {
     "provider": "built-in console with structured format",
-    "levels": ["debug", "info", "warn", "error"],
+    "levels": [
+      "debug",
+      "info"
+    ],
     "context": "Request ID for tracing"
   },
   "documentation": {

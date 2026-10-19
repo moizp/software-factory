@@ -19,7 +19,7 @@ const exchange: HumanExchange = {
 
 type Comment = { id: number; body: string; author: string };
 
-function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: string; artifact?: boolean; stateId?: string }) {
+function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: string; artifact?: boolean; stateId?: string; withEvents?: boolean }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'human-issue-'));
   const bin = path.join(dir, 'bin');
   const work = path.join(dir, 'work');
@@ -34,7 +34,7 @@ function sandbox(opts: { comments: Comment[]; labels: string[]; permission?: str
   const stateJson = JSON.stringify({ id: stateId, issueNumber: 7, updatedAt: '2026-10-18T10:00:00Z' });
   const download = opts.artifact === false
     ? 'exit 1'
-    : `dir=""; while [ $# -gt 0 ]; do [ "$1" = "-D" ] && dir="$2"; shift; done; mkdir -p "$dir/workflows"; echo '${stateJson}' > "$dir/workflows/${stateId}.json"`;
+    : `dir=""; while [ $# -gt 0 ]; do [ "$1" = "-D" ] && dir="$2"; shift; done; mkdir -p "$dir/workflows"; echo '${stateJson}' > "$dir/workflows/${stateId}.json"${opts.withEvents ? `; echo '{"seq":1}' > "$dir/workflows/${stateId}.events.jsonl"` : ''}`;
   const write = (name: string, body: string) => fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   write('gh', `
 case "$*" in
@@ -177,6 +177,15 @@ describe('route-cli resume after a requeue', () => {
     expect(npx).toContain('FACTORY_IGNORE_WIP=1');
     expect(fs.existsSync(path.join(s.work, 'workflows', 'wf-9.json'))).toBe(true);
     expect(calls.find(c => c.startsWith('POST'))).toContain('carried on from the state saved by run 4242');
+  });
+
+  it('brings the event log along with the state', () => {
+    const s = sandbox({ comments: [requeued()], labels: ['agent:working'], stateId: 'wf-9', withEvents: true });
+    expect(s.run('resume').status).toBe(0);
+    expect(fs.existsSync(path.join(s.work, 'workflows', 'wf-9.events.jsonl'))).toBe(true);
+    const without = sandbox({ comments: [requeued()], labels: ['agent:working'], stateId: 'wf-9' });
+    without.run('resume');
+    expect(fs.existsSync(path.join(without.work, 'workflows', 'wf-9.events.jsonl'))).toBe(false);
   });
 
   it('starts fresh, and marks the requeue used, when the dead run left no state', () => {

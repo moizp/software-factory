@@ -129,7 +129,7 @@ export function buildHandoff(state: WorkflowState, ctx: HandoffContext = {}): st
     lines.push('', '## Decisions made');
     for (const e of answered) lines.push(`- ${oneLine(e.request.question)} -> ${oneLine(e.answer!.value)}${e.answer!.by ? ` (${e.answer!.by})` : ''}`);
   }
-  lines.push('', '## Artifacts', artifacts.length ? artifacts.map(a => `- ${a}`).join('\n') : 'None yet.', `The full output of each is in workflows/${state.id}.json.`);
+  lines.push('', '## Artifacts', artifacts.length ? artifacts.map(a => `- ${a}`).join('\n') : 'None yet.', `The full output of each is in workflows/${state.id}.json; the step-by-step history is in workflows/${state.id}.events.jsonl (factory replay ${state.id}).`);
   lines.push('', '## Learnings', notes.length ? notes.map(n => `- ${oneLine(n)}`).join('\n') : 'None recorded.');
   lines.push('', '## Next steps', ...nextSteps(state).map((s, i) => `${i + 1}. ${s}`), '');
   return lines.join('\n');

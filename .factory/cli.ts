@@ -6,9 +6,12 @@ import chalk from 'chalk';
 import {
   loadWorkflowState,
   listWorkflowStates,
+  readSnapshot,
   WorkflowState,
-  saveWorkflowState
+  saveWorkflowState,
+  writeSnapshot
 } from './state';
+import { describeEvent, readEvents, replay, stateDifferences } from './events';
 import { FactoryOrchestrator } from './orchestrator';
 import { invokeClaudeAgent } from './claude-bridge';
 import { AgentName, isAgentName } from './pipeline';
@@ -164,6 +167,36 @@ async function cmdWatch(workflowId: string, interval: number = 5000): Promise<vo
   });
 }
 
+async function cmdReplay(workflowId: string, write: boolean): Promise<void> {
+  const { events, unreadable } = readEvents(workflowId);
+  if (events.length === 0) {
+    console.error(chalk.red(`✗ No event log for ${workflowId} (workflows/${workflowId}.events.jsonl)`));
+    process.exit(1);
+  }
+  printHeader(`Events for ${workflowId}`);
+  for (const ev of events) console.log(`${String(ev.seq).padStart(4)}  ${ev.at}  ${describeEvent(ev)}`);
+  if (unreadable > 0) console.log(chalk.yellow(`\n${unreadable} unreadable line(s) were skipped (a write cut short).`));
+
+  const rebuilt = replay(events);
+  const saved = readSnapshot(workflowId);
+  if (!rebuilt) {
+    console.error(chalk.red('✗ The log has no starting event'));
+    process.exit(1);
+  }
+  const differences = saved ? stateDifferences(rebuilt, saved) : ['(no snapshot)'];
+  if (differences.length === 0) {
+    console.log(chalk.green(`\n✓ The log replays to the saved state (${events.length} events)`));
+    return;
+  }
+  console.log(chalk.yellow(`\nThe log and the saved state differ in: ${differences.join(', ')}`));
+  if (write) {
+    writeSnapshot(rebuilt);
+    console.log(chalk.green('✓ The saved state was rewritten from the log'));
+  } else {
+    console.log(chalk.gray(`  Rewrite the saved state from the log with: factory replay ${workflowId} --write`));
+  }
+}
+
 async function cmdRetry(workflowId: string, until?: AgentName): Promise<void> {
   const state = loadWorkflowState(workflowId);
 
@@ -298,6 +331,14 @@ const command = args[0];
         }
         break;
 
+      case 'replay':
+        if (args.length < 2) {
+          console.error(chalk.red('Usage: factory replay <workflow-id> [--write]'));
+          process.exit(1);
+        }
+        await cmdReplay(args[1], args.includes('--write'));
+        break;
+
       case 'answer':
         if (args.length < 3) {
           console.error(chalk.red('Usage: factory answer <workflow-id> <answer> [--until <agent>]'));
@@ -320,6 +361,7 @@ const command = args[0];
         console.error(chalk.gray('  factory watch <workflow-id>'));
         console.error(chalk.gray('  factory retry <workflow-id> [--until <agent>]'));
         console.error(chalk.gray('  factory answer <workflow-id> <answer> [--until <agent>]'));
+        console.error(chalk.gray('  factory replay <workflow-id> [--write]'));
         process.exit(1);
     }
   } catch (error) {

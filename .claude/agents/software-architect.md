@@ -339,21 +339,6 @@ Return **ONLY** this JSON structure:
         "name": "Frontend",
         "technology": "React + TypeScript",
         "responsibility": "User interface"
-      },
-      {
-        "name": "API Server",
-        "technology": "Express.js + Node.js",
-        "responsibility": "Business logic, data access"
-      },
-      {
-        "name": "Database",
-        "technology": "PostgreSQL",
-        "responsibility": "Persistent data storage"
-      },
-      {
-        "name": "Cache",
-        "technology": "Redis",
-        "responsibility": "Session + query cache"
       }
     ]
   },
@@ -363,21 +348,18 @@ Return **ONLY** this JSON structure:
     "entities": [
       {
         "name": "users",
-        "fields": ["id", "email", "passwordHash", "createdAt"],
-        "indexes": ["email (unique)"]
-      },
-      {
-        "name": "workspaces",
-        "fields": ["id", "name", "stripeCustomerId"],
-        "relationships": ["members (1:N)"]
-      },
-      {
-        "name": "invoices",
-        "fields": ["id", "workspaceId", "amount", "status"],
-        "relationships": ["workspace (N:1)"]
+        "fields": [
+          "id",
+          "email"
+        ],
+        "indexes": [
+          "email (unique)"
+        ]
       }
     ],
-    "migrations": ["001_initial_schema.sql"]
+    "migrations": [
+      "001_initial_schema.sql"
+    ]
   },
   "api_specification": {
     "style": "REST",
@@ -385,10 +367,22 @@ Return **ONLY** this JSON structure:
     "auth": "JWT",
     "base_url": "https://api.mysaas.com",
     "endpoints": {
-      "auth": ["/auth/register", "/auth/login", "/auth/logout"],
-      "users": ["GET /users/me", "PATCH /users/me"],
-      "workspaces": ["GET /workspaces", "POST /workspaces"],
-      "payments": ["POST /payments/setup-intent", "POST /payments/webhook"]
+      "auth": [
+        "/auth/register",
+        "/auth/login"
+      ],
+      "users": [
+        "GET /users/me",
+        "PATCH /users/me"
+      ],
+      "workspaces": [
+        "GET /workspaces",
+        "POST /workspaces"
+      ],
+      "payments": [
+        "POST /payments/setup-intent",
+        "POST /payments/webhook"
+      ]
     }
   },
   "code_organization": {
@@ -401,7 +395,10 @@ Return **ONLY** this JSON structure:
     "authentication": "JWT (RS256)",
     "authorization": "Role-based (admin, member)",
     "encryption": "TLS 1.3 in transit, bcrypt for passwords",
-    "secrets": ["JWT_SECRET", "STRIPE_SECRET"],
+    "secrets": [
+      "JWT_SECRET",
+      "STRIPE_SECRET"
+    ],
     "rate_limiting": "100 requests/minute per IP"
   },
   "implementation_plan": {
@@ -409,31 +406,32 @@ Return **ONLY** this JSON structure:
       {
         "name": "Auth and users",
         "goal": "People can register and log in",
-        "files": ["src/server.ts", "src/routes/auth.ts", "prisma/schema.prisma"],
-        "automated_checks": ["npx prisma validate", "npm test -- auth"],
-        "manual_checks": ["Password rules match the product requirements"]
+        "files": [
+          "src/server.ts",
+          "src/routes/auth.ts"
+        ],
+        "automated_checks": [
+          "npx prisma validate",
+          "npm test -- auth"
+        ],
+        "manual_checks": [
+          "Password rules match the product requirements"
+        ]
       }
     ]
   },
   "data_flow": {
     "user_login": [
       "POST /auth/login",
-      "Validate credentials",
-      "Generate JWT",
-      "Return token"
+      "Validate credentials"
     ],
     "create_workspace": [
       "POST /workspaces",
-      "Validate user authenticated",
-      "Create workspace record",
-      "Add user as owner",
-      "Return workspace"
+      "Validate user authenticated"
     ],
     "payment_webhook": [
       "POST /payments/webhook from Stripe",
-      "Verify webhook signature",
-      "Update invoice status",
-      "Trigger email notification"
+      "Verify webhook signature"
     ]
   },
   "error_handling": {
