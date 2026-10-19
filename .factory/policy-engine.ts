@@ -175,7 +175,9 @@ export function evaluatePolicy(policy: Policy, pr: PrInfo): Decision {
 
   if (autoMerge && allowedBy.length > 0) {
     reasons.push(`auto-merge allowed by: ${allowedBy.map(r => r.name ?? 'unnamed').join(', ')}`);
-  } else if (!autoMerge && reasons.length === 0) {
+  } else if (autoMerge) {
+    reasons.push('auto-merge allowed by the default: nothing protected changed');
+  } else if (reasons.length === 0) {
     reasons.push('no rule allows auto-merge (default is a human merges)');
   }
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "default": { "auto_merge": false, "approvals": 1, "require": ["ci"] },
+  "default": { "auto_merge": true, "approvals": 1, "require": ["ci", "reviewer_verdict"] },
   "protected_paths": [
     ".factory/**",
     ".github/**",
@@ -20,12 +20,6 @@
       "name": "docs only",
       "match": { "paths_only": ["**/*.md", "docs/**"], "max_files": 20 },
       "auto_merge": true
-    },
-    {
-      "name": "small fix",
-      "match": { "branch": ["fix/*"], "max_files": 10, "max_lines": 300 },
-      "auto_merge": true,
-      "require": ["ci", "reviewer_verdict"]
     }
   ]
 }

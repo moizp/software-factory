@@ -8,11 +8,11 @@ The factory augments people. It does not replace their judgement, and it does no
 
 | Rule | Enforced by | Status |
 |---|---|---|
-| People are the strategic directors; agents are tactical executors | Agents never approve a PR; a person merges anything on a protected path; `needs_human` pauses a run | Built |
+| People are the strategic directors; agents are tactical executors | Agents never approve a PR; a person decides what is worth doing (what is labelled ready, the mission, the plan) and merges anything on a protected path; `needs_human` pauses a run | Built |
 | Adversarial scepticism about generated code | The reviewer must list what it tried to find wrong (`review.challenges`) and what it could not check; the contract rejects a review without it | Built |
-| Approval checkpoints before critical actions | The architect's plan can be held for a person's approval (`FACTORY_PLAN_APPROVAL=1`); protected paths need a person; `Mission exception:` and `needs-human` stop the router | Built, but plan approval is opt-in |
+| Approval checkpoints before critical actions | A person approves the architect's plan before anything is built, by default (`FACTORY_PLAN_APPROVAL=0` skips it); a person merges when the policy needs one: a protected path (security, money, data, workflows, CI, the declarations), the `needs-human` label, a reviewer who did not approve, CI not green, a failed merge. Otherwise agents merge after the review cycle, and the question to a person is put at the top of the PR | Built. The review cycle is the factory's own reviewer plus CI until the independent AI review exists, so the protected paths carry the weight |
 | Care in every layer, including the unseen ones | Builder and reviewer prompts name errors, logs, migrations and comments that say why | Prompt only |
-| Autonomy never grows silently | Any capability that merges or continues without a person (merge worker, continue after merge) is a named decision for the owner in `docs/NEXT-CAPABILITIES.md` | Documented |
+| Autonomy is bounded and visible | What agents may merge alone is written in `.factory/policy.json` (read from `main`); what needs a person is a protected path or a flag, never a guess; every escalation names its reason | Built |
 
 ## 2. Architectural integrity: deep modules and system health
 

@@ -233,7 +233,7 @@ To use the API key instead of an account, set only `ANTHROPIC_API_KEY` and leave
 
 ## Governance reference
 
-- **Merge policy** (`.factory/policy.json`, [docs/POLICY.md](docs/POLICY.md)): read from the base branch so a PR cannot loosen its own rules. Protected paths always need a human. Strictest rule wins. Anything unclear fails closed. Docs-only PRs may auto-merge.
+- **Merge policy** (`.factory/policy.json`, [docs/POLICY.md](docs/POLICY.md)): read from the base branch so a PR cannot loosen its own rules. Protected paths always need a human. Strictest rule wins. Anything unclear fails closed. By default agents merge after the review cycle (CI green and a valid reviewer verdict); a person is asked, with the question at the top of the PR and the `needs-human` label, only when the policy or the review cycle needs one.
 - **Board** (`.factory/board.json`, [docs/PROJECT-BOARD.md](docs/PROJECT-BOARD.md)): Backlog, Ready, In progress (WIP 1), In review (WIP 2), Done. The GitHub Project itself is created in the UI.
 - **Releases for apps the factory builds**: release candidate branch from `main`, promoted through `www-test`, `www-demo`, `www-prod` pointers, tagged, merged back. See `.claude/skills/release-process.md` and `templates/release/`. This repo has no releases; `main` is the product.
 - **Repo settings** that cannot live in code: allow merge commits only, auto-delete head branches. Branch protection is off (free private repo), so the rules are enforced by workflows, labels and hooks.
@@ -277,7 +277,7 @@ Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium 
 | `FACTORY_REQUIRE_LANGUAGE` / `FACTORY_LANGUAGE_FILE` | off / `docs/wiki/glossary.md` | `1` stops a workflow that starts without a current glossary; an unusable current one always stops it. See `.claude/skills/ubiquitous-language.md` |
 | `FACTORY_WIKI_DIR` / `FACTORY_WIKI_STALE_DAYS` | `docs/wiki` / `180` | Where `npm run wiki:check` looks, and how many days before a current page is flagged as stale. See `.claude/skills/wiki.md` |
 | `FACTORY_REQUIRE_LOOKFEEL` / `FACTORY_LOOKFEEL_FILE` | off / `LOOKFEEL.md` | `1` stops a workflow that starts without a look and feel file; an unusable file always stops it. See `.claude/skills/look-and-feel.md` |
-| `FACTORY_PLAN_APPROVAL` | off | `1` makes a person approve the architect's implementation plan before the build starts (see `docs/ORCHESTRATION.md`, "Approving the plan"). On the cloud lanes set it as a repository variable |
+| `FACTORY_PLAN_APPROVAL` | on | A person approves the architect's implementation plan before the build starts; `0` skips it (see `docs/ORCHESTRATION.md`, "Approving the plan"). On the cloud lanes set it as a repository variable |
 | `FACTORY_MAX_REPAIRS` | `1` | Re-asks when an agent's reply is unreadable or breaks its contract (0 turns it off, 3 at most). A re-ask costs another model call and counts against `FACTORY_MAX_TOKENS` |
 | `FACTORY_IGNORE_WIP` | unset | `1` starts work even when WIP limits are full |
 | `FACTORY_DATA_DIR` | repo root | Where `workflows/` (state) and `logs/` are written |

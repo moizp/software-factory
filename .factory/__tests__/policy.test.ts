@@ -62,10 +62,12 @@ describe('evaluatePolicy (repo policy)', () => {
     expect(d.require).toContain('ci');
   });
 
-  it('needs a human when a non-doc file is included', () => {
+  it('agents merge a code change after the review cycle: ci and the reviewer verdict are required, nobody else', () => {
     const d = evaluatePolicy(repoPolicy, pr({ files: ['docs/a.md', 'src/app.ts'] }));
-    expect(d.autoMerge).toBe(false);
-    expect(d.approvals).toBe(1);
+    expect(d.autoMerge).toBe(true);
+    expect(d.approvals).toBe(0);
+    expect(d.require).toEqual(expect.arrayContaining(['ci', 'reviewer_verdict']));
+    expect(d.reasons.join()).toMatch(/default: nothing protected changed/);
   });
 
   it.each([
@@ -86,20 +88,30 @@ describe('evaluatePolicy (repo policy)', () => {
     expect(evaluatePolicy(repoPolicy, pr({ files: ['.claude/skills/x.md'] })).autoMerge).toBe(false);
   });
 
-  it('feature branches default to a human', () => {
-    expect(evaluatePolicy(repoPolicy, pr({ branch: 'feature/x', files: ['src/a.ts'] })).autoMerge).toBe(false);
+  it('feature and fix branches merge the same way: size and branch name do not call for a person', () => {
+    for (const branch of ['feature/x', 'fix/typo', 'enhancement/y']) {
+      expect(evaluatePolicy(repoPolicy, pr({ branch, files: ['src/a.ts'], changedLines: 20 })).autoMerge).toBe(true);
+    }
+    const many = Array.from({ length: 40 }, (_, i) => `src/f${i}.ts`);
+    expect(evaluatePolicy(repoPolicy, pr({ branch: 'feature/big', files: many, changedLines: 3000 })).autoMerge).toBe(true);
   });
 
-  it('small fixes outside protected paths auto-merge with ci and reviewer_verdict required', () => {
-    const d = evaluatePolicy(repoPolicy, pr({ branch: 'fix/typo', files: ['src/a.ts'], changedLines: 20 }));
-    expect(d.autoMerge).toBe(true);
-    expect(d.require).toEqual(expect.arrayContaining(['ci', 'reviewer_verdict']));
+  it('asks a person only when something absolutely needs one: protected paths, a label, an empty diff', () => {
+    const needsPerson = [
+      pr({ files: ['src/a.ts', '.github/workflows/x.yml'] }),
+      pr({ files: ['src/a.ts'], labels: ['needs-human'] }),
+      pr({ files: [] })
+    ];
+    for (const p of needsPerson) expect(evaluatePolicy(repoPolicy, p).autoMerge).toBe(false);
   });
 
-  it('large fixes need a human', () => {
-    expect(evaluatePolicy(repoPolicy, pr({ branch: 'fix/big', files: ['src/a.ts'], changedLines: 301 })).autoMerge).toBe(false);
-    const many = Array.from({ length: 11 }, (_, i) => `src/f${i}.ts`);
-    expect(evaluatePolicy(repoPolicy, pr({ branch: 'fix/wide', files: many })).autoMerge).toBe(false);
+  it('can still be told that some branches need a person, for a project that wants it', () => {
+    const careful = parsePolicy({
+      ...repoPolicy,
+      rules: [{ name: 'releases need a person', match: { branch: ['release/*'] }, auto_merge: false }]
+    });
+    expect(evaluatePolicy(careful, pr({ branch: 'release/v1.2.0', files: ['src/a.ts'] })).autoMerge).toBe(false);
+    expect(evaluatePolicy(careful, pr({ branch: 'fix/x', files: ['src/a.ts'] })).autoMerge).toBe(true);
   });
 
   it('the needs-human label can only tighten', () => {
@@ -233,6 +245,20 @@ describe('GitHubAPI policy helpers', () => {
     );
   });
 
+  it('adds a label to a PR', async () => {
+    const api = new GitHubAPI('token');
+    await api.addLabel(5, 'needs-human');
+    expect((api as any).octokit.issues.addLabels).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 5, labels: ['needs-human'] })
+    );
+  });
+
+  it('says so when a label cannot be added', async () => {
+    const api = new GitHubAPI('token');
+    (api as any).octokit.issues.addLabels.mockRejectedValue(new Error('403'));
+    await expect(api.addLabel(5, 'needs-human')).rejects.toThrow('Failed to add label: 403');
+  });
+
   it.each([
     [[], 'none'],
     [[{ status: 'completed', conclusion: 'success' }], 'success'],
@@ -250,15 +276,16 @@ describe('Orchestrator auto-merge gating', () => {
     getPRInfo: jest.fn().mockResolvedValue({ headSha: 'sha', ...info }),
     getCheckSummary: jest.fn().mockResolvedValue(ci),
     autoMergePR: jest.fn().mockResolvedValue(undefined),
-    postComment: jest.fn().mockResolvedValue(undefined)
+    postComment: jest.fn().mockResolvedValue(undefined),
+    addLabel: jest.fn().mockResolvedValue(undefined)
   });
 
-  const run = async (api: any, reviewerValid = true) => {
+  const run = async (api: any, reviewerValid = true, policy: Policy = repoPolicy) => {
     const orchestrator = new FactoryOrchestrator(async () => ({ phase: 'x' as any, valid: true }), false);
     const o = orchestrator as any;
     o.githubAPI = api;
     o.prNumber = 7;
-    o.loadBasePolicy = () => repoPolicy;
+    o.loadBasePolicy = () => policy;
     process.env.FACTORY_CI_POLL_MS = '1';
     process.env.FACTORY_CI_TIMEOUT_MS = '5';
     let state = createWorkflowState('brief');
@@ -278,30 +305,70 @@ describe('Orchestrator auto-merge gating', () => {
     expect(state.notes.join()).toMatch(/auto-merged/);
   });
 
-  it('does not merge when CI fails or never reports', async () => {
+  it('merges a code change after a valid review and green CI, with no person involved', async () => {
+    const api = makeApi({ branch: 'feature/x', files: ['src/a.ts', 'src/a.test.ts'], changedLines: 120, labels: [] });
+    const state = await run(api, true);
+    expect(api.autoMergePR).toHaveBeenCalledWith(7);
+    expect(api.postComment).not.toHaveBeenCalled();
+    expect(api.addLabel).not.toHaveBeenCalled();
+    expect(state.notes.join()).toMatch(/auto-merged/);
+  });
+
+  it('does not merge when CI fails or never reports, and asks a person with the question on top', async () => {
     for (const ci of ['failure', 'none', 'pending']) {
       const api = makeApi({ branch: 'chore/x', files: ['docs/a.md'], changedLines: 3, labels: [] }, ci);
-      await run(api);
+      const state = await run(api);
       expect(api.autoMergePR).not.toHaveBeenCalled();
+      expect(api.postComment).toHaveBeenCalledWith(7, expect.stringMatching(/^## A person is needed: merge decision\n\n\*\*.*CI/));
+      expect(api.addLabel).toHaveBeenCalledWith(7, 'needs-human');
+      expect(state.notes.join()).toMatch(/Asked a person about the merge/);
     }
   });
 
-  it('leaves protected changes to a human and explains why on the PR', async () => {
+  it('leaves protected changes to a human and puts the question and the reason on the PR', async () => {
     const api = makeApi({ branch: 'chore/x', files: ['.github/workflows/a.yml'], changedLines: 3, labels: [] });
     const state = await run(api);
     expect(api.autoMergePR).not.toHaveBeenCalled();
-    expect(api.postComment).toHaveBeenCalledWith(7, expect.stringContaining('protected paths'));
+    const body = api.postComment.mock.calls[0][1] as string;
+    expect(body).toMatch(/^## A person is needed: merge decision/);
+    expect(body).toContain('**Please review and merge this PR (1 approval).**');
+    expect(body).toContain('- protected paths changed: .github/workflows/a.yml');
+    expect(api.addLabel).toHaveBeenCalledWith(7, 'needs-human');
     expect(state.notes.join()).toMatch(/human merge/);
   });
 
-  it('requires a valid reviewer verdict for small fixes', async () => {
-    const info = { branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] };
-    const bad = makeApi(info);
-    await run(bad, false);
-    expect(bad.autoMergePR).not.toHaveBeenCalled();
-    const good = makeApi(info);
-    await run(good, true);
-    expect(good.autoMergePR).toHaveBeenCalled();
+  it('does not merge without a valid reviewer verdict, and asks whether to send it back or merge anyway', async () => {
+    const api = makeApi({ branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] });
+    const state = await run(api, false);
+    expect(api.autoMergePR).not.toHaveBeenCalled();
+    expect(api.postComment).toHaveBeenCalledWith(7, expect.stringContaining('The reviewer did not approve this change. Send it back for fixes, or merge it anyway?'));
+    expect(api.addLabel).toHaveBeenCalledWith(7, 'needs-human');
+    expect(state.notes.join()).toMatch(/reviewer verdict is not valid/);
+  });
+
+  it('asks a person to merge by hand when the merge call itself fails', async () => {
+    const api = makeApi({ branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] });
+    api.autoMergePR.mockRejectedValue(new Error('405 not mergeable'));
+    const state = await run(api, true);
+    expect(api.postComment).toHaveBeenCalledWith(7, expect.stringContaining('the merge call failed: 405 not mergeable'));
+    expect(api.addLabel).toHaveBeenCalledWith(7, 'needs-human');
+    expect(state.notes.join()).toMatch(/Auto-merge failed/);
+  });
+
+  it('still finishes the run when the question cannot be posted', async () => {
+    const api = makeApi({ branch: 'chore/x', files: ['.github/workflows/a.yml'], changedLines: 3, labels: [] });
+    api.postComment.mockRejectedValue(new Error('403'));
+    api.addLabel.mockRejectedValue(new Error('403'));
+    const state = await run(api);
+    expect(state.notes.join()).toMatch(/Asked a person about the merge/);
+  });
+
+  it('can be told to merge nothing without a person, for a project that wants it', async () => {
+    const strict = parsePolicy({ ...repoPolicy, default: { auto_merge: false, approvals: 1, require: ['ci'] } });
+    const api = makeApi({ branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] });
+    await run(api, true, strict);
+    expect(api.autoMergePR).not.toHaveBeenCalled();
+    expect(api.addLabel).toHaveBeenCalledWith(7, 'needs-human');
   });
 
   it('fails closed when PR info cannot be read', async () => {
@@ -319,8 +386,10 @@ describe('monorepo policy template (templates/monorepo/policy.json)', () => {
   );
   const change = (branch: string, files: string[], changedLines = 20) => ({ branch, files, changedLines, labels: [] });
 
-  it('lets a small fix inside one service auto-merge', () => {
-    expect(evaluatePolicy(monorepo, change('fix/billing-rounding', ['services/billing/src/invoice.ts'])).autoMerge).toBe(true);
+  it('lets agents merge a change inside one service after review', () => {
+    const d = evaluatePolicy(monorepo, change('fix/billing-rounding', ['services/billing/src/invoice.ts']));
+    expect(d.autoMerge).toBe(true);
+    expect(d.require).toEqual(expect.arrayContaining(['ci', 'reviewer_verdict']));
   });
 
   it.each([
@@ -337,8 +406,9 @@ describe('monorepo policy template (templates/monorepo/policy.json)', () => {
     expect(evaluatePolicy(monorepo, change('fix/auth-token', ['services/auth/src/t.ts'])).autoMerge).toBe(false);
   });
 
-  it('does not let the billing rule cover a differently named branch', () => {
-    expect(evaluatePolicy(monorepo, change('feature/billing-x', ['services/billing/src/a.ts'])).autoMerge).toBe(false);
+  it('treats a feature branch in one service like a fix: only the protected paths and the auth rule call for a person', () => {
+    expect(evaluatePolicy(monorepo, change('feature/billing-x', ['services/billing/src/a.ts'])).autoMerge).toBe(true);
+    expect(evaluatePolicy(monorepo, change('feature/billing-x', ['services/auth/src/a.ts'])).autoMerge).toBe(false);
   });
 
   it('keeps docs-only changes automatic', () => {

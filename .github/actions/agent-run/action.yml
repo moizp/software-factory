@@ -37,7 +37,7 @@ inputs:
     required: false
     default: ''
   plan_approval:
-    description: Set to 1 to make a person approve the architect's plan before the build (repository variable FACTORY_PLAN_APPROVAL)
+    description: Leave empty or 1 for a person to approve the architect's plan before the build (the default); set to 0 to skip approval (repository variable FACTORY_PLAN_APPROVAL)
     required: false
     default: ''
 
