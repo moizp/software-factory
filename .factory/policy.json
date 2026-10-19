@@ -10,7 +10,8 @@
     "package.json",
     "package-lock.json",
     "CONTRIBUTING.md",
-    "MISSION.md"
+    "MISSION.md",
+    "LOOKFEEL.md"
   ],
   "force_manual_labels": ["needs-human"],
   "rules": [

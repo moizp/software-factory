@@ -16,6 +16,9 @@ import * as path from 'path';
  *   ### BC1: Short name
  *   - Who: ...        - From: what they do today      - To: what we want them to do      - Signal: how we would see it
  *
+ *   ## Goals            (optional)
+ *   - Secondary aims that are not behaviour changes: nice to advance, never required
+ *
  *   ## Not our mission
  *   - Things we will not do, even when asked
  */
@@ -29,10 +32,18 @@ export interface BehaviourChange {
   signal: string;
 }
 
+/** An optional aim next to the behaviour changes: something worth advancing, never a reason to say yes or no on its own. */
+export interface Goal {
+  id: string;
+  text: string;
+}
+
 export interface Mission {
   mission: string;
   users: string[];
   behaviourChanges: BehaviourChange[];
+  /** Optional. Empty when the file declares none. */
+  goals: Goal[];
   notOurMission: string[];
 }
 
@@ -41,6 +52,8 @@ export type MissionParse =
   | { ok: false; errors: string[]; warnings: string[] };
 
 const MAX_CHANGES = 8;
+const MAX_GOALS = 6;
+const MAX_GOAL_CHARS = 300;
 const MIN_FIELD = 8;
 const MAX_FIELD = 400;
 const FIELDS = ['who', 'from', 'to', 'signal'] as const;
@@ -135,6 +148,19 @@ export function parseMission(md: string): MissionParse {
     if (ids.size > MAX_CHANGES) errors.push(`more than ${MAX_CHANGES} behaviour changes: a mission this wide cannot steer anything`);
   }
 
+  const goalsSection = find(/^goals$|^optional goals$/i);
+  const goals: Goal[] = [];
+  if (goalsSection) {
+    const items = bullets(goalsSection.lines);
+    if (items.length > MAX_GOALS) errors.push(`more than ${MAX_GOALS} goals: optional goals are a short list, or they steer nothing`);
+    items.forEach((raw, i) => {
+      const text = raw.replace(/^G\d+\s*[:.\-]\s*/i, '').trim();
+      if (text.length < MIN_FIELD) errors.push(`goal ${i + 1} is too short to mean anything`);
+      else if (text.length > MAX_GOAL_CHARS) errors.push(`goal ${i + 1} is longer than ${MAX_GOAL_CHARS} characters`);
+      else goals.push({ id: `G${i + 1}`, text });
+    });
+  }
+
   const nots = find(/^not our mission$|^non-goals$/i);
   const notOur = nots ? bullets(nots.lines) : [];
   if (!nots || notOur.length === 0) warnings.push('"## Not our mission" is empty: without a line drawn, nothing is ever out of mission');
@@ -142,7 +168,7 @@ export function parseMission(md: string): MissionParse {
   if (PLACEHOLDER.test(md.replace(/<!--[\s\S]*?-->/g, '').replace(/```[\s\S]*?```/g, ''))) errors.push('the file still contains template placeholders (<...>, TODO or TBD)');
 
   if (errors.length > 0) return { ok: false, errors, warnings };
-  return { ok: true, mission: { mission: statement, users, behaviourChanges: changes, notOurMission: notOur }, warnings };
+  return { ok: true, mission: { mission: statement, users, behaviourChanges: changes, goals, notOurMission: notOur }, warnings };
 }
 
 /** The mission as the agents receive it: short keys, nothing they do not need. */
@@ -151,6 +177,7 @@ export function missionForAgents(m: Mission): Record<string, unknown> {
     mission: m.mission,
     users: m.users,
     behaviour_changes: m.behaviourChanges.map(c => ({ id: c.id, name: c.name, who: c.who, from: c.from, to: c.to, signal: c.signal })),
+    ...(m.goals.length ? { goals: m.goals } : {}),
     not_our_mission: m.notOurMission
   };
 }

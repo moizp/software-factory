@@ -38,6 +38,7 @@ describe('parseMission', () => {
       expect(r.mission.users).toHaveLength(1);
       expect(r.mission.behaviourChanges.map(c => c.id)).toEqual(['BC1', 'BC2']);
       expect(r.mission.behaviourChanges[0]).toMatchObject({ name: 'Invoice at the moment of delivery', who: 'freelancers with fewer than ten clients' });
+      expect(r.mission.goals.map(g => g.id)).toEqual(['G1', 'G2']);
       expect(r.mission.notOurMission).toHaveLength(2);
       expect(r.warnings).toEqual([]);
     }
@@ -88,6 +89,23 @@ describe('parseMission', () => {
     ]);
   });
 
+  it('treats goals as optional: none declared is fine and is left out of the agent view', () => {
+    const without = edit(/## Goals[\s\S]*?(?=## Not our mission)/, '');
+    const m = ok(without);
+    expect(m.goals).toEqual([]);
+    expect(Object.keys(missionForAgents(m))).not.toContain('goals');
+    expect(parseMission(without).warnings).toEqual([]);
+  });
+
+  it('numbers goals in order, accepts G1-style prefixes, and keeps them short and few', () => {
+    const goals = (lines: string[]): string => edit(/## Goals[\s\S]*?(?=## Not our mission)/, `## Goals\n\n${lines.map(l => `- ${l}`).join('\n')}\n\n`);
+    expect(ok(goals(['G7: Keep the first screen quiet', 'Never lose a draft'])).goals).toEqual([{ id: 'G1', text: 'Keep the first screen quiet' }, { id: 'G2', text: 'Never lose a draft' }]);
+    expect(errorsOf(goals(Array.from({ length: 7 }, (_, i) => `Goal number ${i} is worth having`)))).toEqual([expect.stringContaining('more than 6 goals')]);
+    expect(errorsOf(goals(['Tiny']))).toEqual(['goal 1 is too short to mean anything']);
+    expect(errorsOf(goals(['x'.repeat(301)]))).toEqual([expect.stringContaining('longer than 300')]);
+    expect(errorsOf(goals(['<a goal worth stating>']))).toEqual([expect.stringContaining('placeholders')]);
+  });
+
   it('ignores headings inside code blocks and text inside HTML comments, and accepts other spellings', () => {
     const md = `<!-- ## Behaviour changes in a comment -->\n# Mission\n\nHelp our users do something better every single week.\n\n## Users\n\n* Everyone: they exist\n\n## Behavior Changes\n\n### BC1 - Be on time\n- who: some users\n- FROM: they arrive late today\n- To: they arrive on time\n- Signal: 80% on time\n\n\`\`\`\n## Not our mission\n\`\`\`\n\n## Non-goals\n\n- Scheduling the whole company\n`;
     const m = ok(md);
@@ -100,7 +118,8 @@ describe('what agents receive', () => {
   const m = ok(exampleMd);
   it('is short keys and nothing else', () => {
     const v = missionForAgents(m) as any;
-    expect(Object.keys(v)).toEqual(['mission', 'users', 'behaviour_changes', 'not_our_mission']);
+    expect(Object.keys(v)).toEqual(['mission', 'users', 'behaviour_changes', 'goals', 'not_our_mission']);
+    expect(v.goals).toEqual([{ id: 'G1', text: 'Clients can pay straight from the invoice email in two taps' }, { id: 'G2', text: 'Everything a freelancer enters can be exported at any time' }]);
     expect(v.behaviour_changes[0]).toEqual({ id: 'BC1', name: 'Invoice at the moment of delivery', who: expect.any(String), from: expect.any(String), to: expect.any(String), signal: expect.any(String) });
     expect(missionIds(m)).toEqual(['BC1', 'BC2']);
     expect(renderMissionLine(m)).toMatch(/\(BC1, BC2\)$/);

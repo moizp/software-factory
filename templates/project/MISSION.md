@@ -19,6 +19,11 @@ It must stay short. Two to four behaviour changes steer better than eight.
 - To: <what we want them to do instead, as something a person does, not something we build>
 - Signal: <how we would see it happening: a count, a rate, or something observable>
 
+## Goals
+
+<!-- Optional. Delete this section if there are none. Up to six aims that are not behaviour changes: a quality to protect, a promise to keep. -->
+- <An aim worth advancing, in a sentence>
+
 ## Not our mission
 
 - <Something we will not do, even when asked>

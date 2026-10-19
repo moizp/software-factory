@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
 import { pendingExchange, renderQuestion } from './human';
+import { renderLookFeelLine } from './lookfeel';
 import { renderMissionLine } from './mission';
 import { workflowsDir } from './paths';
 import { PLAN_INTENT } from './plan';
@@ -118,6 +119,7 @@ export function buildHandoff(state: WorkflowState, ctx: HandoffContext = {}): st
     '## Task',
     state.issueBrief.length > MAX_BRIEF ? `${state.issueBrief.slice(0, MAX_BRIEF)}...` : state.issueBrief,
     ...(state.mission ? ['', `Mission: ${oneLine(renderMissionLine(state.mission), 300)}`] : []),
+    ...(state.lookfeel ? [`Look and feel: ${oneLine(renderLookFeelLine(state.lookfeel), 200)}`] : []),
     '',
     '## Status',
     '| Phase | Result |',

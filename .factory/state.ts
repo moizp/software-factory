@@ -4,6 +4,7 @@ import { AgentName } from './pipeline';
 import { workflowsDir } from './paths';
 import type { HumanExchange } from './human';
 import { readEvents, recordState, replay } from './events';
+import type { LookFeel } from './lookfeel';
 import type { Mission } from './mission';
 
 export type Phase = AgentName | 'completed' | 'failed';
@@ -54,6 +55,8 @@ export interface WorkflowState {
   humanRequests?: HumanExchange[];
   /** The project's mission when the workflow started (MISSION.md). Kept so a resume plans against the same one. */
   mission?: Mission;
+  /** The project's declared look and feel (LOOKFEEL.md) when the workflow started. */
+  lookfeel?: LookFeel;
 }
 
 

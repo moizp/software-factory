@@ -100,7 +100,7 @@ describe('buildHandoff', () => {
     expect(parseHandoff(hostile)!.status).toBe('running');
   });
   it('names the mission when the project has one', () => {
-    const mission = { mission: 'Freelancers get paid on time.', users: ['Freelancers'], notOurMission: [], behaviourChanges: [{ id: 'BC1', name: 'x', who: 'a', from: 'b', to: 'c', signal: 'd' }] };
+    const mission = { mission: 'Freelancers get paid on time.', users: ['Freelancers'], goals: [], notOurMission: [], behaviourChanges: [{ id: 'BC1', name: 'x', who: 'a', from: 'b', to: 'c', signal: 'd' }] };
     expect(buildHandoff({ ...answered(), mission } as WorkflowState, ctx)).toContain('Mission: Freelancers get paid on time. (BC1)');
     expect(buildHandoff(answered(), ctx)).not.toContain('Mission:');
   });

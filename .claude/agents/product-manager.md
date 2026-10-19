@@ -73,6 +73,7 @@ If the input has `mission`, it is the project's agreed direction: what we aim to
 - If the brief itself asks for something out of mission, or listed under `not_our_mission`, do not plan it silently. Ask first with `needs_human` (`multiple_choice`: "Add it to the mission", "Drop it", "Build it as a one-off exception").
 - `mission_alignment` also lists the behaviour changes covered by some feature and the ones not covered this round.
 - The brief may carry two lines a person wrote. `Serves: BC1` means the work is meant to move those behaviour changes: at least one feature must serve each. `Mission exception: <reason>` means a person decided to do it despite the mission: do not ask again, list the features that serve nothing under `out_of_mission` with that reason (a must-have may be there).
+- `mission.goals` are optional and secondary: among features that serve a behaviour change, prefer the ones that also advance a goal. A goal alone never justifies a feature.
 - Without `mission` in the input, leave out `serves` and `mission_alignment`.
 
 ## Output Format
