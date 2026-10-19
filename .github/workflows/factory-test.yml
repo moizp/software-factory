@@ -1,50 +1,43 @@
 name: Factory Test Suite
 
 on:
-  push:
-    branches: [main, claude/**]
-    paths:
-      - '.factory/**'
-      - '.claude/**'
-      - 'docs/**'
-      - 'README.md'
-      - 'QUICKSTART.md'
-      - 'CONTRIBUTING.md'
-      - '.github/workflows/factory-test.yml'
-      - 'package.json'
-      - 'jest.config.js'
-      - 'tsconfig.json'
+  # A pull request runs only the tests its change needs (npm run test:changed). Nothing runs for docs-only changes.
   pull_request:
     branches: [main]
     paths:
       - '.factory/**'
       - '.claude/**'
-      - 'docs/**'
-      - 'README.md'
-      - 'QUICKSTART.md'
-      - 'CONTRIBUTING.md'
-      - '.github/workflows/factory-test.yml'
+      - 'templates/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'jest.config.js'
       - 'tsconfig.json'
+      - '.nvmrc'
+  # The full suite runs on main every day, on a release candidate branch, and on demand.
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    branches: ['release/**']
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
     name: Unit & Integration Tests
 
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24.x
           cache: 'npm'
 
       - name: Install dependencies
@@ -52,15 +45,20 @@ jobs:
         env:
           CI: true
 
-      - name: Run type check
-        run: npm run build
+      - name: Run the tests this change needs
+        if: github.event_name == 'pull_request'
+        run: npm run test:changed -- --base origin/${{ github.base_ref }}
+        env:
+          CI: true
 
-      - name: Run test suite
+      - name: Run the full test suite
+        if: github.event_name != 'pull_request'
         run: npm test -- --coverage
         env:
           CI: true
 
       - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage/lcov.info
@@ -70,6 +68,7 @@ jobs:
           verbose: true
 
       - name: Check coverage threshold
+        if: github.event_name != 'pull_request'
         run: |
           COVERAGE=$(npm run test:coverage -- --silent 2>&1 | grep -oP 'Statements\s*:\s*\K[0-9.]+' | head -1)
           if (( $(echo "$COVERAGE < 70" | bc -l) )); then
@@ -80,10 +79,10 @@ jobs:
           fi
 
       - name: Archive test results
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.node-version }}
+          name: test-results
           path: coverage/
           retention-days: 30
 
@@ -98,7 +97,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 24.x
           cache: 'npm'
 
       - name: Install dependencies
@@ -132,7 +131,7 @@ jobs:
           echo "- **Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Code Quality**: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Coverage Requirements" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage Requirements (full runs only: daily on main, release branches, manual)" >> $GITHUB_STEP_SUMMARY
           echo "- Statements: **70%+**" >> $GITHUB_STEP_SUMMARY
           echo "- Branches: **70%+**" >> $GITHUB_STEP_SUMMARY
           echo "- Functions: **70%+**" >> $GITHUB_STEP_SUMMARY

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Multi-agent software factory orchestration engine",
   "engines": {
-    "node": ">=20.19.0 <21 || >=22.12.0"
+    "node": ">=24 <25"
   },
   "main": "dist/index.js",
   "scripts": {
@@ -25,6 +25,7 @@
     "policy:check": "ts-node .factory/policy-cli.ts",
     "gate:check": "ts-node .factory/gate/cli.ts",
     "gate:commit": "ts-node .factory/gate/commit-cli.ts",
+    "test:changed": "ts-node .factory/gate/test-select-cli.ts",
     "report:prompts": "ts-node .factory/report-cli.ts prompts",
     "report:usage": "ts-node .factory/report-cli.ts usage",
     "mission:check": "ts-node .factory/mission-cli.ts",
@@ -38,7 +39,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
-    "@types/node": "^20.10.0",
+    "@types/node": "^24.0.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",

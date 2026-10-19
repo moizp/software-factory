@@ -102,7 +102,7 @@ Work lives in issues and PRs under a GitHub Project that follows the Kanban temp
 
 ## Protection on the free plan
 
-Private repos on the free plan have no branch protection or required reviews, so these rules are conventions plus CI (`factory-test.yml` runs on every PR to `main`). Never push directly to `main`; the one exception is a fast-forward that moves it to an already-reviewed commit.
+Private repos on the free plan have no branch protection or required reviews, so these rules are conventions plus CI (`factory-test.yml` runs on Node 24 only the tests a PR's change needs (`npm run test:changed`: tests related to changed code plus tests that read changed prompts, templates or workflows); a docs-only PR runs none. The full suite runs on `main` daily, on `release/**` branches and on demand). Never push directly to `main`; the one exception is a fast-forward that moves it to an already-reviewed commit.
 
 ## Dos and Don'ts
 
