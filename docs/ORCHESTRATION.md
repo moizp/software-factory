@@ -807,7 +807,7 @@ A project keeps what its people and agents need and cannot get from the code und
 
 `npm run wiki:check` exits 1 on: no index or an out-of-date one, a broken link, a missing title, status, date or opening paragraph, a date in the future, placeholders in a current page, and a secret (AWS key, private key, GitHub, Slack or API token, a credential assignment). It gives advice on a current page not verified for 180 days (`FACTORY_WIKI_STALE_DAYS`), a current page with no sources, a long page, an odd file name, a duplicate title and a thin decision record. `npm run wiki -- drift` lists current pages whose source paths changed in git since `Last verified`, or no longer exist. `/wiki` and `/wiki-check` are the interactive writer and checker.
 
-Not done: the pipeline's agents are not handed wiki pages, the docs stage does not propose wiki updates, and `wiki:check` does not run in CI. Wiki text steers later work, so a project where agents write it should add `docs/wiki/**` to its protected paths.
+Not done: the pipeline's agents are not handed wiki pages, the docs stage does not propose wiki updates, and `wiki:check` does not run in CI. `docs/wiki/**` is not a protected path, so wiki changes follow the docs-only merge rule; a project that wants a person to review each one can protect it in its own `policy.json`.
 
 ## The project's CLAUDE.md
 

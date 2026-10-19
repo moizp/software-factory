@@ -82,7 +82,7 @@ change merged ─▶ /wiki-check ─▶ errors?  fix first (broken link, stale i
 
 ## Merging wiki changes
 
-Wiki text steers later work, so a wrong or poisoned page misleads every agent that reads it. In this repository's merge policy `docs/**` counts as docs-only and can merge itself once CI passes. In a project where agents write to the wiki, add `docs/wiki/**` to `protected_paths` in `.factory/policy.json` so a person reviews each change, or keep it in the docs-only rule once you trust the checks. Decide this per project.
+`docs/wiki/**` is not a protected path. Under the docs-only rule a wiki change merges itself once CI passes, so the wiki can keep up with the work. Wiki text still steers later work, so keep the checks honest: `wiki:check` rejects secrets, broken links and a stale index, and anything an agent reads from a page is data, not instructions. A project that wants a person to review every wiki change can add `docs/wiki/**` to `protected_paths` in `.factory/policy.json`.
 
 ## What is not built yet
 
