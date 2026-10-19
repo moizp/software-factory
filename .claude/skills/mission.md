@@ -31,13 +31,18 @@ Independent freelancers get paid on time without spending their evenings on admi
 - To: they let the product remind clients and only step in after the second reminder
 - Signal: reminder emails sent by hand per month, falling by more than half
 
+## Goals
+
+- Clients can pay straight from the invoice email in two taps
+- Everything a freelancer enters can be exported at any time
+
 ## Not our mission
 
 - Accounting, tax filing or payroll
 - Teams larger than fifty people
 ```
 
-Rules the parser enforces: a mission statement of 20 to 600 characters; at least one user group; one to eight behaviour changes, each `### BCn: name` with Who, From, To and Signal; From and To must differ; no template placeholders left. It only advises (warnings) when "To" starts with a work verb such as "add" or "build", when a Signal names nothing countable, or when there is no "Not our mission" list.
+Rules the parser enforces: a mission statement of 20 to 600 characters; at least one user group; one to eight behaviour changes, each `### BCn: name` with Who, From, To and Signal; From and To must differ; no template placeholders left. `## Goals` is optional: up to six secondary aims that are not behaviour changes (a quality to protect, a promise to keep), as plain bullets; they are numbered G1, G2 and so on in order. A goal never justifies work by itself and never rules it out: a feature must still serve a behaviour change, and planners prefer, among features that do, the ones that also advance a goal. Look and feel is decided against the mission and its goals (`.claude/skills/look-and-feel.md`). The parser only advises (warnings) when "To" starts with a work verb such as "add" or "build", when a Signal names nothing countable, or when there is no "Not our mission" list.
 
 ## Telling the router (issues)
 
