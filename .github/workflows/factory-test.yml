@@ -16,9 +16,9 @@ on:
       - 'jest.config.js'
       - 'tsconfig.json'
       - '.nvmrc'
-  # The full suite runs on main every day, on a release candidate branch, and on demand.
+  # The full suite runs on main every Monday, on a release candidate branch, and on demand. A failed run opens an issue.
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '17 3 * * 1'
   push:
     branches: ['release/**']
   workflow_dispatch:
@@ -116,6 +116,58 @@ jobs:
           test -f .factory/__tests__/integration.test.ts || (echo "Missing integration.test.ts" && exit 1)
           test -f .factory/__tests__/fixtures.ts || (echo "Missing fixtures.ts" && exit 1)
           echo "✅ All test files present"
+
+  # Scheduled, release and manual runs have no pull request to show a failure on, so a failure opens one issue (or adds
+  # a comment to the one already open) and the next passing run closes it. It does not label the issue agent:ready:
+  # a person starts agent work (docs/CLOUD-RUNNERS.md), and an event made by this workflow's token would not start it.
+  report:
+    name: Report full-run failures
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: always() && github.event_name != 'pull_request' && (needs.test.result != 'cancelled' && needs.lint.result != 'cancelled')
+    permissions:
+      contents: read
+      issues: write
+    env:
+      FAILED: ${{ needs.test.result == 'failure' || needs.lint.result == 'failure' }}
+      TEST_RESULT: ${{ needs.test.result }}
+      LINT_RESULT: ${{ needs.lint.result }}
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'test-failure';
+            const { owner, repo } = context.repo;
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const failed = process.env.FAILED === 'true';
+            try { await github.rest.issues.getLabel({ owner, repo, name: label }); }
+            catch { await github.rest.issues.createLabel({ owner, repo, name: label, color: 'b60205', description: 'The full test suite failed on main' }); }
+            const open = (await github.rest.issues.listForRepo({ owner, repo, labels: label, state: 'open', per_page: 1 })).data[0];
+            if (!failed) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `The full test suite passed again: ${run}\n\nClosing.` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            const line = `Full test suite failed on \`${context.ref.replace('refs/heads/', '')}\` at \`${context.sha.slice(0, 7)}\` (${context.eventName}): tests ${process.env.TEST_RESULT}, code quality ${process.env.LINT_RESULT}. Run: ${run}`;
+            if (open) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: line });
+              return;
+            }
+            const body = [
+              '## What',
+              line,
+              '',
+              '## Why',
+              'The full suite runs weekly, on release branches and on demand. Pull requests run only the tests their change needs, so this run can see a break no pull request showed.',
+              '',
+              '## Next',
+              'Read the failing job in the run, find the change that broke it (`git log` on the files the failing test covers), and fix it on a short-lived branch. To hand it to the agents, a person applies `agent:ready`.',
+              '',
+              'Mission exception: a failing test suite on main blocks every later change, whatever behaviour change it serves.',
+            ].join('\n');
+            await github.rest.issues.create({ owner, repo, title: 'Full test suite is failing on main', labels: [label], body });
 
   summary:
     name: Test Summary
