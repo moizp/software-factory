@@ -256,6 +256,7 @@ Models: Haiku 4.5 for small few-turn work (R1 first pass), Sonnet 5.5 at medium 
 | `FACTORY_AGENT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh`, `max` |
 | `FACTORY_AGENT_TIMEOUT_MS` | 600000 | Per-agent timeout |
 | `FACTORY_MAX_TOKENS` | 600000 | Pause before the next stage once reached; `0` disables |
+| `npm run report:prompts` / `report:usage` | | Prompt size against `prompt-budgets.json` (exit 1 when over); real token use per agent from saved workflows |
 | `FACTORY_PLAN_APPROVAL` | off | `1` makes a person approve the architect's implementation plan before the build starts (see `docs/ORCHESTRATION.md`, "Approving the plan"). On the cloud lanes set it as a repository variable |
 | `FACTORY_MAX_REPAIRS` | `1` | Re-asks when an agent's reply is unreadable or breaks its contract (0 turns it off, 3 at most). A re-ask costs another model call and counts against `FACTORY_MAX_TOKENS` |
 | `FACTORY_IGNORE_WIP` | unset | `1` starts work even when WIP limits are full |

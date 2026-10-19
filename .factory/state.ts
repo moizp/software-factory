@@ -3,6 +3,7 @@ import * as path from 'path';
 import { AgentName } from './pipeline';
 import { workflowsDir } from './paths';
 import type { HumanExchange } from './human';
+import { readEvents, recordState, replay } from './events';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
@@ -82,22 +83,40 @@ export function createWorkflowState(
   };
 }
 
-export function saveWorkflowState(state: WorkflowState): void {
-  ensureWorkflowsDir();
-  const filePath = path.join(workflowsDir(), `${state.id}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(state, null, 2));
-}
-
-export function loadWorkflowState(workflowId: string): WorkflowState | null {
-  ensureWorkflowsDir();
+export function readSnapshot(workflowId: string): WorkflowState | null {
   const filePath = path.join(workflowsDir(), `${workflowId}.json`);
-
-  if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as WorkflowState;
+  } catch {
     return null;
   }
+}
 
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(content) as WorkflowState;
+/**
+ * Saves the state. The change is appended to the event log first and the snapshot is written after, so the log is never
+ * behind the snapshot. A failure to write the log is reported but never stops the run.
+ */
+export function saveWorkflowState(state: WorkflowState): void {
+  ensureWorkflowsDir();
+  try {
+    recordState(state, readSnapshot(state.id));
+  } catch (error) {
+    console.warn(`[State] Could not append to the event log for ${state.id}: ${error instanceof Error ? error.message : error}`);
+  }
+  writeSnapshot(state);
+}
+
+/** Writes the snapshot only. Used when the snapshot is rebuilt from the log, which already describes it. */
+export function writeSnapshot(state: WorkflowState): void {
+  ensureWorkflowsDir();
+  fs.writeFileSync(path.join(workflowsDir(), `${state.id}.json`), JSON.stringify(state, null, 2));
+}
+
+/** The saved state; when the snapshot is missing or unreadable, the state the event log describes. */
+export function loadWorkflowState(workflowId: string): WorkflowState | null {
+  ensureWorkflowsDir();
+  return readSnapshot(workflowId) ?? replay(readEvents(workflowId).events);
 }
 
 export function listWorkflowStates(): WorkflowState[] {

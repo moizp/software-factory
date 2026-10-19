@@ -15,6 +15,7 @@
     "factory:list": "ts-node .factory/cli.ts list",
     "factory:watch": "ts-node .factory/cli.ts watch",
     "factory:retry": "ts-node .factory/cli.ts retry",
+    "factory:replay": "ts-node .factory/cli.ts replay",
     "factory:answer": "ts-node .factory/cli.ts answer",
     "orchestrator:run": "ts-node .factory/run-workflow.ts",
     "test": "jest",
