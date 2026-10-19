@@ -182,6 +182,7 @@ describe('plan approval', () => {
   });
 
   it('can be switched on in the workflow config', async () => {
+    delete process.env.FACTORY_PLAN_APPROVAL;
     const r = recorder();
     const s = await orch(r.invoker).executeWorkflow('Build', 1, { plan_approval: true }, undefined, { until: 'reviewer' });
     expect(s.status).toBe('paused');
@@ -199,6 +200,24 @@ describe('plan approval', () => {
     expect(r.of('reviewer')).toHaveLength(1);
     expect(done.humanRequests).toHaveLength(1);
     expect(done.notes.some(n => n.includes('Stopped after reviewer'))).toBe(true);
+  });
+
+  it('asks a person to approve the plan by default, and not when approval is switched off', async () => {
+    const asks = async (setup: () => void, config: Record<string, unknown> = {}) => {
+      delete process.env.FACTORY_PLAN_APPROVAL;
+      setup();
+      const r = recorder();
+      const state = await orch(r.invoker).executeWorkflow('Build', Math.floor(Math.random() * 1e6), config, undefined, { until: 'reviewer' });
+      return { asked: (state.humanRequests ?? []).length === 1, built: r.of('backend-engineer').length };
+    };
+    expect(await asks(() => {})).toEqual({ asked: true, built: 0 });
+    expect(await asks(() => { process.env.FACTORY_PLAN_APPROVAL = '0'; })).toEqual({ asked: false, built: 1 });
+    expect(await asks(() => { process.env.FACTORY_PLAN_APPROVAL = 'false'; })).toEqual({ asked: false, built: 1 });
+    expect(await asks(() => {}, { plan_approval: false })).toEqual({ asked: false, built: 1 });
+    expect(await asks(() => {}, { plan_approval: true })).toEqual({ asked: true, built: 0 });
+    // the environment wins over the workflow config, in both directions
+    expect(await asks(() => { process.env.FACTORY_PLAN_APPROVAL = '1'; }, { plan_approval: false })).toEqual({ asked: true, built: 0 });
+    expect(await asks(() => { process.env.FACTORY_PLAN_APPROVAL = '0'; }, { plan_approval: true })).toEqual({ asked: false, built: 1 });
   });
 
   it('changes sent back make the architect revise with the answer, then ask again', async () => {

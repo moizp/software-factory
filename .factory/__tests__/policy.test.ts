@@ -90,16 +90,28 @@ describe('evaluatePolicy (repo policy)', () => {
     expect(evaluatePolicy(repoPolicy, pr({ branch: 'feature/x', files: ['src/a.ts'] })).autoMerge).toBe(false);
   });
 
-  it('small fixes outside protected paths auto-merge with ci and reviewer_verdict required', () => {
+  it('a code change never merges on an agent\'s verdict: fixes need a human like everything else', () => {
     const d = evaluatePolicy(repoPolicy, pr({ branch: 'fix/typo', files: ['src/a.ts'], changedLines: 20 }));
+    expect(d.autoMerge).toBe(false);
+    expect(repoPolicy.rules.every(r => !r.require?.includes('reviewer_verdict'))).toBe(true);
+  });
+
+  // The engine can still express an auto-merge on a reviewer verdict, for a project that chooses it
+  const fixPolicy = parsePolicy({
+    ...repoPolicy,
+    rules: [{ name: 'small fix', match: { branch: ['fix/*'], max_files: 10, max_lines: 300 }, auto_merge: true, require: ['ci', 'reviewer_verdict'] }]
+  });
+
+  it('can be told to auto-merge a small fix with ci and reviewer_verdict required', () => {
+    const d = evaluatePolicy(fixPolicy, pr({ branch: 'fix/typo', files: ['src/a.ts'], changedLines: 20 }));
     expect(d.autoMerge).toBe(true);
     expect(d.require).toEqual(expect.arrayContaining(['ci', 'reviewer_verdict']));
   });
 
-  it('large fixes need a human', () => {
-    expect(evaluatePolicy(repoPolicy, pr({ branch: 'fix/big', files: ['src/a.ts'], changedLines: 301 })).autoMerge).toBe(false);
+  it('can be told that large fixes still need a human', () => {
+    expect(evaluatePolicy(fixPolicy, pr({ branch: 'fix/big', files: ['src/a.ts'], changedLines: 301 })).autoMerge).toBe(false);
     const many = Array.from({ length: 11 }, (_, i) => `src/f${i}.ts`);
-    expect(evaluatePolicy(repoPolicy, pr({ branch: 'fix/wide', files: many })).autoMerge).toBe(false);
+    expect(evaluatePolicy(fixPolicy, pr({ branch: 'fix/wide', files: many })).autoMerge).toBe(false);
   });
 
   it('the needs-human label can only tighten', () => {
@@ -253,12 +265,12 @@ describe('Orchestrator auto-merge gating', () => {
     postComment: jest.fn().mockResolvedValue(undefined)
   });
 
-  const run = async (api: any, reviewerValid = true) => {
+  const run = async (api: any, reviewerValid = true, policy: Policy = repoPolicy) => {
     const orchestrator = new FactoryOrchestrator(async () => ({ phase: 'x' as any, valid: true }), false);
     const o = orchestrator as any;
     o.githubAPI = api;
     o.prNumber = 7;
-    o.loadBasePolicy = () => repoPolicy;
+    o.loadBasePolicy = () => policy;
     process.env.FACTORY_CI_POLL_MS = '1';
     process.env.FACTORY_CI_TIMEOUT_MS = '5';
     let state = createWorkflowState('brief');
@@ -294,13 +306,20 @@ describe('Orchestrator auto-merge gating', () => {
     expect(state.notes.join()).toMatch(/human merge/);
   });
 
-  it('requires a valid reviewer verdict for small fixes', async () => {
+  it('does not merge a small fix on a reviewer verdict under this repository\'s policy', async () => {
+    const api = makeApi({ branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] });
+    await run(api, true);
+    expect(api.autoMergePR).not.toHaveBeenCalled();
+  });
+
+  it('requires a valid reviewer verdict when a policy asks for one', async () => {
+    const fix = parsePolicy({ ...repoPolicy, rules: [{ name: 'small fix', match: { branch: ['fix/*'] }, auto_merge: true, require: ['ci', 'reviewer_verdict'] }] });
     const info = { branch: 'fix/x', files: ['src/a.ts'], changedLines: 3, labels: [] };
     const bad = makeApi(info);
-    await run(bad, false);
+    await run(bad, false, fix);
     expect(bad.autoMergePR).not.toHaveBeenCalled();
     const good = makeApi(info);
-    await run(good, true);
+    await run(good, true, fix);
     expect(good.autoMergePR).toHaveBeenCalled();
   });
 
@@ -319,8 +338,8 @@ describe('monorepo policy template (templates/monorepo/policy.json)', () => {
   );
   const change = (branch: string, files: string[], changedLines = 20) => ({ branch, files, changedLines, labels: [] });
 
-  it('lets a small fix inside one service auto-merge', () => {
-    expect(evaluatePolicy(monorepo, change('fix/billing-rounding', ['services/billing/src/invoice.ts'])).autoMerge).toBe(true);
+  it('has a person merge a small fix inside one service', () => {
+    expect(evaluatePolicy(monorepo, change('fix/billing-rounding', ['services/billing/src/invoice.ts'])).autoMerge).toBe(false);
   });
 
   it.each([

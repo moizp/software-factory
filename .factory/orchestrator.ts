@@ -331,9 +331,15 @@ export class FactoryOrchestrator {
     return notes.reduce((s, n) => addNote(s, n), state);
   }
 
-  /** Plan approval is on with FACTORY_PLAN_APPROVAL=1 or `"plan_approval": true` in the workflow config. */
+  /**
+   * A person approves the plan before anything is built, unless approval is switched off with FACTORY_PLAN_APPROVAL=0
+   * or `"plan_approval": false` in the workflow config. The environment wins over the config. People direct, agents execute.
+   */
   private planApprovalRequired(state: WorkflowState): boolean {
-    return /^(1|true)$/i.test(process.env.FACTORY_PLAN_APPROVAL ?? '') || state.config?.plan_approval === true;
+    const env = (process.env.FACTORY_PLAN_APPROVAL ?? '').trim().toLowerCase();
+    if (/^(0|false|off|no)$/.test(env)) return false;
+    if (/^(1|true|on|yes)$/.test(env)) return true;
+    return state.config?.plan_approval !== false;
   }
 
   /**

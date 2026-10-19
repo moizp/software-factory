@@ -20,12 +20,6 @@
       "name": "docs only",
       "match": { "paths_only": ["**/*.md", "docs/**"], "max_files": 20 },
       "auto_merge": true
-    },
-    {
-      "name": "small fix",
-      "match": { "branch": ["fix/*"], "max_files": 10, "max_lines": 300 },
-      "auto_merge": true,
-      "require": ["ci", "reviewer_verdict"]
     }
   ]
 }

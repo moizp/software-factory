@@ -20,12 +20,6 @@
       "auto_merge": true
     },
     {
-      "name": "billing small fix",
-      "match": { "branch": ["fix/billing-*"], "paths_only": ["services/billing/**"], "max_files": 10, "max_lines": 300 },
-      "auto_merge": true,
-      "require": ["ci", "reviewer_verdict"]
-    },
-    {
       "name": "auth always human",
       "match": { "paths_any": ["services/auth/**"] },
       "auto_merge": false,

@@ -21,13 +21,12 @@ The policy is always loaded from the base branch, never from the PR. A PR that e
   "rules": [
     { "name": "docs only",
       "match": { "paths_only": ["**/*.md", "docs/**"], "max_files": 20 },
-      "auto_merge": true },
-    { "name": "small fix",
-      "match": { "branch": ["fix/*"], "max_files": 10, "max_lines": 300 },
-      "auto_merge": true, "require": ["ci", "reviewer_verdict"] }
+      "auto_merge": true }
   ]
 }
 ```
+
+This repository has no rule that merges code on a reviewer agent's verdict: a person merges every code change, and only docs-only changes merge themselves. The engine can still express such a rule (`auto_merge: true` with `require: ["ci", "reviewer_verdict"]`) for a project that decides otherwise.
 
 | Field | Meaning |
 |---|---|

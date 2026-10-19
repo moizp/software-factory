@@ -10,9 +10,9 @@ The factory augments people. It does not replace their judgement, and it does no
 |---|---|---|
 | People are the strategic directors; agents are tactical executors | Agents never approve a PR; a person merges anything on a protected path; `needs_human` pauses a run | Built |
 | Adversarial scepticism about generated code | The reviewer must list what it tried to find wrong (`review.challenges`) and what it could not check; the contract rejects a review without it | Built |
-| Approval checkpoints before critical actions | The architect's plan can be held for a person's approval (`FACTORY_PLAN_APPROVAL=1`); protected paths need a person; `Mission exception:` and `needs-human` stop the router | Built, but plan approval is opt-in |
+| Approval checkpoints before critical actions | A person approves the architect's plan before anything is built, by default (`FACTORY_PLAN_APPROVAL=0` skips it); a person merges every code change, because the policy has no rule that merges code on an agent's verdict; protected paths need a person; `Mission exception:` and `needs-human` stop the router | Built. The exemption for the smallest changes comes with the tier table |
 | Care in every layer, including the unseen ones | Builder and reviewer prompts name errors, logs, migrations and comments that say why | Prompt only |
-| Autonomy never grows silently | Any capability that merges or continues without a person (merge worker, continue after merge) is a named decision for the owner in `docs/NEXT-CAPABILITIES.md` | Documented |
+| Autonomy never grows silently | The planned merge worker merges docs-only PRs and nothing that touches code; after a merge the router only proposes the next items and a person picks (`docs/NEXT-CAPABILITIES.md`) | Documented, not built |
 
 ## 2. Architectural integrity: deep modules and system health
 
