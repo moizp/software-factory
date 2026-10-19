@@ -13,6 +13,7 @@ import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload, ContractContext } from './contracts';
 import { compactArtifacts, describePack, packContext } from './context';
+import { characterFile, characterForAgents, loadCharacter, renderCharacterLine, requireCharacter } from './character';
 import { loadLookFeel, lookFeelFile, lookFeelForAgents, renderLookFeelLine, requireLookFeel } from './lookfeel';
 import { loadMission, missionForAgents, parseDeclaration, renderMissionLine, requireMission, missionFile } from './mission';
 import { saveHandoff } from './handoff';
@@ -175,7 +176,8 @@ export class FactoryOrchestrator {
       try {
         validateAgentResponse(response, agentName, {
           ...(state.mission ? { mission: state.mission, declared: parseDeclaration(state.issueBrief) } : {}),
-          ...(state.lookfeel ? { lookfeel: state.lookfeel } : {})
+          ...(state.lookfeel ? { lookfeel: state.lookfeel } : {}),
+          ...(state.character ? { character: state.character } : {})
         });
       } catch (error) {
         validationError = error instanceof Error ? error.message : String(error);
@@ -240,6 +242,28 @@ export class FactoryOrchestrator {
     let next: WorkflowState = { ...state, mission: load.result.mission };
     next = addNote(next, `Mission loaded: ${renderMissionLine(load.result.mission)}`);
     for (const w of load.result.warnings) next = addNote(next, `Mission advice: ${w}`);
+    return next;
+  }
+
+  /**
+   * Reads the project's CHARACTER.md into the new workflow, checked against the mission when there is one. Like the
+   * look and feel, an unusable file stops the run and a missing one only adds a note unless FACTORY_REQUIRE_CHARACTER is on.
+   */
+  private attachCharacter(state: WorkflowState): WorkflowState {
+    const load = loadCharacter(state.mission);
+    if (!load.found) {
+      const message = `No character file at ${characterFile()}: the product is not built to a declared character (see .claude/skills/character.md)`;
+      if (requireCharacter()) return { ...addNote(state, `${message}. FACTORY_REQUIRE_CHARACTER is on, so the workflow stops here`), status: 'failed' };
+      this.logger.warn(message);
+      return addNote(state, message);
+    }
+    if (!load.result.ok) {
+      this.logger.error(`Character file is not usable: ${load.result.errors.join('; ')}`);
+      return { ...addNote(state, `Character file ${load.file} is not usable: ${load.result.errors.join('; ')}`), status: 'failed' };
+    }
+    let next: WorkflowState = { ...state, character: load.result.character };
+    next = addNote(next, `Character loaded: ${renderCharacterLine(load.result.character)}`);
+    for (const w of load.result.warnings) next = addNote(next, `Character advice: ${w}`);
     return next;
   }
 
@@ -585,6 +609,7 @@ export class FactoryOrchestrator {
       state = createWorkflowState(issueBrief, issueNumber, config);
       state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
       state = this.attachMission(state);
+      if (state.status !== 'failed') state = this.attachCharacter(state);
       if (state.status !== 'failed') state = this.attachLookFeel(state);
       if (state.status === 'failed') {
         saveWorkflowState(state);
@@ -870,6 +895,8 @@ export class FactoryOrchestrator {
     const mission = state.mission ? { mission: missionForAgents(state.mission) } : {};
     // The interface is built, worded and judged against the declared look and feel
     const lookfeel = state.lookfeel ? { lookfeel: lookFeelForAgents(state.lookfeel) } : {};
+    // ... and to the declared character, which shapes what the product does and says at moments like failure and refusal
+    const character = state.character ? { character: characterForAgents(state.character) } : {};
 
     switch (agent) {
       case 'product-manager':
@@ -882,7 +909,7 @@ export class FactoryOrchestrator {
       case 'infrastructure-engineer':
         return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm };
       case 'frontend-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...lookfeel };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...character, ...lookfeel };
       case 'automation-tester':
         return {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
@@ -896,9 +923,9 @@ export class FactoryOrchestrator {
           productManagerOutput: pm
         };
       case 'reviewer':
-        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...mission, ...lookfeel };
+        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...mission, ...character, ...lookfeel };
       case 'customer-support':
-        return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief, ...lookfeel };
+        return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief, ...character, ...lookfeel };
     }
   }
 

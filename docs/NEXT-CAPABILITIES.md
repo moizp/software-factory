@@ -121,6 +121,16 @@ Sizes are relative (S, M, L), not time. "Done when" is the check that it works, 
 | F7 | Release cadence for built apps: small frequent releases (`.claude/skills/release-process.md`), flags for risky slices, release notes generated from merged issues that say what users can try and invite feedback (which feeds F1) | F6 | M | A release produces notes and a feedback link |
 | F8 | Learn: after a set time, compare each behaviour change's signal with its baseline and record keep, iterate or revert; propose a change to `MISSION.md` as a PR for a person | F3, F7 | M | A release has a recorded verdict per behaviour change |
 
+### Knowledge and character follow-ups
+
+Built so far: `CHARACTER.md`, the project wiki and the project `CLAUDE.md` (see `docs/ORCHESTRATION.md`). They are written and checked by people and interactive sessions. These make the pipeline use them.
+
+| # | Capability | Depends on | Size | Done when |
+|---|---|---|---|---|
+| W1 | Hand the character to the product manager and architect, and wiki pages to every planning agent: the index always, the pages whose title or sources match the brief, inside the context pack's budget and never over it | none | M | A run on a project with a wiki shows the matching pages in the architect's input, and `npm run report:usage` shows the cost |
+| W2 | The docs stage proposes wiki updates (a decision record for each decision in the plan, a changed page when a source path changed) as files in the PR, always as drafts for a person | W1 | M | A pipeline run on a project with a wiki adds or updates at least one page, and `wiki:check` passes on the PR |
+| W3 | Run `wiki:check`, `wiki -- drift` and `claudemd:check` in CI for projects that have them, and open an issue (as the weekly full run does) when drift passes a threshold | none | S | A stale page fails nothing but opens one issue; a broken link or a secret fails the PR |
+
 ## Order
 
 ```

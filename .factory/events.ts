@@ -15,7 +15,7 @@ type Gate = WorkflowState['phases'][number];
 type Artifact = WorkflowState['artifacts'][number];
 type Exchange = NonNullable<WorkflowState['humanRequests']>[number];
 
-const SCALARS = ['id', 'issueBrief', 'issueNumber', 'startedAt', 'updatedAt', 'currentPhase', 'status', 'tokensUsed', 'config', 'mission', 'lookfeel'] as const;
+const SCALARS = ['id', 'issueBrief', 'issueNumber', 'startedAt', 'updatedAt', 'currentPhase', 'status', 'tokensUsed', 'config', 'mission', 'lookfeel', 'character'] as const;
 type Scalar = (typeof SCALARS)[number];
 type ListField = 'phases' | 'artifacts' | 'notes' | 'humanRequests';
 

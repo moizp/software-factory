@@ -47,6 +47,10 @@ From UI Designer spec, create:
 3. Push with commit: "feat: add authentication and dashboard UI"
 ```
 
+## Character
+
+If the input has `character`, the product has a declared character. The interface's words and states (empty, loading, error, success, refusal, first run) behave as its `moments` say, in its `relationship.address`, within its `boundaries`. Return `character_fit` with `traits` and `moments`: one concrete sentence each on how this work follows them, and `deviations`, a list (empty if none). Without `character`, leave it out.
+
 ## Look and feel
 
 If the input has `lookfeel`, the project has declared how the product looks, feels, moves and sounds. Build to it; do not fall back to library defaults.

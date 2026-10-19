@@ -4,14 +4,14 @@ A project decides how its product looks, feels, moves, sounds and speaks, once, 
 
 ## Where it lives
 
-`LOOKFEEL.md` at the project root (override with `FACTORY_LOOKFEEL_FILE`), written after `MISSION.md` (`.claude/skills/mission.md`). Start from `templates/project/LOOKFEEL.md`. Check it with `npm run lookfeel:check`; it is checked against the mission when there is one. It is a protected path in the merge policy: changing the look and feel is a decision, so a person merges it.
+`LOOKFEEL.md` at the project root (override with `FACTORY_LOOKFEEL_FILE`), written after `MISSION.md` (`.claude/skills/mission.md`) and `CHARACTER.md` (`.claude/skills/character.md`), whose traits, moments and boundaries the Tone below must agree with. Start from `templates/project/LOOKFEEL.md`. Check it with `npm run lookfeel:check`; it is checked against the mission when there is one. It is a protected path in the merge policy: changing the look and feel is a decision, so a person merges it.
 
 ## The six layers
 
 | Layer | Decides |
 |---|---|
 | Direction | The design language (and at most one secondary to borrow a layer from), and why it serves the mission |
-| Tone | Voice, words we say, words we avoid |
+| Tone | Voice, words we say, words we avoid (in agreement with `CHARACTER.md`: the character decides how the product behaves, the tone how it sounds) |
 | Materials | What surfaces feel made of, light and depth, texture, shape |
 | Colour and type | The palette (hex values) and the typefaces and their roles |
 | Motion | Character, timing, what never animates, what happens under reduced motion |

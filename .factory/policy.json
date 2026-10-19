@@ -11,6 +11,7 @@
     "package-lock.json",
     "CONTRIBUTING.md",
     "MISSION.md",
+    "CHARACTER.md",
     "LOOKFEEL.md"
   ],
   "force_manual_labels": ["needs-human"],
