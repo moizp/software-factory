@@ -5,6 +5,7 @@ import { workflowsDir } from './paths';
 import type { HumanExchange } from './human';
 import { readEvents, recordState, replay } from './events';
 import type { LookFeel } from './lookfeel';
+import type { Character } from './character';
 import type { Mission } from './mission';
 
 export type Phase = AgentName | 'completed' | 'failed';
@@ -57,6 +58,8 @@ export interface WorkflowState {
   mission?: Mission;
   /** The project's declared look and feel (LOOKFEEL.md) when the workflow started. */
   lookfeel?: LookFeel;
+  /** The project's declared character (CHARACTER.md) when the workflow started. */
+  character?: Character;
 }
 
 

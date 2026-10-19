@@ -1,6 +1,7 @@
 <!--
-Copy this file to the root of your project as LOOKFEEL.md after MISSION.md exists, and replace everything in <angle brackets>.
+Copy this file to the root of your project as LOOKFEEL.md after MISSION.md and CHARACTER.md exist, and replace everything in <angle brackets>.
 Guide: .claude/skills/look-and-feel.md. Check it with: npm run lookfeel:check
+The Tone below must agree with CHARACTER.md (its traits, address and boundaries).
 Decide values, not adjectives: "6px corners", "300 ms ease-out", "#1f2a2e", "a soft wooden tap on save".
 -->
 # Look and feel

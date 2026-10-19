@@ -29,6 +29,8 @@
     "report:prompts": "ts-node .factory/report-cli.ts prompts",
     "report:usage": "ts-node .factory/report-cli.ts usage",
     "mission:check": "ts-node .factory/mission-cli.ts",
+    "character": "ts-node .factory/character-cli.ts",
+    "character:check": "ts-node .factory/character-cli.ts check",
     "lookfeel": "ts-node .factory/lookfeel-cli.ts",
     "lookfeel:check": "ts-node .factory/lookfeel-cli.ts check"
   },

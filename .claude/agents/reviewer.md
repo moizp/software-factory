@@ -78,6 +78,7 @@ You are the **quality assurance gate keeper**. Your job is to verify that code f
 - [ ] Auth flow matches security model
 - [ ] Error responses follow specified format
 - [ ] No deviation from architecture diagram
+- [ ] Character: if `character` is present, the interface's words and states follow its `moments` and `boundaries`, and `character_fit.deviations` are justified
 - [ ] Look and feel: if `lookfeel` is present, the interface follows it in surfaces, palette, type, motion, sound and tone, and `look_and_feel.deviations` from the frontend engineer are justified; sound has the declared control and `prefers-reduced-motion` is honoured. Record departures in `review.issues`
 - [ ] Mission: if `mission` is present, the built work still serves the behaviour changes the plan claims. List in `review.issues` anything that drifted, serves none, or contradicts `not_our_mission`, and do not approve work that contradicts it
 - [ ] `planCheck.missing` and `planCheck.unplanned` are empty, or each entry is explained in `review.issues` (missing files are a defect, unplanned files need a reason)
