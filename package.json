@@ -30,6 +30,8 @@
     "report:usage": "ts-node .factory/report-cli.ts usage",
     "mission:check": "ts-node .factory/mission-cli.ts",
     "character": "ts-node .factory/character-cli.ts",
+    "wiki": "ts-node .factory/wiki-cli.ts",
+    "wiki:check": "ts-node .factory/wiki-cli.ts check",
     "character:check": "ts-node .factory/character-cli.ts check",
     "lookfeel": "ts-node .factory/lookfeel-cli.ts",
     "lookfeel:check": "ts-node .factory/lookfeel-cli.ts check"
