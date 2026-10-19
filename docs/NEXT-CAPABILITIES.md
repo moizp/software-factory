@@ -133,6 +133,23 @@ Built so far: `CHARACTER.md`, the project wiki and the project `CLAUDE.md` (see 
 | T1 | Builders that run in a loop: in a worktree with tools, write a failing test, make it pass, run typecheck and tests after each step, stop at the plan's phase boundary | built with F6 | L | A phase is built in several small commits, each with a passing check, and the PR shows the test runs |
 | W3 | Run `wiki:check`, `wiki -- drift` and `claudemd:check` in CI for projects that have them, and open an issue (as the weekly full run does) when drift passes a threshold | none | S | A stale page fails nothing but opens one issue; a broken link or a secret fails the PR |
 
+### Low-cost additions from HumanLayer's docs
+
+Checked against docs.humanlayer.com in October 2026. Each one is a prompt, config or small router change that makes a larger capability above cheaper or safer. They are chosen for value without much new machinery; what was left out is listed below the table.
+
+| # | Capability | Depends on | Size | Done when |
+|---|---|---|---|---|
+| H1 | One open agent PR at a time, and `/iterate`: the router claims nothing while an agent PR is still unreviewed (on top of the WIP limits), and a `/iterate <feedback>` comment on an agent PR from someone with write access runs the author again on the same branch with the PR discussion and the feedback. This is the manual form of R4 and the guard R8 needs | P1 | S | With an unreviewed agent PR open, a ready issue is not claimed; a `/iterate` comment from a writer updates the same branch, and one from anyone else is ignored |
+| H2 | Every plan phase ends with something a person can run, see or query (a command, a page, a query), not only an automated check. Architect prompt and plan check; layer-by-layer plans are flagged | none | S | A plan with a phase that has no runnable check is flagged to the approver, with a unit test |
+| H3 | Ceremony set by size: the factory suggests the risk tier with its reason as a label, and a person can change it. R0 and R1 need no approval; R2 and R3 get two short approvals, the design (the G1 concept) and the outline (the plan), instead of one large one | G1, part of F5 | S | An issue gets a suggested tier with a reason; changing the label changes which approvals the run asks for |
+| H4 | The context pack lists its inputs per agent and a precedence order: each agent gets only the inputs named in its contract; when documents disagree the later one wins (plan over design over requirements over issue); for how things work today, the live code beats any document | none | S | A unit test shows each agent's pack holds only its listed inputs, and every agent prompt states the precedence order |
+| H5 | A model per agent: `FACTORY_AGENT_MODEL` stays the default, and an agent can name its own (cheaper for research and review, the strongest for builders) | none | S | A per-agent setting overrides the default in a unit test, and `npm run report:usage` shows the model for each phase |
+| H6 | Lessons that build up: a lessons page in the project wiki, always included in the context pack within its budget, changed only by PR when a run teaches something. Part of W1, not a second store | W1 | S | A run on a project with a lessons page shows it in each agent's input; a lesson added by PR appears in the next run |
+
+T1's first version stays small: one builder in a worktree, typecheck and tests after each phase, on a change the size of an R1 slice. Research sub-agents (C1) and more than one repository come after it works.
+
+Not taken from HumanLayer, because they add machinery without enough return here: their 18 Linear workflow states, Slack automations, multiplayer prompting, cloud-synced task folders (we commit artifacts), and a separate PRD and TDD stage for every change (R3 only, if ever).
+
 ## Principles check
 
 The five principles in `.claude/skills/principles.md` were checked against the factory. These are the places where it contradicts them, what was changed already, and what needs the owner's decision. Nothing marked "decision" has been changed.
@@ -152,11 +169,11 @@ The five principles in `.claude/skills/principles.md` were checked against the f
 Set by the owner after the principles check (C1, C3):
 
 ```
-M0 prove it runs ─▶ G1 alignment stage ─▶ F6 + T1 change mode with a build loop ─▶ F5 increment mode
+M0 prove it runs ─▶ H2, H4, H5 ─▶ H1 ─▶ G1 alignment stage ─▶ F6 + T1 change mode with a build loop ─▶ F5 increment mode (with H3)
                  └▶ M1 review loop (R1 to R5, R7; R6 for docs only) ─▶ M2 feedback in ─▶ F4 ─▶ R8 ─▶ M5 release and learn
 ```
 
-The WIP limit applies: one at a time unless the owner says otherwise. F5 now depends on F6 and a living design in the repository, not on F4. M0 comes first because nothing after it has run against real services, and the first real run is the cheapest way to find the bugs that tests cannot.
+H2, H4 and H5 are prompt and config changes, so they come right after M0; H1 then gives a working review cycle before R4 exists. H6 lands with W1. The WIP limit applies: one at a time unless the owner says otherwise. F5 now depends on F6 and a living design in the repository, not on F4. M0 comes first because nothing after it has run against real services, and the first real run is the cheapest way to find the bugs that tests cannot.
 
 ## Decisions needed from the owner
 
