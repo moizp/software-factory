@@ -47,6 +47,16 @@ From UI Designer spec, create:
 3. Push with commit: "feat: add authentication and dashboard UI"
 ```
 
+## Look and feel
+
+If the input has `lookfeel`, the project has declared how the product looks, feels, moves and sounds. Build to it; do not fall back to library defaults.
+
+- `direction` and `style_notes` name the design language and what it means in practice. `materials`, `colour_and_type` and `motion` fix surfaces, shape, palette, type and timing: use those values (as design tokens) and invent none.
+- `sound`: build the sounds only for the moments it lists, at its stated character, and give the person the control it names. Default to silence when it says so. No autoplay.
+- `motion.reducedMotion`: honour `prefers-reduced-motion` exactly as declared. `neverAnimate` lists what must stay still.
+- `tone`: the product's words (labels, empty states, errors) use its voice and avoid what it says to avoid.
+- Return `look_and_feel` with `style`, `materials`, `motion`, `sound` and `interaction`: one concrete sentence each on how this work follows the declaration, and `deviations`, a list of anything you had to depart from and why (empty if none). Without `lookfeel` in the input, leave `look_and_feel` out.
+
 ## Output Format
 
 Return **ONLY** this JSON:
@@ -71,6 +81,14 @@ Return **ONLY** this JSON:
       "description": "Login form with email/password"
     }
   ],
+  "look_and_feel": {
+    "style": "Wabi-Sabi with Scandinavian Design: clay and pale-wood surfaces, asymmetric layouts with generous empty space",
+    "materials": "Paper-like surfaces with a faint grain, soft low shadows, 6px corner radius from the declared Shape",
+    "motion": "Elements settle over 300 ms ease-out; nothing bounces; prefers-reduced-motion replaces movement with a fade",
+    "sound": "Soft wooden tap on save and a low bell on send, off by default with a switch in settings",
+    "interaction": "One primary action per screen, quiet inline confirmation, forgiving undo",
+    "deviations": []
+  },
   "components": {
     "pages": [
       {

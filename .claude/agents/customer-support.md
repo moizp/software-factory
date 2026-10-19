@@ -149,6 +149,10 @@ Expected response:
 - Rollback to previous version
 ```
 
+## Tone
+
+If the input has `lookfeel`, write every document in its `tone`: use its voice, prefer the words it says to use, avoid the ones it says to avoid, and match the pace and warmth of its `direction`. Documentation is part of the product's feel.
+
 ## Output Format
 
 Return **ONLY** this JSON:

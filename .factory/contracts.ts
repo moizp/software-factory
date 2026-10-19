@@ -1,6 +1,7 @@
 import Ajv, { ValidateFunction } from 'ajv';
 import envelopeSchema from './contracts/envelope.schema.json';
 import { AGENT_CONTRACTS, isAgentName } from './pipeline';
+import { conformanceProblems, LookFeel } from './lookfeel';
 import { alignmentProblems, Declaration, Mission } from './mission';
 import { parsePlan, stubPlan } from './plan';
 
@@ -55,6 +56,8 @@ export interface ContractContext {
   mission?: Mission;
   /** What the brief says about the mission (Serves: and Mission exception: lines). */
   declared?: Declaration;
+  /** The project's declared look and feel; when present, the frontend engineer must say how its work follows it. */
+  lookfeel?: LookFeel;
 }
 
 /** Checks of a payload's content, beyond the presence of its keys. Only for a valid reply. */
@@ -68,6 +71,7 @@ function payloadProblems(response: unknown, agentName: string, context: Contract
   if (agentName === 'product-manager' && context.mission) {
     return alignmentProblems(context.mission, r, { serves: context.declared?.serves, exception: !!context.declared?.exception });
   }
+  if (agentName === 'frontend-engineer' && context.lookfeel) return conformanceProblems(r);
   return [];
 }
 
