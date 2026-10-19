@@ -295,7 +295,7 @@ npm run factory:retry wf-id
 
 ## Environment Setup Checklist
 
-- [ ] Node.js 20.19+ or 22.12+ installed (older versions cannot load the CLI's ES module dependencies)
+- [ ] Node.js 24 installed (the only supported version)
   ```bash
   node --version  # Should be v18.0.0+
   ```
