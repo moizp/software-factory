@@ -25,6 +25,7 @@
     "policy:check": "ts-node .factory/policy-cli.ts",
     "gate:check": "ts-node .factory/gate/cli.ts",
     "gate:commit": "ts-node .factory/gate/commit-cli.ts",
+    "test:changed": "ts-node .factory/gate/test-select-cli.ts",
     "report:prompts": "ts-node .factory/report-cli.ts prompts",
     "report:usage": "ts-node .factory/report-cli.ts usage",
     "mission:check": "ts-node .factory/mission-cli.ts",
