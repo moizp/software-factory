@@ -30,6 +30,8 @@
     "report:usage": "ts-node .factory/report-cli.ts usage",
     "mission:check": "ts-node .factory/mission-cli.ts",
     "character": "ts-node .factory/character-cli.ts",
+    "claudemd": "ts-node .factory/claudemd-cli.ts",
+    "claudemd:check": "ts-node .factory/claudemd-cli.ts check",
     "wiki": "ts-node .factory/wiki-cli.ts",
     "wiki:check": "ts-node .factory/wiki-cli.ts check",
     "character:check": "ts-node .factory/character-cli.ts check",
