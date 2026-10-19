@@ -57,6 +57,10 @@ From architect spec, create:
 2. Output: prisma/migrations/001_initial_schema.sql
 ```
 
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`. Work in small steps: write each module's boundary tests with its code, through its interface only, and keep the interface the plan gave it. Finish the unseen layers too: errors, logs, migrations, and comments that say why.
+
 ## Output Format
 
 Return **ONLY** this JSON:

@@ -2,7 +2,7 @@ import { stubPayload, validateContract } from '../contracts';
 import { recordAnswer } from '../human';
 import { FactoryOrchestrator } from '../orchestrator';
 import {
-  PLAN_INTENT, automatedChecks, builtPaths, consumePlanChanges, isApproval, normalizePath, parsePlan, planDeviations,
+  PLAN_INTENT, automatedChecks, builtPaths, consumePlanChanges, hasTestFile, isApproval, normalizePath, parsePlan, planDeviations,
   planReview, renderDeviations, renderPlanSummary, stubPlan
 } from '../plan';
 import { retryConfig } from './fixtures';
@@ -11,7 +11,7 @@ const phase = (over: Record<string, unknown> = {}) => ({
   name: 'Auth', goal: 'People can log in', files: ['src/auth.ts', './src/routes//login.ts'],
   automated_checks: ['npm test'], manual_checks: ['Password rules read well'], ...over
 });
-const plan = (...phases: unknown[]) => ({ phases });
+const plan = (...phases: unknown[]) => ({ ...stubPlan(), phases });
 
 describe('parsePlan', () => {
   it('accepts a plan and cleans it up', () => {
@@ -22,12 +22,12 @@ describe('parsePlan', () => {
       expect(r.plan.phases[0].automated_checks).toEqual(['npm test', 'npx tsc']);
     }
   });
-  it('accepts checks of one kind only, but needs one of them', () => {
+  it('needs an automated check in every phase, and accepts a phase without manual ones', () => {
     expect(parsePlan(plan(phase({ manual_checks: undefined }))).ok).toBe(true);
-    expect(parsePlan(plan(phase({ automated_checks: undefined }))).ok).toBe(true);
-    const none = parsePlan(plan(phase({ automated_checks: [], manual_checks: [] })));
-    expect(none.ok).toBe(false);
-    expect((none as any).error).toContain('phases[0] needs at least one check');
+    const manualOnly = parsePlan(plan(phase({ automated_checks: undefined })));
+    expect(manualOnly.ok).toBe(false);
+    expect((manualOnly as any).error).toContain('phases[0] needs at least one command in automated_checks');
+    expect(parsePlan(plan(phase({ automated_checks: [], manual_checks: ['look at it'] }))).ok).toBe(false);
   });
   it('rejects what a person could not review', () => {
     const bad: unknown[] = [
@@ -36,7 +36,7 @@ describe('parsePlan', () => {
       plan(phase({ files: [] })), plan(phase({ files: 'src/a.ts' })), plan(phase({ files: [5] })),
       plan(phase({ files: ['/etc/passwd'] })), plan(phase({ files: ['../outside.ts'] })), plan(phase({ files: ['a/../../b.ts'] })), plan(phase({ files: ['C:\\x.ts'] })),
       plan(phase({ automated_checks: [''] })), plan(phase({ automated_checks: 'npm test' })), plan(phase({ automated_checks: ['x'.repeat(301)] })),
-      plan(phase({ files: Array.from({ length: 61 }, (_, i) => `f${i}.ts`) })),
+      plan(phase({ files: Array.from({ length: 16 }, (_, i) => `f${i}.ts`) })),
       { phases: Array.from({ length: 13 }, () => phase()) }
     ];
     for (const b of bad) expect(parsePlan(b).ok).toBe(false);
@@ -275,5 +275,86 @@ describe('the check against the plan', () => {
       automated_checks: ['npm test']
     });
     expect(s.status).toBe('paused');
+  });
+});
+
+// ---- the principles: deep modules, assumed changes, futures, small steps -----------------------------------------------
+
+describe('modules, assumed changes and futures', () => {
+  const mod = (over: Record<string, unknown> = {}) => ({
+    name: 'Accounts', purpose: 'Registers people and decides who is signed in', interface: ['register()', 'login()'],
+    hides: 'Hashing, sessions and rate limiting', boundary_tests: ['login with a wrong password is refused'], ...over
+  });
+  const withModules = (modules: unknown) => ({ ...plan(phase()), modules });
+  const bad = (raw: unknown) => (parsePlan(raw) as any).error as string;
+
+  it('accepts a plan with modules, assumed changes and futures, and keeps them', () => {
+    const r = parsePlan({ ...plan(phase()), modules: [mod()], assumed_changes: [{ change: 'Support resets passwords in the admin page', affects: 'Support team' }], futures: [{ what: 'Merge the two validators', why: 'one rule in one place' }] });
+    expect(r.ok && r.plan.modules[0].name).toBe('Accounts');
+    expect(r.ok && r.plan.assumed_changes).toEqual([{ change: 'Support resets passwords in the admin page', affects: 'Support team' }]);
+    expect(r.ok && r.plan.futures).toHaveLength(1);
+  });
+  it('needs the three keys to be present, though the last two may be empty', () => {
+    expect(bad({ phases: plan(phase()).phases })).toContain('implementation_plan.modules must list');
+    expect(bad({ phases: plan(phase()).phases, modules: [mod()], futures: [] })).toContain('assumed_changes must be a list');
+    expect(bad({ phases: plan(phase()).phases, modules: [mod()], assumed_changes: [] })).toContain('futures must be a list');
+    expect(parsePlan({ phases: plan(phase()).phases, modules: [mod()], assumed_changes: [], futures: [] }).ok).toBe(true);
+  });
+  it('holds a module to a deep shape: a small interface, something hidden, a boundary test', () => {
+    expect(bad(withModules([]))).toContain('modules must list');
+    expect(bad(withModules([mod({ interface: Array.from({ length: 8 }, (_, i) => `f${i}()`) })]))).toContain('has 8 entries; a deep module has at most 7');
+    expect(bad(withModules([mod({ interface: [] })]))).toContain('interface must list');
+    expect(bad(withModules([mod({ hides: 'x' })]))).toContain('hides must say what is kept inside');
+    expect(bad(withModules([mod({ boundary_tests: [] })]))).toContain('boundary_tests must list at least one');
+    expect(bad(withModules([mod({ purpose: '' })]))).toContain('purpose');
+    expect(bad(withModules([mod(), mod({ name: 'accounts' })]))).toContain('is used twice');
+    expect(bad(withModules(Array.from({ length: 13 }, (_, i) => mod({ name: `M${i}` }))))).toContain('more than 12 modules');
+    expect(bad(withModules(['x']))).toContain('modules[0] must be an object');
+  });
+  it('describes malformed assumed changes and futures precisely', () => {
+    expect(bad({ ...withModules([mod()]), assumed_changes: [{ change: 'x' }], futures: [] })).toContain('assumed_changes[0]');
+    expect(bad({ ...withModules([mod()]), assumed_changes: [], futures: [{ what: 'refactor' }] })).toContain('futures[0]');
+  });
+  it('is required by the architect contract, and the stub plan satisfies it', () => {
+    const reply = (p: unknown) => ({ phase: 'software-architect', valid: true, ...stubPayload('software-architect'), implementation_plan: p });
+    expect(validateContract(reply(stubPlan()), 'software-architect')).toEqual([]);
+    const { modules, ...without } = stubPlan();
+    expect(validateContract(reply(without), 'software-architect').join()).toContain('modules');
+  });
+  it('shows the person approving the modules, the assumed changes and the futures', () => {
+    const r = parsePlan({ ...plan(phase()), modules: [mod()], assumed_changes: [{ change: 'Support resets passwords in the admin page', affects: 'Support team' }], futures: [{ what: 'Merge the two validators', why: 'one rule in one place' }] });
+    const text = renderPlanSummary((r as any).plan);
+    expect(text).toContain('Modules (1): Accounts [register(), login()]');
+    expect(text).toContain('Assumed changes to how people work: Support resets passwords in the admin page (affects Support team)');
+    expect(text).toContain('Futures proposed: Merge the two validators (one rule in one place)');
+    const none = renderPlanSummary(parsePlan(plan(phase()))!.ok ? (parsePlan(plan(phase())) as any).plan : stubPlan());
+    expect(none).toContain('Assumed changes to how people work: none');
+    expect(none).toContain('Futures proposed: none');
+  });
+  it('says which steps have no test file planned', () => {
+    expect(hasTestFile(['src/a.ts', 'src/a.test.ts'])).toBe(true);
+    expect(hasTestFile(['src/__tests__/a.ts'])).toBe(true);
+    expect(hasTestFile(['tests/a.py'])).toBe(true);
+    expect(hasTestFile(['src/a_test.go'])).toBe(true);
+    expect(hasTestFile(['src/a.ts', 'src/contest.ts'])).toBe(false);
+    const p = (parsePlan(plan(phase({ files: ['src/a.ts'] }), phase({ name: 'B', files: ['src/b.ts', 'src/b.spec.ts'] }))) as any).plan;
+    const text = renderPlanSummary(p);
+    expect(text.match(/No test file is planned in this step/g)).toHaveLength(1);
+  });
+});
+
+describe('the reviewer as a sceptic', () => {
+  const reply = (review: unknown) => ({ phase: 'reviewer', valid: true, ...stubPayload('reviewer'), review });
+  it('must say what it tried to find wrong', () => {
+    expect(validateContract(reply({ status: 'approved' }), 'reviewer')[0]).toContain('review.challenges');
+    expect(validateContract(reply({ challenges: [] }), 'reviewer')[0]).toContain('review.challenges');
+    expect(validateContract(reply({ challenges: ['ok'] }), 'reviewer')[0]).toContain('review.challenges');
+    expect(validateContract(reply({ challenges: ['Looked for failure paths and duplicated validation'] }), 'reviewer')).toEqual([]);
+  });
+  it('is not asked when it declines', () => {
+    expect(validateContract({ phase: 'reviewer', valid: false, error: 'nothing to review', blockers: [{ a: 1 }] }, 'reviewer')).toEqual([]);
+  });
+  it('is satisfied by the contract stub', () => {
+    expect(validateContract({ phase: 'reviewer', valid: true, ...stubPayload('reviewer') }, 'reviewer')).toEqual([]);
   });
 });

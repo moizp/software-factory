@@ -61,6 +61,10 @@ If the input has `lookfeel`, the project has declared how the product looks, fee
 - `tone`: the product's words (labels, empty states, errors) use its voice and avoid what it says to avoid.
 - Return `look_and_feel` with `style`, `materials`, `motion`, `sound` and `interaction`: one concrete sentence each on how this work follows the declaration, and `deviations`, a list of anything you had to depart from and why (empty if none). Without `lookfeel` in the input, leave `look_and_feel` out.
 
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`. Work in small steps: write each module's boundary tests with its code, through its interface only, and keep the interface the plan gave it. Finish the unseen layers too: errors, logs, migrations, and comments that say why.
+
 ## Output Format
 
 Return **ONLY** this JSON:

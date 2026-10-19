@@ -8,6 +8,7 @@ The words this project uses for its own things, and what each means here, so a p
 
 ## Terms
 
-| Term | Means | Not to be confused with |
-|---|---|---|
-| <Term> | <One sentence> | <A neighbouring word> |
+<!-- Once Status is current, the agents are given these terms and told never to use the words under Avoid. One meaning per term; at least three terms. -->
+| Term | Means | Avoid | Not to be confused with |
+|---|---|---|---|
+| <Term> | <One sentence> | <Synonyms nobody should use, separated by commas> | <A neighbouring term> |

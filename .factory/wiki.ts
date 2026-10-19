@@ -180,6 +180,7 @@ export function checkWiki(input: Record<string, string>, opts: CheckOptions = {}
 
     if (pg.summary.length < SUMMARY.min) add(file, 'error', `the paragraph under the title (what this page is for) is missing or shorter than ${SUMMARY.min} characters`);
     else if (pg.summary.length > SUMMARY.max) add(file, 'warning', `the opening paragraph is over ${SUMMARY.max} characters: it is the index summary, keep it to what the page covers`);
+    if (current && pg.lines >= 20 && pg.links.length === 0) add(file, 'warning', 'a current page of this length links to nothing: a knowledge repository is hyperlinked, so link the related pages, the code, the decision or the issue it rests on');
     if (pg.lines > MAX_LINES) add(file, 'warning', `${pg.lines} lines: split it, one page per subject`);
 
     if (current && PLACEHOLDER.test(stripCode(md))) add(file, 'error', 'a current page still has template placeholders (<...>, TODO or TBD): finish it or mark it draft');

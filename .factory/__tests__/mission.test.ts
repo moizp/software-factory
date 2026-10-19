@@ -7,7 +7,7 @@ import {
   Mission, alignmentProblems, loadMission, missionFile, missionForAgents, missionIds, parseMission, renderMissionLine, requireMission, unknownServes
 } from '../mission';
 import { FactoryOrchestrator } from '../orchestrator';
-import { parsePlan, renderPlanSummary } from '../plan';
+import { parsePlan, renderPlanSummary, stubPlan } from '../plan';
 import { readEvents, replay, stateDifferences } from '../events';
 import { readSnapshot } from '../state';
 import { retryConfig } from './fixtures';
@@ -198,19 +198,19 @@ describe('plans and the mission', () => {
   const m = ok(exampleMd);
   const phase = (over: Record<string, unknown> = {}) => ({ name: 'Send', files: ['src/a.ts'], automated_checks: ['npm test'], serves: ['BC1'], ...over });
   it('keeps serves, defaults it to none, and refuses ids the mission lacks', () => {
-    const r = parsePlan({ phases: [phase(), phase({ name: 'Groundwork', serves: undefined })] }, { mission: m });
+    const r = parsePlan({ ...stubPlan(), phases: [phase(), phase({ name: 'Groundwork', serves: undefined })] }, { mission: m });
     expect(r.ok && r.plan.phases.map(p => p.serves)).toEqual([['BC1'], []]);
-    expect((parsePlan({ phases: [phase({ serves: ['BC1', 'BC5'] })] }, { mission: m }) as any).error).toContain('BC5, which is not in the mission (BC1, BC2)');
-    expect(parsePlan({ phases: [phase({ serves: ['BC5'] })] }).ok).toBe(true);
-    expect(parsePlan({ phases: [phase({ serves: 'BC1' })] }).ok).toBe(false);
+    expect((parsePlan({ ...stubPlan(), phases: [phase({ serves: ['BC1', 'BC5'] })] }, { mission: m }) as any).error).toContain('BC5, which is not in the mission (BC1, BC2)');
+    expect(parsePlan({ ...stubPlan(), phases: [phase({ serves: ['BC5'] })] }).ok).toBe(true);
+    expect(parsePlan({ ...stubPlan(), phases: [phase({ serves: 'BC1' })] }).ok).toBe(false);
   });
   it('the summary says what each phase serves and what the plan leaves out', () => {
-    const plan = (parsePlan({ phases: [phase()] }, { mission: m }) as any).plan;
+    const plan = (parsePlan({ ...stubPlan(), phases: [phase()] }, { mission: m }) as any).plan;
     const md = renderPlanSummary(plan, 6000, m);
     expect(md).toContain('Serves: BC1');
     expect(md).toContain('Mission: not served by this plan: BC2');
     expect(renderPlanSummary(plan)).not.toContain('Mission:');
-    const both = (parsePlan({ phases: [phase(), phase({ name: 'Two', serves: ['BC2'] })] }, { mission: m }) as any).plan;
+    const both = (parsePlan({ ...stubPlan(), phases: [phase(), phase({ name: 'Two', serves: ['BC2'] })] }, { mission: m }) as any).plan;
     expect(renderPlanSummary(both, 6000, m)).toContain('every behaviour change is served');
   });
 });
@@ -230,7 +230,7 @@ describe('the contract with a mission', () => {
     expect(validateContract({ phase: 'product-manager', valid: false, error: 'no', blockers: [{ a: 1 }] }, 'product-manager', { mission: m })).toEqual([]);
   });
   it('checks the architect\'s plan against the mission ids', () => {
-    const arch = (serves: string[]) => ({ phase: 'software-architect', valid: true, ...stubPayload('software-architect'), implementation_plan: { phases: [{ name: 'A', files: ['a.ts'], automated_checks: ['npm test'], serves }] } });
+    const arch = (serves: string[]) => ({ phase: 'software-architect', valid: true, ...stubPayload('software-architect'), implementation_plan: { ...stubPlan(), phases: [{ name: 'A', files: ['a.ts'], automated_checks: ['npm test'], serves }] } });
     expect(validateContract(arch(['BC1']), 'software-architect', { mission: m })).toEqual([]);
     expect(validateContract(arch(['BC4']), 'software-architect', { mission: m })[0]).toContain('BC4');
   });
@@ -315,7 +315,7 @@ describe('the orchestrator with a mission', () => {
 
   it('puts which behaviour changes the plan serves in front of the person approving it', async () => {
     process.env.FACTORY_PLAN_APPROVAL = '1';
-    const r = recorder({ 'software-architect': () => ({ implementation_plan: { phases: [{ name: 'Send', files: ['a.ts'], automated_checks: ['npm test'], serves: ['BC1'] }] } }) });
+    const r = recorder({ 'software-architect': () => ({ implementation_plan: { ...stubPlan(), phases: [{ name: 'Send', files: ['a.ts'], automated_checks: ['npm test'], serves: ['BC1'] }] } }) });
     const state = await orch(r.invoker).executeWorkflow('Build', 1, {}, undefined, { until: 'reviewer' });
     const ctx = state.humanRequests![0].request.context!;
     expect(ctx).toContain('Serves: BC1');
@@ -362,5 +362,18 @@ describe('the orchestrator with a mission', () => {
     const state = await orch(r.invoker).executeWorkflow('Build', 1, {}, undefined, { until: 'software-architect' });
     expect(stateDifferences(replay(readEvents(state.id).events)!, readSnapshot(state.id)!)).toEqual([]);
     expect(readSnapshot(state.id)!.mission!.mission).toContain('Independent freelancers');
+  });
+});
+
+describe('signals that measure our own output', () => {
+  const md = (signal: string) => exampleMd.replace(/- Signal:.*\n/, `- Signal: ${signal}\n`);
+  const warnings = (signal: string) => { const r = parseMission(md(signal)); return r.ok ? r.warnings : ['not ok']; };
+  it('warns that lines of code, commits, pull requests, tokens and velocity are not signals', () => {
+    for (const s of ['2000 lines of code per week', '30 pull requests a month', '12 commits per day', '500000 tokens a week', 'velocity of 40 story points', '10 features shipped per quarter']) {
+      expect(warnings(s).join()).toContain('measures our output');
+    }
+  });
+  it('does not warn about something users do', () => {
+    expect(warnings('Share of invoices sent within 24 hours of the work, weekly').join()).not.toContain('measures our output');
   });
 });

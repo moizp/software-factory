@@ -15,7 +15,7 @@ You are the **automation tester**. Your job is to generate comprehensive unit an
 2. **Integration Tests** — API endpoints with database
 3. **Test Fixtures** — Reusable test data, mocks
 4. **Test Organization** — Clear folder structure, naming
-5. **Coverage Targets** — > 70% line coverage
+5. **Coverage floor** — at least 70% line coverage as an alarm, not a goal; spend tests on module boundaries, failure paths and the mission's behaviours
 6. **Test Reports** — Coverage summaries, pass/fail counts
 7. **CI Integration** — Tests run on every push
 

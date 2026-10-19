@@ -315,14 +315,17 @@ backend/
 
 ## Implementation Plan
 
-`implementation_plan` is what a person reviews. Keep it short enough to read in a few minutes: 2 to 8 phases, each a step that leaves the project working.
+`implementation_plan` is what a person reviews. Keep it short enough to read in a few minutes: 2 to 8 phases, each a small step (at most 15 files) that leaves the project working.
 
-- `name`, and a one-line `goal`.
-- `files`: every file the phase creates or changes, as relative paths. The builders' `generated_files` are compared with this list afterwards, so it must be complete and use the paths the builders will use.
-- `automated_checks`: commands that show the phase is done (`npm test`, `npx tsc --noEmit`, a `curl` against the running app). Real commands only.
-- `manual_checks`: what a person must look at because no command can (a screen, a wording, a policy decision).
-- `serves`: when the input has `mission`, the behaviour change ids (`BC1`, ...) the phase moves, or `[]` for groundwork that serves none directly. The person approving sees which behaviour changes the plan moves and which it leaves. Add no work that no behaviour change needs.
-- Every phase needs at least one check. If a person answers your plan with changes, they arrive under `humanAnswers`; revise the plan, do not just acknowledge.
+- `phases`: each has `name`, a one-line `goal`, `files` (every file the phase creates or changes, tests listed first; the builders' `generated_files` are compared with this list afterwards), `automated_checks` (at least one real command per phase, such as `npm test -- auth` or `npx tsc --noEmit`, the test that must pass before the step counts as done), `manual_checks` (what a person must look at because no command can) and `serves` (with `mission` in the input, the behaviour change ids the phase moves, or `[]` for groundwork). Add no work that no behaviour change needs.
+- `modules`: the deep modules the work is split into. Each has `name`, `purpose`, `interface` (the public surface, at most 7 entries), `hides` (what stays inside and may change freely) and `boundary_tests` (tests that use only the interface). Hide complexity behind small stable interfaces; a wrapper that hides nothing is not a module.
+- `assumed_changes`: changes to people, roles, workflows, skills or protocols that the plan assumes happen alongside the code, each `{"change", "affects"}`. `[]` says none. Never assume one silently.
+- `futures`: refactoring, simplification or de-duplication that would keep the system healthy, each `{"what", "why"}`. `[]` says none was seen.
+- If a person answers your plan with changes, they arrive under `humanAnswers`; revise the plan, do not just acknowledge.
+
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`. Prefer fewer, deeper modules over many thin ones. Say what the plan assumes about how people work (`assumed_changes`) and what refactoring would keep it healthy (`futures`).
 
 ## Output Format
 
@@ -422,7 +425,23 @@ Return **ONLY** this JSON structure:
           "BC1"
         ]
       }
-    ]
+    ],
+    "modules": [
+      {
+        "name": "Accounts",
+        "purpose": "Registers people and decides who is logged in",
+        "interface": ["register(email, password)", "login(email, password)"],
+        "hides": "Password hashing, session storage and rate limiting",
+        "boundary_tests": ["login with a wrong password is refused and counted"]
+      }
+    ],
+    "assumed_changes": [
+      {
+        "change": "Support staff reset passwords through the admin page instead of the database",
+        "affects": "Support team"
+      }
+    ],
+    "futures": []
   },
   "data_flow": {
     "user_login": [

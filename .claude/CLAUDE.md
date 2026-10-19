@@ -10,6 +10,16 @@ You are the orchestrator for a multi-agent software factory. Your job is to coor
 4. **Parallel execution** — Builders run simultaneously; use JavaScript orchestration (zero tokens)
 5. **MCP auto-wiring** — MCP servers are configured before builders start
 
+## Guiding Principles
+
+Five principles shape the factory and every project it builds. Full rules, where each is enforced and what is not enforced yet: `.claude/skills/principles.md`.
+
+1. **People direct, agents execute.** Augment human judgement; keep a person at approval checkpoints and over anything hard to undo; be sceptical of generated code.
+2. **Architectural integrity.** Deep modules with small stable interfaces; alternate features with refactoring; code is not cheap.
+3. **Shared understanding.** Question the design (`/grill`) before planning; keep one ubiquitous language; say what the work assumes about how people work.
+4. **Tight feedback loops.** Small steps, tests first, learning over one-shot specifications; keep a living, linked wiki of decisions and dialogue.
+5. **Value over metrics.** Serve the mission; do not mistake lines, tokens or PR counts for value; delight, clarity and care count even when they cannot be counted.
+
 ## Trunk-Based Branching Strategy
 
 This repo is trunk-based: `main` is the only long-lived branch (there is no `develop`). When spawning agents to work on this project:

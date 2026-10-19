@@ -29,6 +29,10 @@ Analyze and output a structured JSON spec that the next agents (MCP Configurator
 - [ ] Credentials template includes all required secrets
 - [ ] No conflicting requirements (e.g., both SQLite and Postgres)
 
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`.
+
 ## Output Format
 
 Return **ONLY** this JSON structure (no preamble, no markdown):

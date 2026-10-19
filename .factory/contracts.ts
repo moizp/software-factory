@@ -74,11 +74,25 @@ function payloadProblems(response: unknown, agentName: string, context: Contract
   if (agentName === 'product-manager' && context.mission) {
     return alignmentProblems(context.mission, r, { serves: context.declared?.serves, exception: !!context.declared?.exception });
   }
+  if (agentName === 'reviewer') return reviewProblems(r);
   if (agentName === 'frontend-engineer') {
     return [
       ...(context.lookfeel ? conformanceProblems(r) : []),
       ...(context.character ? characterConformanceProblems(r) : [])
     ];
+  }
+  return [];
+}
+
+/**
+ * The reviewer is a sceptic, not a rubber stamp: it must say what it tried to find wrong. It cannot run code, so it must
+ * also say what it could not verify.
+ */
+function reviewProblems(r: Record<string, unknown>): string[] {
+  const review = r.review;
+  const challenges = review && typeof review === 'object' ? (review as Record<string, unknown>).challenges : undefined;
+  if (!Array.isArray(challenges) || challenges.length === 0 || !challenges.every(c => typeof c === 'string' && c.trim().length >= 10)) {
+    return ['review.challenges must list what you tried to find wrong (edge cases, failure paths, needless complexity, duplication, hidden internals), one sentence each; a review that finds nothing says what it looked for'];
   }
   return [];
 }
@@ -118,7 +132,9 @@ export function stubPayload(agentName: string, data: unknown = {}): Record<strin
   const payload: Record<string, unknown> = {};
   if (isAgentName(agentName)) {
     for (const key of AGENT_CONTRACTS[agentName].requiredPayload) {
-      payload[key] = key === 'implementation_plan' ? stubPlan() : { agent: agentName, data };
+      payload[key] = key === 'implementation_plan' ? stubPlan()
+        : key === 'review' ? { agent: agentName, data, challenges: ['Looked for failure paths, duplication and hidden complexity in the stub'] }
+        : { agent: agentName, data };
     }
   }
   return payload;

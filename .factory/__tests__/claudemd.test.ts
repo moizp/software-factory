@@ -25,7 +25,7 @@ describe('the template', () => {
     expect(advice(filled)).toEqual([]);
   });
   it('routes to every writer command and names all four declarations in its rules', () => {
-    for (const c of ['mission', 'mission-check', 'character', 'character-check', 'lookfeel', 'lookfeel-check', 'wiki', 'wiki-check', 'commit', 'describe-pr', 'debug', 'iterate-plan', 'handoff', 'resume-handoff']) {
+    for (const c of ['mission', 'mission-check', 'character', 'character-check', 'lookfeel', 'lookfeel-check', 'grill', 'language', 'wiki', 'wiki-check', 'commit', 'describe-pr', 'debug', 'iterate-plan', 'handoff', 'resume-handoff']) {
       expect(section(template, 'Skill routing')).toContain(`\`/${c}\``);
     }
     const rules = section(template, 'Working rules');

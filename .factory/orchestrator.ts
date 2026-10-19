@@ -13,6 +13,7 @@ import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload, ContractContext } from './contracts';
 import { compactArtifacts, describePack, packContext } from './context';
+import { languageFile, languageForAgents, languageHits, loadLanguage, renderLanguageLine, requireLanguage } from './language';
 import { characterFile, characterForAgents, loadCharacter, renderCharacterLine, requireCharacter } from './character';
 import { loadLookFeel, lookFeelFile, lookFeelForAgents, renderLookFeelLine, requireLookFeel } from './lookfeel';
 import { loadMission, missionForAgents, parseDeclaration, renderMissionLine, requireMission, missionFile } from './mission';
@@ -265,6 +266,41 @@ export class FactoryOrchestrator {
     next = addNote(next, `Character loaded: ${renderCharacterLine(load.result.character)}`);
     for (const w of load.result.warnings) next = addNote(next, `Character advice: ${w}`);
     return next;
+  }
+
+  /**
+   * Reads the project's glossary into the new workflow when its Status is "current". A draft glossary is a note, not a
+   * rule; an unusable current one stops the run, and a missing one only adds a note unless FACTORY_REQUIRE_LANGUAGE is on.
+   */
+  private attachLanguage(state: WorkflowState): WorkflowState {
+    const load = loadLanguage();
+    if (!load.found) {
+      const message = `No glossary at ${languageFile()}: people, domain experts and agents have no declared shared vocabulary (see .claude/skills/ubiquitous-language.md)`;
+      if (requireLanguage()) return { ...addNote(state, `${message}. FACTORY_REQUIRE_LANGUAGE is on, so the workflow stops here`), status: 'failed' };
+      this.logger.warn(message);
+      return addNote(state, message);
+    }
+    if ('skipped' in load) {
+      const message = `Glossary ${load.file} is not used: ${load.skipped}`;
+      if (requireLanguage()) return { ...addNote(state, `${message}. FACTORY_REQUIRE_LANGUAGE is on, so the workflow stops here`), status: 'failed' };
+      return addNote(state, message);
+    }
+    if (!load.result.ok) {
+      this.logger.error(`Glossary is not usable: ${load.result.errors.join('; ')}`);
+      return { ...addNote(state, `Glossary ${load.file} is not usable: ${load.result.errors.join('; ')}`), status: 'failed' };
+    }
+    let next: WorkflowState = { ...state, language: load.result.terms };
+    next = addNote(next, `Language loaded: ${renderLanguageLine(load.result.terms)}`);
+    for (const w of load.result.warnings) next = addNote(next, `Language advice: ${w}`);
+    return next;
+  }
+
+  /** Where the work so far uses a word the glossary says to avoid, for the reviewer to judge. Empty without a glossary. */
+  private languageCheck(state: WorkflowState): Record<string, unknown> {
+    if (!state.language) return {};
+    const outputs: Record<string, unknown> = {};
+    for (const a of state.artifacts) outputs[a.phase] = [...((outputs[a.phase] as unknown[] | undefined) ?? []), a.content];
+    return { languageCheck: { avoid_words_used: languageHits(outputs, state.language) } };
   }
 
   /**
@@ -611,6 +647,7 @@ export class FactoryOrchestrator {
       state = this.attachMission(state);
       if (state.status !== 'failed') state = this.attachCharacter(state);
       if (state.status !== 'failed') state = this.attachLookFeel(state);
+      if (state.status !== 'failed') state = this.attachLanguage(state);
       if (state.status === 'failed') {
         saveWorkflowState(state);
         return state;
@@ -897,19 +934,22 @@ export class FactoryOrchestrator {
     const lookfeel = state.lookfeel ? { lookfeel: lookFeelForAgents(state.lookfeel) } : {};
     // ... and to the declared character, which shapes what the product does and says at moments like failure and refusal
     const character = state.character ? { character: characterForAgents(state.character) } : {};
+    // ... and every agent that names things uses the project's shared vocabulary
+    const language = state.language ? { language: languageForAgents(state.language) } : {};
 
     switch (agent) {
       case 'product-manager':
-        return { brief: state.issueBrief, ...mission };
+        return { brief: state.issueBrief, ...mission, ...language };
       case 'analyzer':
-        return { brief: state.issueBrief, productManagerOutput: pm, ...mission };
+        return { brief: state.issueBrief, productManagerOutput: pm, ...mission, ...language };
       case 'software-architect':
-        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer, ...mission };
+        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer, ...mission, ...language };
       case 'backend-engineer':
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...language };
       case 'infrastructure-engineer':
         return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm };
       case 'frontend-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...character, ...lookfeel };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...character, ...lookfeel, ...language };
       case 'automation-tester':
         return {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
@@ -923,9 +963,9 @@ export class FactoryOrchestrator {
           productManagerOutput: pm
         };
       case 'reviewer':
-        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...mission, ...character, ...lookfeel };
+        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...this.languageCheck(state), ...mission, ...character, ...lookfeel, ...language };
       case 'customer-support':
-        return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief, ...character, ...lookfeel };
+        return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief, ...character, ...lookfeel, ...language };
     }
   }
 
