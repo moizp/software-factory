@@ -127,11 +127,6 @@ Return **ONLY** this JSON:
             "name": "Password hashing should work",
             "tested_function": "hashPassword",
             "assertions": 2
-          },
-          {
-            "name": "Password verification should match",
-            "tested_function": "verifyPassword",
-            "assertions": 2
           }
         ],
         "total_tests": 5,
@@ -140,16 +135,6 @@ Return **ONLY** this JSON:
           "branches": 85,
           "functions": 100
         }
-      },
-      {
-        "file": "tests/unit/workspace.test.ts",
-        "tests": 8,
-        "coverage": {"lines": 88, "branches": 80, "functions": 100}
-      },
-      {
-        "file": "tests/unit/payment.test.ts",
-        "tests": 6,
-        "coverage": {"lines": 92, "branches": 88, "functions": 100}
       }
     ],
     "integration_tests": [
@@ -160,71 +145,19 @@ Return **ONLY** this JSON:
             "name": "POST /auth/register - success",
             "endpoint": "POST /auth/register",
             "setup": "Clear users table",
-            "request": {"email": "test@example.com", "password": "SecurePass123"},
-            "expected_response": {"status": 201, "body.token": "exists"},
+            "request": {
+              "email": "test@example.com",
+              "password": "SecurePass123"
+            },
+            "expected_response": {
+              "status": 201,
+              "body.token": "exists"
+            },
             "assertions": 4
-          },
-          {
-            "name": "POST /auth/register - duplicate email",
-            "endpoint": "POST /auth/register",
-            "setup": "Create existing user",
-            "request": {"email": "existing@example.com", "password": "pass"},
-            "expected_response": {"status": 409, "body.error.code": "EMAIL_EXISTS"},
-            "assertions": 2
-          },
-          {
-            "name": "POST /auth/login - success",
-            "endpoint": "POST /auth/login",
-            "setup": "Create user with known password",
-            "request": {"email": "user@example.com", "password": "SecurePass123"},
-            "expected_response": {"status": 200, "body.token": "exists"},
-            "assertions": 4
-          },
-          {
-            "name": "POST /auth/login - wrong password",
-            "endpoint": "POST /auth/login",
-            "setup": "Create user",
-            "request": {"email": "user@example.com", "password": "WrongPass"},
-            "expected_response": {"status": 401, "body.error.code": "INVALID_CREDENTIALS"},
-            "assertions": 2
           }
         ],
         "total_tests": 12,
         "database_coverage": "All mutations tested"
-      },
-      {
-        "file": "tests/integration/workspace.integration.test.ts",
-        "scenarios": [
-          {
-            "name": "GET /workspaces - returns user's workspaces",
-            "endpoint": "GET /workspaces",
-            "auth_required": true,
-            "setup": "Create 3 workspaces for user",
-            "expected_response": {"status": 200, "body.length": 3}
-          },
-          {
-            "name": "POST /workspaces - creates workspace",
-            "endpoint": "POST /workspaces",
-            "auth_required": true,
-            "request": {"name": "My New Workspace"},
-            "expected_response": {"status": 201, "body.owner_id": "current_user"}
-          }
-        ],
-        "total_tests": 8
-      },
-      {
-        "file": "tests/integration/payments.integration.test.ts",
-        "scenarios": [
-          {
-            "name": "POST /payments/webhook - updates invoice on Stripe webhook",
-            "endpoint": "POST /payments/webhook",
-            "setup": "Create invoice with pending status",
-            "request": {"event_type": "payment_intent.succeeded", "invoice_id": "inv_123"},
-            "expected_response": {"status": 200},
-            "database_checks": "Invoice status = paid"
-          }
-        ],
-        "total_tests": 6
       }
     ]
   },
@@ -233,7 +166,10 @@ Return **ONLY** this JSON:
       "john_doe": {
         "email": "john@example.com",
         "password_hash": "hashed_pass",
-        "workspace_ids": ["ws_1", "ws_2"]
+        "workspace_ids": [
+          "ws_1",
+          "ws_2"
+        ]
       },
       "jane_smith": {
         "email": "jane@example.com",
@@ -244,7 +180,10 @@ Return **ONLY** this JSON:
       "ws_1": {
         "name": "Acme Corp",
         "owner_id": "john_doe",
-        "members": ["john_doe", "jane_smith"]
+        "members": [
+          "john_doe",
+          "jane_smith"
+        ]
       }
     },
     "invoices": [
@@ -262,15 +201,6 @@ Return **ONLY** this JSON:
         "file": "src/lib/auth.ts",
         "coverage_percent": 95,
         "uncovered_lines": 2
-      },
-      {
-        "file": "src/routes/auth.ts",
-        "coverage_percent": 88,
-        "uncovered_lines": "Error case at line 42"
-      },
-      {
-        "file": "src/services/workspace.ts",
-        "coverage_percent": 92
       }
     ],
     "total_coverage": 91,
@@ -300,8 +230,14 @@ Return **ONLY** this JSON:
       "statements": 91
     },
     "by_category": {
-      "unit": {"total": 19, "passed": 19},
-      "integration": {"total": 26, "passed": 26}
+      "unit": {
+        "total": 19,
+        "passed": 19
+      },
+      "integration": {
+        "total": 26,
+        "passed": 26
+      }
     }
   },
   "test_scenarios_from_acceptance_criteria": [
@@ -309,49 +245,18 @@ Return **ONLY** this JSON:
       "acceptance_criterion": "Users can register and login",
       "test_scenarios": [
         "POST /auth/register with valid email/password",
-        "POST /auth/register rejects invalid email",
-        "POST /auth/register rejects duplicate email",
-        "POST /auth/login with correct credentials",
-        "POST /auth/login with wrong password",
-        "GET /users/me returns authenticated user"
-      ]
-    },
-    {
-      "acceptance_criterion": "Users can create and manage workspaces",
-      "test_scenarios": [
-        "POST /workspaces creates new workspace",
-        "GET /workspaces lists user's workspaces",
-        "PATCH /workspaces/:id updates workspace",
-        "DELETE /workspaces/:id removes workspace",
-        "Non-owner cannot delete workspace"
-      ]
-    },
-    {
-      "acceptance_criterion": "Payment processing completes < 5 seconds",
-      "test_scenarios": [
-        "POST /payments/setup-intent returns within 100ms",
-        "POST /payments/webhook processes within 500ms",
-        "Stripe webhook timeout > 5s triggers retry"
+        "POST /auth/register rejects invalid email"
       ]
     }
   ],
   "edge_cases_tested": [
     "Empty strings and null values",
-    "Very long inputs (SQL injection prevention)",
-    "Concurrent requests to same resource",
-    "Database connection failures",
-    "External API timeouts",
-    "Invalid JWT tokens"
+    "Very long inputs (SQL injection prevention)"
   ],
   "performance_tests": [
     {
       "name": "Database query performance",
       "target": "< 50ms p95",
-      "status": "passing"
-    },
-    {
-      "name": "API endpoint latency",
-      "target": "< 100ms p95",
       "status": "passing"
     }
   ],

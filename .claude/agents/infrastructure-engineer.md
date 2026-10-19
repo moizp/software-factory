@@ -96,62 +96,11 @@ Return **ONLY** this JSON:
     {
       "path": "Dockerfile",
       "language": "dockerfile",
-      "stages": ["builder", "runtime"],
+      "stages": [
+        "builder",
+        "runtime"
+      ],
       "description": "Multi-stage build for Node.js backend"
-    },
-    {
-      "path": "docker-compose.yml",
-      "language": "yaml",
-      "services": ["api", "postgres", "redis"],
-      "description": "Local development environment"
-    },
-    {
-      "path": ".github/workflows/test.yml",
-      "language": "yaml",
-      "triggers": ["pull_request", "push"],
-      "jobs": ["lint", "test", "build"]
-    },
-    {
-      "path": ".github/workflows/deploy-staging.yml",
-      "language": "yaml",
-      "trigger": "push to dev branch",
-      "deployment_target": "render-staging"
-    },
-    {
-      "path": ".github/workflows/deploy-production.yml",
-      "language": "yaml",
-      "trigger": "push to main branch",
-      "deployment_target": "render-production"
-    },
-    {
-      "path": ".env.example",
-      "language": "text",
-      "variables": [
-        "DATABASE_URL",
-        "STRIPE_SECRET_KEY",
-        "JWT_SECRET",
-        "NODE_ENV"
-      ]
-    },
-    {
-      "path": "render.yaml",
-      "language": "yaml",
-      "description": "Render Infrastructure as Code"
-    },
-    {
-      "path": "scripts/deploy.sh",
-      "language": "bash",
-      "description": "Manual deployment script"
-    },
-    {
-      "path": "docs/deployment.md",
-      "language": "markdown",
-      "sections": ["Prerequisites", "Deploy Steps", "Verify", "Rollback"]
-    },
-    {
-      "path": "docs/monitoring.md",
-      "language": "markdown",
-      "sections": ["Logging", "Metrics", "Alerting", "Dashboards"]
     }
   ],
   "docker_setup": {
@@ -159,16 +108,12 @@ Return **ONLY** this JSON:
       {
         "name": "my-saas-backend",
         "base": "node:18-alpine",
-        "stages": ["builder", "runtime"],
+        "stages": [
+          "builder",
+          "runtime"
+        ],
         "size": "150MB",
         "security": "Non-root user, minimal dependencies"
-      },
-      {
-        "name": "my-saas-frontend",
-        "base": "node:18-alpine",
-        "build_command": "npm run build",
-        "output": "dist/",
-        "deployed_as": "Static files to Vercel"
       }
     ],
     "docker_compose": {
@@ -178,18 +123,10 @@ Return **ONLY** this JSON:
           "image": "my-saas-backend",
           "port": 3000,
           "env_file": ".env.local",
-          "depends_on": ["postgres", "redis"]
-        },
-        {
-          "name": "postgres",
-          "image": "postgres:15-alpine",
-          "port": 5432,
-          "volumes": ["postgres_data:/var/lib/postgresql/data"]
-        },
-        {
-          "name": "redis",
-          "image": "redis:7-alpine",
-          "port": 6379
+          "depends_on": [
+            "postgres",
+            "redis"
+          ]
         }
       ]
     }
@@ -201,15 +138,10 @@ Return **ONLY** this JSON:
       "jobs": [
         {
           "name": "lint",
-          "steps": ["checkout", "setup-node", "npm ci", "npm run lint"]
-        },
-        {
-          "name": "test",
-          "steps": ["checkout", "setup-node", "npm ci", "npm test"]
-        },
-        {
-          "name": "build",
-          "steps": ["checkout", "setup-node", "npm ci", "npm run build"]
+          "steps": [
+            "checkout",
+            "setup-node"
+          ]
         }
       ]
     },
@@ -221,16 +153,6 @@ Return **ONLY** this JSON:
         {
           "name": "build-and-test",
           "runs_on": "ubuntu-latest"
-        },
-        {
-          "name": "deploy",
-          "environment": "staging",
-          "steps": [
-            "Build Docker image",
-            "Push to registry",
-            "Deploy to Render",
-            "Run smoke tests"
-          ]
         }
       ]
     },
@@ -244,10 +166,7 @@ Return **ONLY** this JSON:
           "name": "build-test-deploy",
           "steps": [
             "All tests must pass",
-            "Build Docker image",
-            "Deploy to production",
-            "Health check",
-            "Monitor logs"
+            "Build Docker image"
           ]
         }
       ]
@@ -284,17 +203,9 @@ Return **ONLY** this JSON:
       "interval": "30s",
       "timeout": "5s",
       "expected_status": 200,
-      "response_body": {"status": "healthy"}
-    },
-    {
-      "check": "Database connectivity",
-      "command": "SELECT 1;",
-      "interval": "60s"
-    },
-    {
-      "check": "Redis connectivity",
-      "command": "PING",
-      "interval": "60s"
+      "response_body": {
+        "status": "healthy"
+      }
     }
   ],
   "monitoring": {
@@ -308,18 +219,14 @@ Return **ONLY** this JSON:
       "provider": "datadog-apm-free",
       "dashboards": [
         "API response times",
-        "Error rates",
-        "Database query performance",
-        "Memory usage"
+        "Error rates"
       ]
     },
     "alerting": {
       "slack_channel": "#alerts",
       "triggers": [
         "API error rate > 5%",
-        "Response time > 500ms",
-        "Database down",
-        "Disk usage > 85%"
+        "Response time > 500ms"
       ]
     },
     "uptime_monitoring": {
@@ -331,7 +238,10 @@ Return **ONLY** this JSON:
   "security": {
     "secrets_management": {
       "provider": "Render environment variables",
-      "secrets": ["DATABASE_URL", "STRIPE_SECRET_KEY", "JWT_SECRET"],
+      "secrets": [
+        "DATABASE_URL",
+        "STRIPE_SECRET_KEY"
+      ],
       "rotation": "Manual"
     },
     "ssl_certificates": {
@@ -352,16 +262,6 @@ Return **ONLY** this JSON:
         "step": 1,
         "action": "Run pending migrations",
         "command": "npx prisma migrate deploy"
-      },
-      {
-        "step": 2,
-        "action": "Verify schema",
-        "command": "npx prisma db push --skip-generate"
-      },
-      {
-        "step": 3,
-        "action": "Seed if needed",
-        "command": "npx prisma db seed"
       }
     ],
     "rollback": "Manual via Prisma migrations (version control)"
@@ -378,12 +278,6 @@ Return **ONLY** this JSON:
       "operation": "create_or_update_file",
       "status": "executed",
       "result": "Created Dockerfile, docker-compose.yml, GitHub Actions workflows"
-    },
-    {
-      "server": "github",
-      "operation": "push_files",
-      "status": "executed",
-      "result": "Pushed .github/workflows/ and root config files"
     }
   ],
   "documentation": {

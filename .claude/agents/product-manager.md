@@ -94,18 +94,19 @@ Return **ONLY** this JSON:
     {
       "name": "Sarah (Freelancer)",
       "age": 32,
-      "goals": ["Get paid on time", "Spend less time on admin"],
-      "pain_points": ["Manual invoicing", "Chasing payments"],
+      "goals": [
+        "Get paid on time",
+        "Spend less time on admin"
+      ],
+      "pain_points": [
+        "Manual invoicing",
+        "Chasing payments"
+      ],
       "tech_comfort": "Intermediate",
-      "devices_used": ["MacBook", "iPhone"]
-    },
-    {
-      "name": "Marcus (Agency Owner)",
-      "age": 45,
-      "goals": ["Automate billing", "Improve cash flow"],
-      "pain_points": ["Multiple payment processors", "Subscription tracking"],
-      "tech_comfort": "Intermediate",
-      "devices_used": ["Windows PC", "iPad"]
+      "devices_used": [
+        "MacBook",
+        "iPhone"
+      ]
     }
   ],
   "features": {
@@ -116,33 +117,7 @@ Return **ONLY** this JSON:
         "priority": 1,
         "acceptance_criteria": [
           "User can fill template with client name, items, amount",
-          "Invoice validates before sending",
-          "PDF generated automatically",
-          "Email sent to client with payment link"
-        ],
-        "estimated_effort": "medium"
-      },
-      {
-        "name": "Accept Payments",
-        "user_story": "As a freelancer, I want clients to pay via Stripe/PayPal",
-        "priority": 1,
-        "acceptance_criteria": [
-          "Payment link redirects to Stripe checkout",
-          "Payment confirmation email sent",
-          "Invoice marked as paid automatically",
-          "Funds appear in account within 1 business day"
-        ],
-        "estimated_effort": "high"
-      },
-      {
-        "name": "User Authentication",
-        "user_story": "As a user, I want secure login with email/password",
-        "priority": 1,
-        "acceptance_criteria": [
-          "Sign up with email verification",
-          "Password reset via email",
-          "2FA optional",
-          "Session expires after 30 days"
+          "Invoice validates before sending"
         ],
         "estimated_effort": "medium"
       }
@@ -154,21 +129,9 @@ Return **ONLY** this JSON:
         "priority": 2,
         "acceptance_criteria": [
           "Create recurring invoice template",
-          "Automatically generate invoices on schedule",
-          "Notify client before charging"
+          "Automatically generate invoices on schedule"
         ],
         "estimated_effort": "high"
-      },
-      {
-        "name": "Analytics Dashboard",
-        "user_story": "As a business owner, I want to see revenue trends",
-        "priority": 3,
-        "acceptance_criteria": [
-          "Monthly revenue chart",
-          "Outstanding invoices list",
-          "Average days to payment metric"
-        ],
-        "estimated_effort": "medium"
       }
     ],
     "future": [
@@ -182,20 +145,15 @@ Return **ONLY** this JSON:
   "success_metrics": {
     "business": [
       "1000 active users in month 1",
-      "50% of users create 5+ invoices",
-      "$10K MRR by month 3",
-      "Net retention > 90%"
+      "50% of users create 5+ invoices"
     ],
     "product": [
       "Invoice creation time < 2 min (p95)",
-      "Payment success rate > 95%",
-      "API uptime > 99.9%",
-      "Support response time < 24 hours"
+      "Payment success rate > 95%"
     ],
     "user_satisfaction": [
       "NPS > 50",
-      "Customer satisfaction > 4.5/5",
-      "Churn rate < 5% monthly"
+      "Customer satisfaction > 4.5/5"
     ]
   },
   "constraints": {
@@ -208,17 +166,26 @@ Return **ONLY** this JSON:
   "roadmap": {
     "phase_1_mvp": {
       "duration": "8 weeks",
-      "features": ["Create Invoice", "Accept Payments", "User Auth"],
+      "features": [
+        "Create Invoice",
+        "Accept Payments"
+      ],
       "success_criteria": "100 users creating invoices"
     },
     "phase_2_growth": {
       "duration": "4 weeks post-launch",
-      "features": ["Recurring Invoices", "Basic Analytics"],
+      "features": [
+        "Recurring Invoices",
+        "Basic Analytics"
+      ],
       "success_criteria": "1000 users, $1K MRR"
     },
     "phase_3_scale": {
       "duration": "Q2 next year",
-      "features": ["Multi-currency", "Advanced Analytics", "Teams"],
+      "features": [
+        "Multi-currency",
+        "Advanced Analytics"
+      ],
       "success_criteria": "10K users, $10K MRR"
     }
   },
@@ -243,7 +210,10 @@ Return **ONLY** this JSON:
   "next_inputs": {
     "requirements_document": "Complete with vision, personas, features, acceptance criteria",
     "ready_for_analyzer": true,
-    "feature_list": ["user-auth", "payments", "invoice-creation", "invoice-management"]
+    "feature_list": [
+      "user-auth",
+      "payments"
+    ]
   },
   "blockers": []
 }

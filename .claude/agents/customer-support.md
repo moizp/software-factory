@@ -166,44 +166,8 @@ Return **ONLY** this JSON:
             "name": "Account Setup",
             "steps": [
               "Sign up with email",
-              "Verify email",
-              "Set company name",
-              "Invite team members"
+              "Verify email"
             ]
-          },
-          {
-            "name": "Creating Your First Invoice",
-            "steps": [
-              "Click New Invoice",
-              "Select or add client",
-              "Add line items",
-              "Set payment terms",
-              "Send to client"
-            ]
-          }
-        ]
-      },
-      {
-        "title": "Invoice Management",
-        "sections": [
-          {
-            "name": "Edit Invoice",
-            "applies_to": "Unpaid invoices only",
-            "steps": ["Select invoice", "Click Edit", "Make changes", "Save"]
-          },
-          {
-            "name": "Send Reminder",
-            "applies_to": "Unpaid invoices > 5 days old",
-            "steps": ["Select invoice", "Click Send Reminder", "Choose template"]
-          }
-        ]
-      },
-      {
-        "title": "Payment Management",
-        "sections": [
-          {
-            "name": "View Payment Status",
-            "steps": ["Go to Invoices", "Check Status column", "Click for details"]
           }
         ]
       }
@@ -226,70 +190,25 @@ Return **ONLY** this JSON:
             "email": "string",
             "token": "string"
           },
-          "error_codes": ["400_invalid_email", "409_email_exists"]
-        },
-        {
-          "path": "/auth/login",
-          "method": "POST",
-          "description": "Login user",
-          "auth_required": false,
-          "request_schema": {
-            "email": "string",
-            "password": "string"
-          },
-          "response_schema": {
-            "token": "string"
-          }
-        },
-        {
-          "path": "/users/me",
-          "method": "GET",
-          "description": "Get current user",
-          "auth_required": true
-        },
-        {
-          "path": "/invoices",
-          "method": "GET",
-          "description": "List invoices",
-          "auth_required": true,
-          "query_params": {
-            "status": "paid|unpaid|draft",
-            "limit": "integer (default 10)",
-            "offset": "integer (default 0)"
-          }
-        },
-        {
-          "path": "/invoices",
-          "method": "POST",
-          "description": "Create invoice",
-          "auth_required": true,
-          "request_schema": {
-            "client_id": "string",
-            "items": ["array of {description, amount}"],
-            "notes": "string"
-          }
+          "error_codes": [
+            "400_invalid_email",
+            "409_email_exists"
+          ]
         }
       ]
     },
     "deployment_guides": [
       {
         "title": "Deploy to Render",
-        "prerequisites": ["Render account", "GitHub repo", "PostgreSQL DB"],
+        "prerequisites": [
+          "Render account",
+          "GitHub repo"
+        ],
         "steps": [
           {
             "step": 1,
             "action": "Set environment variables",
             "details": "Copy from credentials.sh.template"
-          },
-          {
-            "step": 2,
-            "action": "Push to GitHub",
-            "details": "GitHub Actions triggers deployment"
-          },
-          {
-            "step": 3,
-            "action": "Verify deployment",
-            "command": "curl https://your-app.com/health"
           }
         ],
         "troubleshooting": [
@@ -297,32 +216,6 @@ Return **ONLY** this JSON:
             "problem": "Database connection failed",
             "cause": "DATABASE_URL not set",
             "solution": "Set DATABASE_URL in Render dashboard"
-          },
-          {
-            "problem": "App crashes after deploy",
-            "cause": "Migration error",
-            "solution": "Check logs: render logs, then run npx prisma migrate deploy"
-          }
-        ]
-      },
-      {
-        "title": "Deploy to Self-Hosted",
-        "prerequisites": ["Docker", "Docker Compose", "Server with 2GB RAM"],
-        "steps": [
-          {
-            "step": 1,
-            "action": "Clone repository",
-            "command": "git clone <repo>"
-          },
-          {
-            "step": 2,
-            "action": "Set .env file",
-            "file": ".env.production"
-          },
-          {
-            "step": 3,
-            "action": "Start services",
-            "command": "docker-compose up -d"
           }
         ]
       }
@@ -334,30 +227,6 @@ Return **ONLY** this JSON:
       "answer": "Less than 2 minutes for most invoices. We've optimized the form to be quick but thorough.",
       "category": "Invoicing",
       "upvotes": 42
-    },
-    {
-      "question": "What payment methods do you accept?",
-      "answer": "We accept all major credit cards, debit cards, and bank transfers via Stripe.",
-      "category": "Payments",
-      "upvotes": 31
-    },
-    {
-      "question": "Can I get a refund if my client overpays?",
-      "answer": "Yes. Go to Payments, select the transaction, click Refund. It processes within 3-5 business days.",
-      "category": "Payments",
-      "upvotes": 18
-    },
-    {
-      "question": "Is my data encrypted?",
-      "answer": "Yes. All data is encrypted in transit (TLS 1.3) and at rest. Passwords are hashed with bcrypt.",
-      "category": "Security",
-      "upvotes": 15
-    },
-    {
-      "question": "Can I use custom branding on invoices?",
-      "answer": "Yes, with a paid plan. Add your logo and brand colors in Settings → Branding.",
-      "category": "Features",
-      "upvotes": 22
     }
   ],
   "help_articles": [
@@ -368,34 +237,12 @@ Return **ONLY** this JSON:
         {
           "heading": "Create Your Account",
           "content": "1. Go to mysaas.com\n2. Click Sign Up\n3. Enter email\n4. Verify email\n5. Set password"
-        },
-        {
-          "heading": "Set Up Your Profile",
-          "content": "Add company name, address, and logo for invoices"
         }
       ],
       "video": "https://youtube.com/...",
-      "related_articles": ["Inviting Team Members", "Creating Invoices"]
-    },
-    {
-      "title": "How to Create an Invoice",
-      "slug": "create-invoice",
-      "screenshots": ["dashboard.png", "new-invoice-form.png", "invoice-created.png"],
-      "estimated_time": "2 minutes"
-    },
-    {
-      "title": "How to Send Payment Reminders",
-      "slug": "payment-reminders",
-      "estimated_time": "1 minute"
-    },
-    {
-      "title": "Troubleshooting: Payment Not Received",
-      "slug": "payment-not-received",
-      "checklist": [
-        "Check Stripe dashboard for payment status",
-        "Verify client email was delivered",
-        "Check spam folder",
-        "Resend payment link"
+      "related_articles": [
+        "Inviting Team Members",
+        "Creating Invoices"
       ]
     }
   ],
@@ -407,36 +254,6 @@ Return **ONLY** this JSON:
           {
             "cause": "Required field empty",
             "solution": "Fill in client name and at least one line item"
-          },
-          {
-            "cause": "Network error",
-            "solution": "Check connection, click Save again"
-          }
-        ]
-      },
-      {
-        "title": "Payment link not working",
-        "causes": [
-          {
-            "cause": "Link expired (> 30 days)",
-            "solution": "Create a new invoice and send fresh link"
-          },
-          {
-            "cause": "Stripe connection down",
-            "solution": "Try again in 5 minutes or use bank transfer"
-          }
-        ]
-      },
-      {
-        "title": "Can't log in",
-        "causes": [
-          {
-            "cause": "Forgot password",
-            "solution": "Click Forgot Password, follow email"
-          },
-          {
-            "cause": "Email not verified",
-            "solution": "Check email for verification link"
           }
         ]
       }
@@ -448,18 +265,6 @@ Return **ONLY** this JSON:
       "message": "Please enter a valid email address",
       "user_friendly": "That email doesn't look right. Try again.",
       "solution": "Use format: yourname@example.com"
-    },
-    {
-      "code": "PASSWORD_TOO_SHORT",
-      "message": "Password must be at least 8 characters",
-      "user_friendly": "Your password needs to be at least 8 characters long",
-      "solution": "Add more characters to your password"
-    },
-    {
-      "code": "PAYMENT_DECLINED",
-      "message": "Stripe declined payment",
-      "user_friendly": "Your payment was declined. Try a different card.",
-      "solution": "Check card details or contact your bank"
     }
   ],
   "release_notes": [
@@ -468,13 +273,11 @@ Return **ONLY** this JSON:
       "date": "2024-01-15",
       "highlights": [
         "Launch of core invoicing features",
-        "Stripe payment integration",
-        "Multi-team support"
+        "Stripe payment integration"
       ],
       "features": [
         "Create and send invoices",
-        "Accept payments",
-        "Invoice templates"
+        "Accept payments"
       ],
       "bug_fixes": [],
       "breaking_changes": false
@@ -486,21 +289,6 @@ Return **ONLY** this JSON:
         "day": 0,
         "email": "Welcome to MySaaS",
         "content": "Account created. Verify email and set password."
-      },
-      {
-        "day": 1,
-        "email": "Your first invoice (5 min guide)",
-        "content": "Step-by-step guide with screenshots"
-      },
-      {
-        "day": 3,
-        "email": "Getting paid is easy",
-        "content": "How payment processing works"
-      },
-      {
-        "day": 7,
-        "email": "We're here to help",
-        "content": "Contact support with questions"
       }
     ],
     "in_app_onboarding": [
@@ -518,9 +306,7 @@ Return **ONLY** this JSON:
       "path": "/docs/guides",
       "articles": [
         "Getting Started",
-        "Creating Invoices",
-        "Payment Processing",
-        "Team Management"
+        "Creating Invoices"
       ]
     },
     "api_docs": {
@@ -531,8 +317,7 @@ Return **ONLY** this JSON:
       "path": "/docs/deployment",
       "articles": [
         "Render Deployment",
-        "Self-Hosted Setup",
-        "Environment Variables"
+        "Self-Hosted Setup"
       ]
     }
   },

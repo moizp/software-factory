@@ -47,14 +47,11 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
       "core_value_proposition": "...",
       "success_metrics": [
         "User retention > 80%",
-        "API response time < 100ms",
-        "99.9% uptime"
+        "API response time < 100ms"
       ],
       "acceptance_criteria": [
         "Users can register and login",
-        "Users can create and manage workspaces",
-        "Payment processing completes < 5 seconds",
-        "Real-time sync latency < 1 second"
+        "Users can create and manage workspaces"
       ]
     },
     "tech_stack": {
@@ -74,19 +71,9 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
         "name": "user-auth",
         "description": "JWT-based authentication",
         "priority": "high",
-        "mcp_dependencies": ["github"]
-      },
-      {
-        "name": "payments",
-        "description": "Stripe payment processing",
-        "priority": "high",
-        "mcp_dependencies": ["stripe"]
-      },
-      {
-        "name": "real-time-sync",
-        "description": "WebSocket-based real-time updates",
-        "priority": "medium",
-        "mcp_dependencies": []
+        "mcp_dependencies": [
+          "github"
+        ]
       }
     ],
     "mcp_servers_required": {
@@ -115,38 +102,49 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
       "entities": [
         {
           "name": "users",
-          "fields": ["id", "email", "password_hash", "created_at"],
-          "relationships": ["workspace(many)", "sessions(many)"]
-        },
-        {
-          "name": "workspaces",
-          "fields": ["id", "name", "owner_id", "stripe_customer_id"],
-          "relationships": ["users(many)", "invitations(many)"]
-        },
-        {
-          "name": "sessions",
-          "fields": ["id", "user_id", "token", "expires_at"],
-          "relationships": ["users(one)"]
+          "fields": [
+            "id",
+            "email"
+          ],
+          "relationships": [
+            "workspace(many)",
+            "sessions(many)"
+          ]
         }
       ],
       "complexity": "medium"
     },
     "api_surface": {
-      "auth_endpoints": ["POST /auth/register", "POST /auth/login", "POST /auth/logout"],
-      "user_endpoints": ["GET /users/me", "PATCH /users/me"],
-      "workspace_endpoints": ["GET /workspaces", "POST /workspaces", "PATCH /workspaces/:id"],
-      "payment_endpoints": ["POST /payments/setup-intent", "POST /payments/webhook"]
+      "auth_endpoints": [
+        "POST /auth/register",
+        "POST /auth/login"
+      ],
+      "user_endpoints": [
+        "GET /users/me",
+        "PATCH /users/me"
+      ],
+      "workspace_endpoints": [
+        "GET /workspaces",
+        "POST /workspaces"
+      ],
+      "payment_endpoints": [
+        "POST /payments/setup-intent",
+        "POST /payments/webhook"
+      ]
     },
-    "deployment_targets": ["vercel", "render"]
+    "deployment_targets": [
+      "vercel",
+      "render"
+    ]
   },
   "next_inputs": {
     "mcp_servers_to_configure": [
-      "github", "postgres", "stripe"
+      "github",
+      "postgres"
     ],
     "credentials_needed": [
       "GITHUB_TOKEN",
-      "DB_PASSWORD",
-      "STRIPE_MCP_KEY"
+      "DB_PASSWORD"
     ],
     "config": {}
   },

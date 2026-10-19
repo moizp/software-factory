@@ -69,115 +69,6 @@ Return **ONLY** this JSON:
       "language": "typescript",
       "lines": 120,
       "description": "Login form with email/password"
-    },
-    {
-      "path": "src/pages/RegisterPage.tsx",
-      "language": "typescript",
-      "lines": 140,
-      "description": "Sign up form with validation"
-    },
-    {
-      "path": "src/pages/DashboardPage.tsx",
-      "language": "typescript",
-      "lines": 180,
-      "description": "Main dashboard with stats and invoice list"
-    },
-    {
-      "path": "src/pages/CreateInvoicePage.tsx",
-      "language": "typescript",
-      "lines": 200,
-      "description": "Invoice creation form"
-    },
-    {
-      "path": "src/pages/SettingsPage.tsx",
-      "language": "typescript",
-      "lines": 100,
-      "description": "User and workspace settings"
-    },
-    {
-      "path": "src/components/Button.tsx",
-      "language": "typescript",
-      "lines": 60,
-      "description": "Reusable button with variants"
-    },
-    {
-      "path": "src/components/Card.tsx",
-      "language": "typescript",
-      "lines": 30,
-      "description": "Card container component"
-    },
-    {
-      "path": "src/components/Modal.tsx",
-      "language": "typescript",
-      "lines": 80,
-      "description": "Modal dialog component"
-    },
-    {
-      "path": "src/components/Form.tsx",
-      "language": "typescript",
-      "lines": 100,
-      "description": "Form wrapper with validation"
-    },
-    {
-      "path": "src/components/InvoiceTable.tsx",
-      "language": "typescript",
-      "lines": 140,
-      "description": "Table of invoices with sorting/filtering"
-    },
-    {
-      "path": "src/lib/api-client.ts",
-      "language": "typescript",
-      "lines": 200,
-      "description": "Auto-generated from OpenAPI, all endpoints typed"
-    },
-    {
-      "path": "src/lib/hooks.ts",
-      "language": "typescript",
-      "lines": 80,
-      "description": "useAuth, useInvoices, useWorkspaces hooks"
-    },
-    {
-      "path": "src/lib/auth.ts",
-      "language": "typescript",
-      "lines": 60,
-      "description": "Token storage, auth context"
-    },
-    {
-      "path": "src/App.tsx",
-      "language": "typescript",
-      "lines": 50,
-      "description": "Root component with routing"
-    },
-    {
-      "path": "src/layout/AuthenticatedLayout.tsx",
-      "language": "typescript",
-      "lines": 80,
-      "description": "Sidebar + header for authenticated pages"
-    },
-    {
-      "path": "tailwind.config.js",
-      "language": "javascript",
-      "description": "Design system colors, typography, spacing"
-    },
-    {
-      "path": "package.json",
-      "language": "json",
-      "dependencies": [
-        "react",
-        "react-router",
-        "tanstack-query",
-        "tailwindcss",
-        "typescript"
-      ]
-    },
-    {
-      "path": "tsconfig.json",
-      "language": "json"
-    },
-    {
-      "path": ".env.example",
-      "language": "text",
-      "variables": ["VITE_API_URL"]
     }
   ],
   "components": {
@@ -186,52 +77,23 @@ Return **ONLY** this JSON:
         "name": "LoginPage",
         "route": "/login",
         "authenticated": false,
-        "sections": ["Logo", "Email Input", "Password Input", "Login Button", "Signup Link"]
-      },
-      {
-        "name": "RegisterPage",
-        "route": "/register",
-        "authenticated": false
-      },
-      {
-        "name": "DashboardPage",
-        "route": "/dashboard",
-        "authenticated": true,
-        "sections": ["Welcome Message", "Stat Cards", "Recent Invoices", "Create Button"]
-      },
-      {
-        "name": "CreateInvoicePage",
-        "route": "/invoices/new",
-        "authenticated": true
-      },
-      {
-        "name": "InvoiceDetailPage",
-        "route": "/invoices/:id",
-        "authenticated": true
-      },
-      {
-        "name": "SettingsPage",
-        "route": "/settings",
-        "authenticated": true
+        "sections": [
+          "Logo",
+          "Email Input"
+        ]
       }
     ],
     "shared_components": [
       {
         "name": "Button",
-        "variants": ["primary", "secondary", "danger"],
-        "sizes": ["sm", "md", "lg"]
-      },
-      {
-        "name": "Card",
-        "props": ["title", "children"]
-      },
-      {
-        "name": "Modal",
-        "props": ["isOpen", "onClose", "title", "children"]
-      },
-      {
-        "name": "InvoiceTable",
-        "props": ["invoices", "onSelect", "onDelete"]
+        "variants": [
+          "primary",
+          "secondary"
+        ],
+        "sizes": [
+          "sm",
+          "md"
+        ]
       }
     ]
   },
@@ -242,9 +104,7 @@ Return **ONLY** this JSON:
     "error_handling": "Global error handler, toast notifications",
     "hooks_provided": [
       "useAuth() - login, logout, register",
-      "useInvoices() - list, create, update, delete",
-      "useWorkspaces() - list, select",
-      "useUser() - current user data"
+      "useInvoices() - list, create, update, delete"
     ]
   },
   "authentication": {
@@ -265,11 +125,6 @@ Return **ONLY** this JSON:
         "file": "tests/components/Button.test.tsx",
         "test_count": 5,
         "coverage": "All variants and states"
-      },
-      {
-        "file": "tests/pages/LoginPage.test.tsx",
-        "test_count": 8,
-        "coverage": "Form validation, submission, error handling"
       }
     ],
     "total_tests": 24,
@@ -285,18 +140,6 @@ Return **ONLY** this JSON:
       "operation": "create_repository",
       "status": "executed",
       "result": "Repository created: my-saas-frontend"
-    },
-    {
-      "server": "github",
-      "operation": "create_or_update_file",
-      "status": "executed",
-      "result": "Created 20 files"
-    },
-    {
-      "server": "github",
-      "operation": "push_files",
-      "status": "executed",
-      "result": "Pushed main branch with initial commit"
     }
   ],
   "deployed_code": {
@@ -308,20 +151,15 @@ Return **ONLY** this JSON:
   },
   "pages_implemented": [
     "Login Page",
-    "Register Page",
-    "Dashboard Page",
-    "Create Invoice Page",
-    "Invoice Detail Page",
-    "Settings Page"
+    "Register Page"
   ],
   "user_flows": [
     {
       "flow": "Authentication",
-      "pages": ["LoginPage", "RegisterPage", "DashboardPage"]
-    },
-    {
-      "flow": "Invoice Creation",
-      "pages": ["DashboardPage", "CreateInvoicePage", "InvoiceDetailPage"]
+      "pages": [
+        "LoginPage",
+        "RegisterPage"
+      ]
     }
   ],
   "accessibility": {

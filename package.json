@@ -23,7 +23,9 @@
     "orchestrator:test": "ts-node .factory/test.ts",
     "policy:check": "ts-node .factory/policy-cli.ts",
     "gate:check": "ts-node .factory/gate/cli.ts",
-    "gate:commit": "ts-node .factory/gate/commit-cli.ts"
+    "gate:commit": "ts-node .factory/gate/commit-cli.ts",
+    "report:prompts": "ts-node .factory/report-cli.ts prompts",
+    "report:usage": "ts-node .factory/report-cli.ts usage"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",

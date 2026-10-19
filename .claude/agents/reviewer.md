@@ -93,8 +93,13 @@ Return **ONLY** this JSON:
   "review": {
     "code_quality": {
       "status": "passing",
-      "linter": { "errors": 0, "warnings": 0 },
-      "formatter": { "matches": true },
+      "linter": {
+        "errors": 0,
+        "warnings": 0
+      },
+      "formatter": {
+        "matches": true
+      },
       "coverage": "78%",
       "issues": []
     },
@@ -145,10 +150,7 @@ Return **ONLY** this JSON:
       "status": "complete",
       "files": [
         "README.md",
-        "docs/API.md",
-        "docs/SETUP.md",
-        "docs/DEPLOY.md",
-        ".env.example"
+        "docs/API.md"
       ],
       "api_docs": "OpenAPI 3.0 spec included"
     },
@@ -168,11 +170,7 @@ Return **ONLY** this JSON:
     "production_ready": true,
     "deployment_checklist": [
       "Environment variables configured",
-      "Database migrations applied",
-      "Secrets loaded from vault",
-      "Health check endpoint working",
-      "Monitoring configured",
-      "Rollback plan documented"
+      "Database migrations applied"
     ]
   },
   "recommendations": [
