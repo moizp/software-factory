@@ -8,7 +8,7 @@ import { lintProse } from '../gate/prose-lint';
 
 const root = path.join(__dirname, '..', '..');
 const commandsDir = path.join(root, '.claude', 'commands');
-const NAMES = ['commit', 'debug', 'describe-pr', 'handoff', 'iterate-plan', 'resume-handoff'];
+const NAMES = ['commit', 'debug', 'describe-pr', 'handoff', 'iterate-plan', 'mission-check', 'mission', 'resume-handoff'];
 const read = (n: string) => fs.readFileSync(path.join(commandsDir, `${n}.md`), 'utf-8');
 const frontmatter = (n: string): Record<string, string> => {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(read(n));
@@ -140,7 +140,7 @@ describe('workspace scripts', () => {
       env: { PATH: process.env.PATH, HOME: home }, encoding: 'utf-8'
     }).stdout;
 
-    expect(doctor()).toContain('writer commands missing or out of date: /commit /debug /describe-pr /handoff /iterate-plan /resume-handoff');
+    expect(doctor()).toContain('writer commands missing or out of date: /commit /debug /describe-pr /handoff /iterate-plan /mission-check /mission /resume-handoff');
 
     fs.mkdirSync(path.join(home, '.claude', 'commands'), { recursive: true });
     for (const n of NAMES) fs.copyFileSync(path.join(commandsDir, `${n}.md`), path.join(home, '.claude', 'commands', `${n}.md`));

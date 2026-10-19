@@ -26,7 +26,8 @@
     "gate:check": "ts-node .factory/gate/cli.ts",
     "gate:commit": "ts-node .factory/gate/commit-cli.ts",
     "report:prompts": "ts-node .factory/report-cli.ts prompts",
-    "report:usage": "ts-node .factory/report-cli.ts usage"
+    "report:usage": "ts-node .factory/report-cli.ts usage",
+    "mission:check": "ts-node .factory/mission-cli.ts"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",

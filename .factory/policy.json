@@ -9,7 +9,8 @@
     "templates/**",
     "package.json",
     "package-lock.json",
-    "CONTRIBUTING.md"
+    "CONTRIBUTING.md",
+    "MISSION.md"
   ],
   "force_manual_labels": ["needs-human"],
   "rules": [
