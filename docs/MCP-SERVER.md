@@ -20,7 +20,7 @@ remote multi-tenant service              NOT NOW        auth, tenancy, cost and 
 
 ## What the spike showed
 
-A 80-line stdio server (official SDK 1.32.1, protocol 2025-11-25) wrapping the compiled factory modules, run against a sample project built from the skills' own examples. Four tools: `factory_check` (kind: mission, character, lookfeel, language, wiki, claude_md), `factory_plan_check`, `factory_policy_decide`, `factory_context`; plus 19 skills as resources and 17 writer commands as prompts.
+An 81-line stdio server (official SDK 1.32.1, protocol 2025-11-25) wrapping the compiled factory modules, run against a sample project built from the skills' own examples. Four tools: `factory_check` (kind: mission, character, lookfeel, language, wiki, claude_md), `factory_plan_check`, `factory_policy_decide`, `factory_context`; plus 19 skills as resources and 17 writer commands as prompts.
 
 | Measure | Result |
 |---|---|
