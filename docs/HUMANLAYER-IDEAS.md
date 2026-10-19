@@ -1,5 +1,7 @@
 # Ideas to borrow from HumanLayer
 
+The ideas still open here (B1, B5, C1 to C3) are placed in the build order in [docs/NEXT-CAPABILITIES.md](NEXT-CAPABILITIES.md), together with the review loop and the feedback-driven flow.
+
 What HumanLayer's public material teaches that would make this factory more effective, checked against what the factory does today. This is a list to choose from, not a plan. Built so far: A2, A1 (the typed request, the pause and resume, and the issue comment with `/answer`), A3 (plan with checks, approval before the build, file comparison after it; the commands are not run yet) A5 (the writer commands) A4 (handoff files for stopped workflows, resume of a requeued job, `/handoff` and `/resume-handoff`), B3 (prompt budgets and reports), B4 (the context pack) and B2 (the event log). None of it has run against the real model or GitHub yet.
 
 ## Sources and how far to trust them
