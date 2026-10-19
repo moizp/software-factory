@@ -1,6 +1,7 @@
 import Ajv, { ValidateFunction } from 'ajv';
 import envelopeSchema from './contracts/envelope.schema.json';
 import { AGENT_CONTRACTS, isAgentName } from './pipeline';
+import { alignmentProblems, Mission } from './mission';
 import { parsePlan, stubPlan } from './plan';
 
 /** Keys that belong to the envelope, not to an agent's payload. */
@@ -40,21 +41,29 @@ function getValidator(agentName: string): ValidateFunction {
 }
 
 /** Returns human-readable contract violations; empty when the response conforms. */
-export function validateContract(response: unknown, agentName: string): string[] {
+export function validateContract(response: unknown, agentName: string, context: ContractContext = {}): string[] {
   const validate = getValidator(agentName);
   if (!validate(response)) {
     return (validate.errors || []).map(e => `${e.instancePath || '(root)'} ${e.message}`);
   }
-  return payloadProblems(response, agentName);
+  return payloadProblems(response, agentName, context);
+}
+
+/** What a reply is checked against besides its own shape. */
+export interface ContractContext {
+  /** The project's mission; when present, planning agents must say how their work serves it. */
+  mission?: Mission;
 }
 
 /** Checks of a payload's content, beyond the presence of its keys. Only for a valid reply. */
-function payloadProblems(response: unknown, agentName: string): string[] {
+function payloadProblems(response: unknown, agentName: string, context: ContractContext): string[] {
   const r = response as Record<string, unknown>;
-  if (agentName === 'software-architect' && r.valid === true) {
-    const plan = parsePlan(r.implementation_plan);
+  if (r.valid !== true) return [];
+  if (agentName === 'software-architect') {
+    const plan = parsePlan(r.implementation_plan, context.mission ? { mission: context.mission } : {});
     if (!plan.ok) return [plan.error];
   }
+  if (agentName === 'product-manager' && context.mission) return alignmentProblems(context.mission, r);
   return [];
 }
 

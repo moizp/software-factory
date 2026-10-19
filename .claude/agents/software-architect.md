@@ -321,6 +321,7 @@ backend/
 - `files`: every file the phase creates or changes, as relative paths. The builders' `generated_files` are compared with this list afterwards, so it must be complete and use the paths the builders will use.
 - `automated_checks`: commands that show the phase is done (`npm test`, `npx tsc --noEmit`, a `curl` against the running app). Real commands only.
 - `manual_checks`: what a person must look at because no command can (a screen, a wording, a policy decision).
+- `serves`: when the input has `mission`, the behaviour change ids (`BC1`, ...) the phase moves, or `[]` for groundwork that serves none directly. The person approving sees which behaviour changes the plan moves and which it leaves. Add no work that no behaviour change needs.
 - Every phase needs at least one check. If a person answers your plan with changes, they arrive under `humanAnswers`; revise the plan, do not just acknowledge.
 
 ## Output Format
@@ -416,6 +417,9 @@ Return **ONLY** this JSON structure:
         ],
         "manual_checks": [
           "Password rules match the product requirements"
+        ],
+        "serves": [
+          "BC1"
         ]
       }
     ]

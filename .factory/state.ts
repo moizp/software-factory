@@ -4,6 +4,7 @@ import { AgentName } from './pipeline';
 import { workflowsDir } from './paths';
 import type { HumanExchange } from './human';
 import { readEvents, recordState, replay } from './events';
+import type { Mission } from './mission';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
@@ -51,6 +52,8 @@ export interface WorkflowState {
   tokensUsed?: number;
   /** Questions agents have put to a person, with the answers received. At most one is unanswered. */
   humanRequests?: HumanExchange[];
+  /** The project's mission when the workflow started (MISSION.md). Kept so a resume plans against the same one. */
+  mission?: Mission;
 }
 
 

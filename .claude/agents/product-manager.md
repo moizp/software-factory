@@ -65,6 +65,15 @@ Each user story must have testable criteria:
 ✓ Payment link works for 30 days
 ```
 
+## Mission
+
+If the input has `mission`, it is the project's agreed direction: what we aim to achieve with our users and the behaviour changes (`BC1`, `BC2`, ...) we expect in them. Use it as the test for every feature.
+
+- Give each `must_have` and `nice_to_have` feature `serves`: the ids of the behaviour changes it moves. A feature that moves none is out of mission: list it under `mission_alignment.out_of_mission` with a reason, and keep it out of `must_have`.
+- If the brief itself asks for something out of mission, or listed under `not_our_mission`, do not plan it silently. Ask first with `needs_human` (`multiple_choice`: "Add it to the mission", "Drop it", "Build it as a one-off exception").
+- `mission_alignment` also lists the behaviour changes covered by some feature and the ones not covered this round.
+- Without `mission` in the input, leave out `serves` and `mission_alignment`.
+
 ## Output Format
 
 Return **ONLY** this JSON:
@@ -119,7 +128,10 @@ Return **ONLY** this JSON:
           "User can fill template with client name, items, amount",
           "Invoice validates before sending"
         ],
-        "estimated_effort": "medium"
+        "estimated_effort": "medium",
+        "serves": [
+          "BC1"
+        ]
       }
     ],
     "nice_to_have": [
@@ -139,6 +151,20 @@ Return **ONLY** this JSON:
         "name": "Multi-currency Support",
         "priority": 4,
         "rationale": "Needed for international expansion"
+      }
+    ]
+  },
+  "mission_alignment": {
+    "behaviour_changes_covered": [
+      "BC1"
+    ],
+    "behaviour_changes_not_covered": [
+      "BC2"
+    ],
+    "out_of_mission": [
+      {
+        "feature": "Dark mode",
+        "reason": "Moves none of the declared behaviour changes"
       }
     ]
   },

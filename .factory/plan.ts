@@ -1,3 +1,6 @@
+import type { Mission } from './mission';
+import { missionIds } from './mission';
+
 /**
  * The architect's implementation plan: ordered phases, each with the files it touches and the checks that show it is
  * done, split into automated (commands) and manual (things a person looks at). A person reviews this plan before
@@ -8,6 +11,8 @@
 export interface PlanPhase {
   name: string;
   goal?: string;
+  /** Behaviour change ids from the project's mission that this phase serves. May be empty for groundwork. */
+  serves: string[];
   files: string[];
   automated_checks: string[];
   manual_checks: string[];
@@ -60,7 +65,7 @@ function checkList(raw: unknown, where: string): { ok: true; checks: string[] } 
 }
 
 /** Checks what the architect sent. A bad plan is described precisely so the agent can fix it when asked again. */
-export function parsePlan(raw: unknown): Parsed {
+export function parsePlan(raw: unknown, opts: { mission?: Mission } = {}): Parsed {
   if (!isRecord(raw)) return { ok: false, error: 'implementation_plan must be an object with a "phases" list' };
   const phases = raw.phases;
   if (!Array.isArray(phases) || phases.length === 0) return { ok: false, error: 'implementation_plan.phases must list at least one phase' };
@@ -76,6 +81,17 @@ export function parsePlan(raw: unknown): Parsed {
 
     const files = fileList(p.files, where);
     if (!files.ok) return files;
+    let serves: string[] = [];
+    if (p.serves !== undefined) {
+      if (!Array.isArray(p.serves) || !p.serves.every(isString)) return { ok: false, error: `${where}.serves must be a list of behaviour change ids from the mission` };
+      serves = [...new Set((p.serves as string[]).map(s => s.trim()))];
+      if (opts.mission) {
+        const known = new Set(missionIds(opts.mission));
+        const unknown = serves.filter(id => !known.has(id));
+        if (unknown.length) return { ok: false, error: `${where}.serves names ${unknown.join(', ')}, which ${unknown.length === 1 ? 'is' : 'are'} not in the mission (${[...known].join(', ')})` };
+      }
+    }
+
     const automated = checkList(p.automated_checks, `${where}.automated_checks`);
     if (!automated.ok) return automated;
     const manual = checkList(p.manual_checks, `${where}.manual_checks`);
@@ -86,6 +102,7 @@ export function parsePlan(raw: unknown): Parsed {
     out.push({
       name: p.name.trim(),
       ...(isString(p.goal) && p.goal.trim() ? { goal: p.goal.trim() } : {}),
+      serves,
       files: files.files,
       automated_checks: automated.checks,
       manual_checks: manual.checks
@@ -95,14 +112,20 @@ export function parsePlan(raw: unknown): Parsed {
 }
 
 /** The plan as a person reads it: phases, files and checks. Cut at `maxChars` with a note, never mid-line. */
-export function renderPlanSummary(plan: ImplementationPlan, maxChars = 6000): string {
+export function renderPlanSummary(plan: ImplementationPlan, maxChars = 6000, mission?: Mission): string {
   const lines: string[] = [];
   plan.phases.forEach((p, i) => {
     lines.push(`${i + 1}. **${p.name}**${p.goal ? `: ${p.goal}` : ''}`);
+    if (mission) lines.push(`   - Serves: ${p.serves.length ? p.serves.join(', ') : 'no behaviour change directly (groundwork)'}`);
     lines.push(`   - Files (${p.files.length}): ${p.files.slice(0, 8).join(', ')}${p.files.length > 8 ? `, and ${p.files.length - 8} more` : ''}`);
     p.automated_checks.forEach(c => lines.push(`   - Automated: \`${c}\``));
     p.manual_checks.forEach(c => lines.push(`   - Manual: ${c}`));
   });
+  if (mission) {
+    const served = new Set(plan.phases.flatMap(ph => ph.serves));
+    const left = missionIds(mission).filter(id => !served.has(id));
+    lines.push(left.length ? `Mission: not served by this plan: ${left.join(', ')}` : 'Mission: every behaviour change is served by some phase');
+  }
   const notice = '\n(The rest of the plan is in the workflow state.)';
   let text = '';
   for (const line of lines) {
@@ -202,6 +225,7 @@ export function stubPlan(): ImplementationPlan {
     phases: [{
       name: 'Skeleton',
       goal: 'The app starts and answers a health check',
+      serves: [],
       files: ['src/server.ts'],
       automated_checks: ['npm test'],
       manual_checks: []

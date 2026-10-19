@@ -3,7 +3,7 @@
   "note": "Token figures are estimates (characters / 4). 'instructions' caps the agent prompt file; 'context' caps the JSON input handed to the agent, which is trimmed only above the cap. Measure real use with npm run report:usage.",
   "agents": {
     "product-manager": {
-      "instructions": 1950,
+      "instructions": 2300,
       "context": 4000
     },
     "analyzer": {
@@ -11,7 +11,7 @@
       "context": 8000
     },
     "software-architect": {
-      "instructions": 3600,
+      "instructions": 3700,
       "context": 12000
     },
     "backend-engineer": {
@@ -35,7 +35,7 @@
       "context": 20000
     },
     "reviewer": {
-      "instructions": 2800,
+      "instructions": 2850,
       "context": 40000
     },
     "customer-support": {

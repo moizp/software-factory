@@ -10,12 +10,12 @@ import { estimateTokens } from './prompts';
 
 /** Stable, widely shared parts first; parts that change between calls last. */
 export const CONTEXT_ORDER = [
-  'brief', 'productManagerOutput', 'analyzerOutput', 'architectOutput', 'builderOutputs', 'testerOutput',
+  'brief', 'mission', 'productManagerOutput', 'analyzerOutput', 'architectOutput', 'builderOutputs', 'testerOutput',
   'allArtifacts', 'planCheck', 'humanAnswers'
 ];
 
-/** Never shortened: the task itself, what a person decided, and the plan check. If these alone are too big the pack says so. */
-const PROTECTED = new Set(['brief', 'humanAnswers', 'planCheck']);
+/** Never shortened: the task itself, the mission, what a person decided, and the plan check. If these alone are too big the pack says so. */
+const PROTECTED = new Set(['brief', 'mission', 'humanAnswers', 'planCheck']);
 
 interface Limits {
   /** Longest string kept, in characters. */

@@ -11,8 +11,9 @@ import {
 import { GitHubAPI } from './github-integration';
 import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
-import { validateContract, normalizeResponse, stubPayload } from './contracts';
+import { validateContract, normalizeResponse, stubPayload, ContractContext } from './contracts';
 import { compactArtifacts, describePack, packContext } from './context';
+import { loadMission, missionForAgents, renderMissionLine, requireMission, missionFile } from './mission';
 import { saveHandoff } from './handoff';
 import { contextBudget } from './prompts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
@@ -65,12 +66,12 @@ class AgentResponseValidationError extends Error {
   }
 }
 
-function validateAgentResponse(response: AgentResponse, expectedPhase: string): void {
+function validateAgentResponse(response: AgentResponse, expectedPhase: string, context: ContractContext = {}): void {
   if (!response || typeof response !== 'object') {
     throw new AgentResponseValidationError(`Invalid agent response from ${expectedPhase}: not an object`);
   }
 
-  const errors = validateContract(response, expectedPhase);
+  const errors = validateContract(response, expectedPhase, context);
   if (errors.length > 0) {
     throw new AgentResponseValidationError(
       `Invalid agent response from ${expectedPhase}:\n  ${errors.join('\n  ')}`
@@ -171,7 +172,7 @@ export class FactoryOrchestrator {
 
       let validationError: string | null = null;
       try {
-        validateAgentResponse(response, agentName);
+        validateAgentResponse(response, agentName, state.mission ? { mission: state.mission } : {});
       } catch (error) {
         validationError = error instanceof Error ? error.message : String(error);
       }
@@ -216,6 +217,28 @@ export class FactoryOrchestrator {
     return addNote(paused, `Phase ${phase} asked a person (${request.urgency} urgency): ${request.question}`);
   }
 
+  /**
+   * Reads the project's MISSION.md into the new workflow. A mission that is there but unusable stops the run: planning
+   * against a half-read mission is worse than none. A missing one stops it only when FACTORY_REQUIRE_MISSION is on.
+   */
+  private attachMission(state: WorkflowState): WorkflowState {
+    const load = loadMission();
+    if (!load.found) {
+      const message = `No mission file at ${missionFile()}: work is not checked against a mission (see .claude/skills/mission.md)`;
+      if (requireMission()) return { ...addNote(state, `${message}. FACTORY_REQUIRE_MISSION is on, so the workflow stops here`), status: 'failed' };
+      this.logger.warn(message);
+      return addNote(state, message);
+    }
+    if (!load.result.ok) {
+      this.logger.error(`Mission file is not usable: ${load.result.errors.join('; ')}`);
+      return { ...addNote(state, `Mission file ${load.file} is not usable: ${load.result.errors.join('; ')}`), status: 'failed' };
+    }
+    let next: WorkflowState = { ...state, mission: load.result.mission };
+    next = addNote(next, `Mission loaded: ${renderMissionLine(load.result.mission)}`);
+    for (const w of load.result.warnings) next = addNote(next, `Mission advice: ${w}`);
+    return next;
+  }
+
   private flushContextNotes(state: WorkflowState): WorkflowState {
     const notes = this.contextNotes;
     this.contextNotes = [];
@@ -232,7 +255,7 @@ export class FactoryOrchestrator {
    * else is taken as changes to make and the architect runs again with it. Rounds are limited like any other question.
    */
   private askForPlanApproval(state: WorkflowState): WorkflowState {
-    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan);
+    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan, state.mission ? { mission: state.mission } : {});
     if (!plan.ok) {
       const failed = addNote(state, `Plan approval impossible: ${plan.error}`);
       return { ...failed, status: 'failed' };
@@ -244,7 +267,7 @@ export class FactoryOrchestrator {
     const exchange = newExchange(PLAN_PHASE, {
       intent: PLAN_INTENT,
       question: 'Approve this implementation plan, or say what should change? Answer "approve" to start the build.',
-      context: renderPlanSummary(plan.plan),
+      context: renderPlanSummary(plan.plan, 6000, state.mission),
       urgency: 'medium',
       format: 'free_text'
     }, state.humanRequests);
@@ -261,7 +284,7 @@ export class FactoryOrchestrator {
   }
 
   private planCheck(state: WorkflowState): { deviations: ReturnType<typeof planDeviations>; automated_checks: string[] } | null {
-    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan);
+    const plan = parsePlan(this.getLatestArtifactByPhase(state, PLAN_PHASE)?.implementation_plan, state.mission ? { mission: state.mission } : {});
     if (!plan.ok) return null;
     const builders: AgentName[] = ['backend-engineer', 'frontend-engineer', 'infrastructure-engineer'];
     const outputs = state.artifacts.filter(a => builders.includes(a.phase as AgentName)).map(a => a.content);
@@ -535,6 +558,11 @@ export class FactoryOrchestrator {
     } else {
       state = createWorkflowState(issueBrief, issueNumber, config);
       state = addNote(state, `Workflow started with brief: ${issueBrief.substring(0, 100)}...`);
+      state = this.attachMission(state);
+      if (state.status === 'failed') {
+        saveWorkflowState(state);
+        return state;
+      }
     }
     saveWorkflowState(state);
     this.logger.info(resumeFrom ? 'Workflow resumed' : 'Workflow created', { workflowId: state.id, brief: issueBrief.substring(0, 100) });
@@ -811,14 +839,16 @@ export class FactoryOrchestrator {
     const analyzer = this.getLatestArtifactByPhase(state, 'analyzer');
     const architect = this.getLatestArtifactByPhase(state, 'software-architect');
     const builders: AgentName[] = ['backend-engineer', 'frontend-engineer', 'infrastructure-engineer'];
+    // Agents that plan or judge direction see the mission; builders work from the plan that already carries it
+    const mission = state.mission ? { mission: missionForAgents(state.mission) } : {};
 
     switch (agent) {
       case 'product-manager':
-        return { brief: state.issueBrief };
+        return { brief: state.issueBrief, ...mission };
       case 'analyzer':
-        return { brief: state.issueBrief, productManagerOutput: pm };
+        return { brief: state.issueBrief, productManagerOutput: pm, ...mission };
       case 'software-architect':
-        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer };
+        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer, ...mission };
       case 'backend-engineer':
       case 'frontend-engineer':
       case 'infrastructure-engineer':
@@ -836,7 +866,7 @@ export class FactoryOrchestrator {
           productManagerOutput: pm
         };
       case 'reviewer':
-        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state) };
+        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...mission };
       case 'customer-support':
         return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief };
     }

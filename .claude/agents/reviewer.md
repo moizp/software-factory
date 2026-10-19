@@ -78,6 +78,7 @@ You are the **quality assurance gate keeper**. Your job is to verify that code f
 - [ ] Auth flow matches security model
 - [ ] Error responses follow specified format
 - [ ] No deviation from architecture diagram
+- [ ] Mission: if `mission` is present, the built work still serves the behaviour changes the plan claims. List in `review.issues` anything that drifted, serves none, or contradicts `not_our_mission`, and do not approve work that contradicts it
 - [ ] `planCheck.missing` and `planCheck.unplanned` are empty, or each entry is explained in `review.issues` (missing files are a defect, unplanned files need a reason)
 - [ ] The plan's `automated_checks` are listed under `review.issues` as "not run" unless a tester's output shows them passing (you cannot run commands)
 - [ ] All acceptance criteria from analyzer met
