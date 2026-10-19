@@ -13,6 +13,9 @@
     "resolveJsonModule": true,
     "moduleResolution": "node"
   },
+  "ts-node": {
+    "preferTsExts": true
+  },
   "include": [".factory/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

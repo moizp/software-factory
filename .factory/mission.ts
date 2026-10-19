@@ -174,6 +174,85 @@ export function loadMission(file: string = missionFile()): MissionLoad {
   return { found: true, file, result: parseMission(fs.readFileSync(file, 'utf-8')) };
 }
 
+// ---- what an issue declares ----------------------------------------------------------------------------------------
+
+export interface Declaration {
+  /** Behaviour change ids named on `Serves:` lines, upper case, no repeats. */
+  serves: string[];
+  /** The reason on a `Mission exception:` line, when there is one. */
+  exception?: string;
+  /** Things on those lines that cannot be used. */
+  problems: string[];
+}
+
+const MIN_EXCEPTION = 10;
+
+/**
+ * What an issue (or any brief) says about the mission, from lines that start with `Serves:` (ids such as BC1, BC3) or
+ * `Mission exception:` (a reason). Quoted lines and code blocks are ignored, so an example in a comment does not count.
+ */
+export function parseDeclaration(text: string): Declaration {
+  const serves: string[] = [];
+  const problems: string[] = [];
+  let exception: string | undefined;
+  let fenced = false;
+  for (const raw of text.replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/)) {
+    if (/^\s*```/.test(raw)) { fenced = !fenced; continue; }
+    if (fenced || /^\s*>/.test(raw)) continue;
+    const line = raw.replace(/^\s*(?:[-*]\s+)?/, '').replace(/\*\*/g, '');
+    const s = /^serves\s*:\s*(.*)$/i.exec(line);
+    if (s) {
+      const tokens = s[1].split(/[\s,;]+|\band\b/i).map(t => t.trim()).filter(Boolean);
+      if (tokens.length === 0) problems.push('"Serves:" names no behaviour change');
+      for (const t of tokens) {
+        if (/^BC\d+$/i.test(t)) { if (!serves.includes(t.toUpperCase())) serves.push(t.toUpperCase()); }
+        else problems.push(`"${t}" is not a behaviour change id (they look like BC1)`);
+      }
+      continue;
+    }
+    const e = /^mission\s+exception\s*:\s*(.*)$/i.exec(line);
+    if (e) {
+      const reason = e[1].trim();
+      if (reason.length < MIN_EXCEPTION) problems.push(`"Mission exception:" needs a reason of at least ${MIN_EXCEPTION} characters`);
+      else exception = reason;
+    }
+  }
+  return { serves, ...(exception ? { exception } : {}), problems };
+}
+
+export type MissionGate =
+  | { state: 'none'; required: boolean }
+  | { state: 'unusable'; errors: string[] }
+  | { state: 'ok'; behaviourChanges: Array<{ id: string; name: string }> };
+
+export type GateResult = { ok: true; note?: string } | { ok: false; reasons: string[] };
+
+/**
+ * The router's question before any tokens are spent: does this issue say which behaviour change it serves (or why it is
+ * an exception)? It checks that the issue says so, not whether it is true: the product manager checks the substance.
+ */
+export function checkDeclaration(gate: MissionGate, decl: Declaration): GateResult {
+  if (gate.state === 'none') {
+    return gate.required
+      ? { ok: false, reasons: ['The project has no MISSION.md and FACTORY_REQUIRE_MISSION is on. Declare the mission (.claude/skills/mission.md), then re-apply the label.'] }
+      : { ok: true };
+  }
+  if (gate.state === 'unusable') {
+    return { ok: false, reasons: [`MISSION.md cannot be used, so no work can be checked against it: ${gate.errors.join('; ')}`] };
+  }
+
+  const list = gate.behaviourChanges.map(c => `${c.id} ${c.name}`).join('; ');
+  const known = new Set(gate.behaviourChanges.map(c => c.id));
+  const unknown = decl.serves.filter(id => !known.has(id));
+  const how = 'Add a line "Serves: BC1" (or several, such as "Serves: BC1, BC3") to the issue, or, if the work moves none of them and should still be done, a line "Mission exception: <why>". Then remove and re-apply the label.';
+
+  if (decl.problems.length > 0) return { ok: false, reasons: [...decl.problems, `Behaviour changes in MISSION.md: ${list}.`, how] };
+  if (unknown.length > 0) return { ok: false, reasons: [`The issue says it serves ${unknown.join(', ')}, which MISSION.md does not have. It has: ${list}.`, how] };
+  if (decl.serves.length > 0) return { ok: true, note: `mission: serves ${decl.serves.join(', ')}` };
+  if (decl.exception) return { ok: true, note: `mission: exception declared (${decl.exception.slice(0, 120)})` };
+  return { ok: false, reasons: [`This issue does not say which behaviour change it serves. The project's mission has: ${list}.`, how] };
+}
+
 // ---- what the planning agents must return ----------------------------------------------------------------------------
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -183,7 +262,12 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
  * listed as out of mission with a reason, and a must-have feature cannot be out of mission (that is a question for a person).
  * Returns the problems in words the agent can act on when it is asked again.
  */
-export function alignmentProblems(mission: Mission, response: Record<string, unknown>): string[] {
+export function alignmentProblems(
+  mission: Mission,
+  response: Record<string, unknown>,
+  /** What the brief declared: ids it says it serves, and whether a person declared a one-off exception. */
+  declared: { serves?: string[]; exception?: boolean } = {}
+): string[] {
   const ids = new Set(missionIds(mission));
   const problems: string[] = [];
   const align = response.mission_alignment;
@@ -212,12 +296,23 @@ export function alignmentProblems(mission: Mission, response: Record<string, unk
       if (!isRecord(f) || typeof f.name !== 'string') continue;
       const serves = Array.isArray(f.serves) ? (f.serves as unknown[]) : null;
       if (outNames.has(f.name)) {
-        if (tier === 'must_have') problems.push(`must-have feature "${f.name}" is listed as out of mission: a must-have has to serve a behaviour change; tie it to one, or leave it out and ask a person with needs_human`);
+        if (tier === 'must_have' && !declared.exception) problems.push(`must-have feature "${f.name}" is listed as out of mission: a must-have has to serve a behaviour change; tie it to one, or leave it out and ask a person with needs_human`);
         continue;
       }
       if (!serves || serves.length === 0) problems.push(`feature "${f.name}" has no "serves": list the behaviour change ids it serves (${[...ids].join(', ')}), or put it under out_of_mission with a reason`);
       else for (const id of serves) if (typeof id !== 'string' || !ids.has(id)) problems.push(`feature "${f.name}" serves ${JSON.stringify(id)}, which is not in the mission (${[...ids].join(', ')})`);
     }
+  }
+  // The brief names the behaviour changes it serves: the plan has to deliver on them
+  const served = new Set<string>();
+  for (const tier of ['must_have', 'nice_to_have']) {
+    for (const f of Array.isArray(features[tier]) ? (features[tier] as unknown[]) : []) {
+      if (isRecord(f) && Array.isArray(f.serves)) for (const id of f.serves) if (typeof id === 'string') served.add(id);
+    }
+  }
+  for (const id of declared.serves ?? []) {
+    if (!ids.has(id)) continue;
+    if (!served.has(id)) problems.push(`the brief says it serves ${id}, but no feature serves ${id}: tie a feature to ${id}, or ask a person with needs_human if the brief and the mission disagree`);
   }
   return problems;
 }

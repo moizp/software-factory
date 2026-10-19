@@ -39,6 +39,18 @@ Independent freelancers get paid on time without spending their evenings on admi
 
 Rules the parser enforces: a mission statement of 20 to 600 characters; at least one user group; one to eight behaviour changes, each `### BCn: name` with Who, From, To and Signal; From and To must differ; no template placeholders left. It only advises (warnings) when "To" starts with a work verb such as "add" or "build", when a Signal names nothing countable, or when there is no "Not our mission" list.
 
+## Telling the router (issues)
+
+Issues that start agent work (the `agent:ready` label) must say which behaviour change they serve, before any agent runs. In the issue body, on its own line:
+
+```text
+Serves: BC1
+Serves: BC1, BC3
+Mission exception: the old export format is removed by the provider in March
+```
+
+The router reads these lines. An issue with neither waits, with a comment that lists the project's behaviour changes and what to add; re-apply the label after editing. An id the mission does not have, an unreadable line, or an exception with no reason (at least 10 characters) waits too. `task:review`, `task:gate` and `task:triage` issues are exempt, because they plan no product work. A project without a `MISSION.md` is not checked, unless `FACTORY_REQUIRE_MISSION` is on. The router checks that the issue says so, not that it is true: the product manager holds it to it. If the issue says `Serves: BC2`, some feature must serve BC2. A `Mission exception:` tells the product manager a person already decided, so it does not ask again and a must-have may sit outside the mission. `templates/project/ISSUE_TEMPLATE/agent-task.md` has the line ready.
+
 ## Writing a good one
 
 - **Behaviour, not features.** "Users export their data" is a feature. "Accountants stop retyping figures into their own sheets" is a behaviour change. If the To line starts with "add" or "build", it is a task.
@@ -71,6 +83,7 @@ after release: look at each Signal ─▶ update MISSION.md when a change is ach
 
 | Where | What happens |
 |---|---|
+| Router (`route.yml`) | Before choosing a lane or spending a token, an issue must carry a `Serves:` or `Mission exception:` line (see above); otherwise it waits with the choices in a comment |
 | Workflow start | `MISSION.md` is read into the workflow. An unusable file stops the run. A missing file only adds a note, unless `FACTORY_REQUIRE_MISSION=1`, which stops the run |
 | product-manager | Receives `mission`. Each must-have and nice-to-have feature must say which behaviour changes it `serves`, or be listed as out of mission with a reason; a must-have cannot be out of mission. An out-of-mission request in the brief becomes a question to a person. Checked by the contract: a reply that skips this is asked again |
 | analyzer, software-architect | Receive `mission`. Every phase of the architect's plan says which behaviour changes it serves, and the plan a person approves shows which ones the plan leaves unserved |

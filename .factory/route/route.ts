@@ -1,4 +1,5 @@
 import { evaluateWip } from '../board';
+import { checkDeclaration } from '../mission';
 import { actionsRatio, buddyRatio } from './ledger';
 import { NEEDS_HUMAN, READY, REVIEW, WORKING, FAILED } from './labels';
 import { Budget, Lane, Permission, RouteDecision, RouteInput } from './types';
@@ -6,6 +7,8 @@ import { Budget, Lane, Permission, RouteDecision, RouteInput } from './types';
 const CAN_START: Permission[] = ['admin', 'maintain', 'write'];
 const SHORT_KINDS = ['review', 'gate', 'triage', 'small-fix'];
 const LONG_KINDS = ['pipeline', 'refactor'];
+/** Operational tasks that plan no product work, so they owe the mission nothing. */
+const MISSION_EXEMPT_KINDS = ['review', 'gate', 'triage'];
 /** Longest job that belongs on hosted Actions. */
 export const SHORT_MAX_MINUTES = 10;
 
@@ -64,11 +67,21 @@ export function route(input: RouteInput): RouteDecision {
   const blocking = [WORKING, REVIEW, FAILED, NEEDS_HUMAN].filter(l => labels.includes(l));
   if (blocking.length) return { action: 'ignore', reasons: [`issue already has ${blocking.join(', ')}`] };
 
+  // Before any lane or token is spent: the issue must say which behaviour change it serves (or why it is an exception)
+  let missionNote: string | undefined;
+  const exempt = MISSION_EXEMPT_KINDS.find(k => labels.includes(`task:${k}`));
+  if (input.mission && !exempt) {
+    const gate = checkDeclaration(input.mission, input.issue.declaration ?? { serves: [], problems: [] });
+    if (!gate.ok) return { action: 'wait', reasons: gate.reasons };
+    missionNote = gate.note;
+  }
+
   const wip = evaluateWip(input.board, input.wip);
   if (!wip.canStart) return { action: 'wait', reasons: wip.reasons };
 
   const want = desiredLane(labels, input.issue.estimateMinutes);
   const reasons = [`wants ${want.lane} (${want.why})`];
+  if (missionNote) reasons.push(missionNote);
   const ratio = actionsRatio(input.ledger, input.budget);
   const hostedFull = ratio >= 1;
   const hostedSoftFull = ratio >= input.budget.actionsSoftRatio;

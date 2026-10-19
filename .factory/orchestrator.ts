@@ -13,7 +13,7 @@ import { Logger } from './logger';
 import { STAGES, Stage, AgentName, AGENT_NAMES, agentFilePath } from './pipeline';
 import { validateContract, normalizeResponse, stubPayload, ContractContext } from './contracts';
 import { compactArtifacts, describePack, packContext } from './context';
-import { loadMission, missionForAgents, renderMissionLine, requireMission, missionFile } from './mission';
+import { loadMission, missionForAgents, parseDeclaration, renderMissionLine, requireMission, missionFile } from './mission';
 import { saveHandoff } from './handoff';
 import { contextBudget } from './prompts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
@@ -172,7 +172,7 @@ export class FactoryOrchestrator {
 
       let validationError: string | null = null;
       try {
-        validateAgentResponse(response, agentName, state.mission ? { mission: state.mission } : {});
+        validateAgentResponse(response, agentName, state.mission ? { mission: state.mission, declared: parseDeclaration(state.issueBrief) } : {});
       } catch (error) {
         validationError = error instanceof Error ? error.message : String(error);
       }

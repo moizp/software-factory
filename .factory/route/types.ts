@@ -1,4 +1,5 @@
 import { Board, WipCounts } from '../board';
+import type { Declaration, MissionGate } from '../mission';
 
 /** short: hosted Actions. long: Oracle self-hosted runner. burst: Buddy.works overflow. */
 export type Lane = 'short' | 'long' | 'burst';
@@ -44,7 +45,15 @@ export interface RouteInput {
   /** False when the AGENTS_ENABLED kill switch is off. */
   enabled: boolean;
   sender: { login: string; permission: Permission };
-  issue: { number: number; labels: string[]; estimateMinutes?: number };
+  issue: {
+    number: number;
+    labels: string[];
+    estimateMinutes?: number;
+    /** What the issue text says about the mission (Serves: and Mission exception: lines). */
+    declaration?: Declaration;
+  };
+  /** The project's mission as the router sees it. Absent means the check is not made. */
+  mission?: MissionGate;
   oracle: { state: OracleState; unavailableMinutes: number };
   /** Null when the ledger could not be read: treated as an exhausted hosted pool (fail closed). */
   ledger: Ledger | null;
