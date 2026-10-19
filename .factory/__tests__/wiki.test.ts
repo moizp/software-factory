@@ -255,3 +255,14 @@ describe('the repository', () => {
     for (const c of ['wiki', 'wiki-check']) expect(fs.existsSync(path.join(root, '.claude', 'commands', `${c}.md`))).toBe(true);
   });
 });
+
+describe('a hyperlinked repository', () => {
+  const long = (links: string) => page({ body: '## Rules\n\n' + Array.from({ length: 25 }, (_, i) => `- Rule number ${i}`).join('\n') + links });
+  it('advises a long current page that links to nothing, but not a short one, a draft or a linked one', () => {
+    const has2 = (files: Record<string, string>) => problems(files).some(x => x.includes('links to nothing'));
+    expect(has2(wiki({ 'a.md': long('') }))).toBe(true);
+    expect(has2(wiki({ 'a.md': page() }))).toBe(false);
+    expect(has2(wiki({ 'a.md': page({ status: 'draft', body: '## Rules\n\n' + 'x\n'.repeat(25) }) }))).toBe(false);
+    expect(has2(wiki({ 'a.md': long('\n\nSee [the code](../src/a.ts).'), }))).toBe(false);
+  });
+});

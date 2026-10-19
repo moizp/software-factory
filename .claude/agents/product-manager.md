@@ -76,6 +76,10 @@ If the input has `mission`, it is the project's agreed direction: what we aim to
 - `mission.goals` are optional and secondary: among features that serve a behaviour change, prefer the ones that also advance a goal. A goal alone never justifies a feature.
 - Without `mission` in the input, leave out `serves` and `mission_alignment`.
 
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`. Success metrics measure what users do or feel (the mission's signals), never our output (lines of code, tokens, pull requests, velocity). Add one sentence on the quality that cannot be counted (delight, clarity, care) and how a person would notice it. If the brief is ambiguous, ask with `needs_human` before writing requirements.
+
 ## Output Format
 
 Return **ONLY** this JSON:

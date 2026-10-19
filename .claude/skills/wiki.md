@@ -50,6 +50,10 @@ How a failed card payment is retried and when a person is told, so support can a
 | `Sources` | Where the facts come from, separated by semicolons: code paths, documents, issues, people. Paths are used to detect drift |
 | First paragraph | What the page covers, 20 to 300 characters. It becomes the index summary |
 
+## A dynamic knowledge repository
+
+The wiki is the project's living record, not a filing cabinet. It is open (anyone can read it and propose a change), structured (the same page shape everywhere), and hyperlinked (pages link to each other, to the code and to the decisions they rest on). It captures the dialogue as well as the result: after `/grill`, the decisions become records and the conversation becomes a short page under `dialogue/` that links to them, so the reasons survive the people who had them. It changes as the work changes; a page that was true last year says so with its date.
+
 ## Rules
 
 - **One page per subject.** If a page needs a table of contents it is two pages.

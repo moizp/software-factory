@@ -18,12 +18,44 @@ export interface PlanPhase {
   manual_checks: string[];
 }
 
+/** A deep module: a small, stable interface in front of a complicated inside, with tests at the boundary. */
+export interface PlanModule {
+  name: string;
+  purpose: string;
+  /** The public surface: functions, endpoints, events. Few and stable. */
+  interface: string[];
+  /** What is hidden behind the interface and free to change. */
+  hides: string;
+  /** Tests that exercise the module through its interface only. */
+  boundary_tests: string[];
+}
+
+/** A change to people, roles, workflows, skills or protocols that the plan assumes will happen alongside the code. */
+export interface AssumedChange {
+  change: string;
+  affects: string;
+}
+
+/** Refactoring, simplification or removal of duplication that would keep the system healthy. */
+export interface Future {
+  what: string;
+  why: string;
+}
+
 export interface ImplementationPlan {
   phases: PlanPhase[];
+  modules: PlanModule[];
+  /** Empty means the plan assumes no change to how people work; the key itself must be present. */
+  assumed_changes: AssumedChange[];
+  /** Empty means no health work was seen; the key itself must be present. */
+  futures: Future[];
 }
 
 const MAX_PHASES = 12;
-const MAX_FILES_PER_PHASE = 60;
+const MAX_FILES_PER_PHASE = 15;
+const MAX_MODULES = 12;
+const MAX_INTERFACE = 7;
+const MIN_TEXT = 10;
 const MAX_CHECKS_PER_LIST = 20;
 const MAX_TEXT = 300;
 
@@ -96,8 +128,8 @@ export function parsePlan(raw: unknown, opts: { mission?: Mission } = {}): Parse
     if (!automated.ok) return automated;
     const manual = checkList(p.manual_checks, `${where}.manual_checks`);
     if (!manual.ok) return manual;
-    if (automated.checks.length + manual.checks.length === 0) {
-      return { ok: false, error: `${where} needs at least one check in automated_checks or manual_checks, or nobody can tell when it is done` };
+    if (automated.checks.length === 0) {
+      return { ok: false, error: `${where} needs at least one command in automated_checks: a step small enough to test is a step with a test, and a manual check alone cannot show it is done` };
     }
     out.push({
       name: p.name.trim(),
@@ -108,7 +140,75 @@ export function parsePlan(raw: unknown, opts: { mission?: Mission } = {}): Parse
       manual_checks: manual.checks
     });
   }
-  return { ok: true, plan: { phases: out } };
+  const modules = parseModules(raw.modules);
+  if (!modules.ok) return modules;
+  const changes = parseAssumedChanges(raw.assumed_changes);
+  if (!changes.ok) return changes;
+  const futures = parseFutures(raw.futures);
+  if (!futures.ok) return futures;
+  return { ok: true, plan: { phases: out, modules: modules.modules, assumed_changes: changes.changes, futures: futures.futures } };
+}
+
+type Result<K extends string, T> = ({ ok: true } & Record<K, T>) | { ok: false; error: string };
+
+const text = (v: unknown, min = 1): v is string => isString(v) && v.trim().length >= min && v.length <= MAX_TEXT;
+
+function parseModules(raw: unknown): Result<'modules', PlanModule[]> {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { ok: false, error: 'implementation_plan.modules must list the modules the work is split into, each with a purpose, a small interface, what it hides and tests at its boundary' };
+  }
+  if (raw.length > MAX_MODULES) return { ok: false, error: `implementation_plan.modules has more than ${MAX_MODULES} modules; group them so a person can hold the design in their head` };
+  const modules: PlanModule[] = [];
+  const names = new Set<string>();
+  for (let i = 0; i < raw.length; i++) {
+    const m = raw[i];
+    const where = `implementation_plan.modules[${i}]`;
+    if (!isRecord(m)) return { ok: false, error: `${where} must be an object` };
+    if (!text(m.name)) return { ok: false, error: `${where}.name must be a short non-empty string` };
+    if (names.has(m.name.trim().toLowerCase())) return { ok: false, error: `${where}.name "${m.name}" is used twice` };
+    names.add(m.name.trim().toLowerCase());
+    if (!text(m.purpose, MIN_TEXT)) return { ok: false, error: `${where}.purpose must say in a sentence what the module is for` };
+    const api = Array.isArray(m.interface) ? m.interface : null;
+    if (!api || api.length === 0 || !api.every(x => text(x))) return { ok: false, error: `${where}.interface must list the module's public surface as short strings` };
+    if (api.length > MAX_INTERFACE) return { ok: false, error: `${where}.interface has ${api.length} entries; a deep module has at most ${MAX_INTERFACE}: narrow it or split the module` };
+    if (!text(m.hides, MIN_TEXT)) return { ok: false, error: `${where}.hides must say what is kept inside the module, or it is a shallow wrapper` };
+    const tests = Array.isArray(m.boundary_tests) ? m.boundary_tests : null;
+    if (!tests || tests.length === 0 || !tests.every(x => text(x))) return { ok: false, error: `${where}.boundary_tests must list at least one test that exercises the module through its interface only` };
+    modules.push({
+      name: m.name.trim(), purpose: m.purpose.trim(), interface: (api as string[]).map(x => x.trim()),
+      hides: m.hides.trim(), boundary_tests: (tests as string[]).map(x => x.trim())
+    });
+  }
+  return { ok: true, modules };
+}
+
+function parseAssumedChanges(raw: unknown): Result<'changes', AssumedChange[]> {
+  if (!Array.isArray(raw)) return { ok: false, error: 'implementation_plan.assumed_changes must be a list of changes to people, roles, workflows, skills or protocols that this plan assumes (an empty list says it assumes none)' };
+  const changes: AssumedChange[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (!isRecord(c) || !text(c.change, MIN_TEXT) || !text(c.affects)) return { ok: false, error: `implementation_plan.assumed_changes[${i}] must be {"change": what has to change, "affects": who or what it affects}` };
+    changes.push({ change: c.change.trim(), affects: c.affects.trim() });
+  }
+  return { ok: true, changes };
+}
+
+function parseFutures(raw: unknown): Result<'futures', Future[]> {
+  if (!Array.isArray(raw)) return { ok: false, error: 'implementation_plan.futures must be a list of refactoring, simplification or de-duplication work that would keep the system healthy (an empty list says none was seen)' };
+  const futures: Future[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const f = raw[i];
+    if (!isRecord(f) || !text(f.what, MIN_TEXT) || !text(f.why, MIN_TEXT)) return { ok: false, error: `implementation_plan.futures[${i}] must be {"what": the work, "why": what it keeps open}` };
+    futures.push({ what: f.what.trim(), why: f.why.trim() });
+  }
+  return { ok: true, futures };
+}
+
+const TEST_FILE = /(?:\.|_)(?:test|spec)\.[a-z]+$|(?:^|\/)(?:__tests__|tests?|spec)\//i;
+
+/** Whether a phase's files include a test, so the plan can say which steps have no test file planned. */
+export function hasTestFile(files: string[]): boolean {
+  return files.some(f => TEST_FILE.test(f));
 }
 
 /** The plan as a person reads it: phases, files and checks. Cut at `maxChars` with a note, never mid-line. */
@@ -120,7 +220,13 @@ export function renderPlanSummary(plan: ImplementationPlan, maxChars = 6000, mis
     lines.push(`   - Files (${p.files.length}): ${p.files.slice(0, 8).join(', ')}${p.files.length > 8 ? `, and ${p.files.length - 8} more` : ''}`);
     p.automated_checks.forEach(c => lines.push(`   - Automated: \`${c}\``));
     p.manual_checks.forEach(c => lines.push(`   - Manual: ${c}`));
+    if (!hasTestFile(p.files)) lines.push('   - No test file is planned in this step');
   });
+  lines.push(`Modules (${plan.modules.length}): ${plan.modules.map(m => `${m.name} [${m.interface.join(', ')}]`).join('; ')}`);
+  lines.push(plan.assumed_changes.length
+    ? `Assumed changes to how people work: ${plan.assumed_changes.map(c => `${c.change} (affects ${c.affects})`).join('; ')}`
+    : 'Assumed changes to how people work: none');
+  lines.push(plan.futures.length ? `Futures proposed: ${plan.futures.map(f => `${f.what} (${f.why})`).join('; ')}` : 'Futures proposed: none');
   if (mission) {
     const served = new Set(plan.phases.flatMap(ph => ph.serves));
     const left = missionIds(mission).filter(id => !served.has(id));
@@ -229,6 +335,15 @@ export function stubPlan(): ImplementationPlan {
       files: ['src/server.ts'],
       automated_checks: ['npm test'],
       manual_checks: []
-    }]
+    }],
+    modules: [{
+      name: 'Server',
+      purpose: 'Accepts requests and answers them',
+      interface: ['GET /health'],
+      hides: 'Routing, startup and shutdown',
+      boundary_tests: ['GET /health returns 200']
+    }],
+    assumed_changes: [],
+    futures: []
   };
 }

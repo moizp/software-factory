@@ -16,4 +16,4 @@ Each decision that is costly to reverse gets a page `decisions/NNNN-short-title.
 
 ## Consequences
 
-The wiki grows by one small page per decision. Reviewers can ask for a record when a pull request makes such a decision. Reading the decisions in order tells the story of the project.
+The wiki grows by one small page per decision, linked from the [index](../README.md) and from the pages it affects. Reviewers can ask for a record when a pull request makes such a decision. Reading the decisions in order tells the story of the project.

@@ -153,6 +153,10 @@ Expected response:
 
 If the input has `character`, write as it would: its `relationship.address`, its `traits`, and its `moments` for first run, mistakes and failures; never do what its `boundaries.never` lists. If the input has `lookfeel`, write every document in its `tone`: use its voice, prefer the words it says to use, avoid the ones it says to avoid, and match the pace and warmth of its `direction`. Documentation is part of the product's feel.
 
+## Working principles
+
+If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`.
+
 ## Output Format
 
 Return **ONLY** this JSON:

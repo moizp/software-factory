@@ -60,6 +60,8 @@ const FIELDS = ['who', 'from', 'to', 'signal'] as const;
 const PLACEHOLDER = /<[^>\n]{1,80}>|\b(?:TODO|TBD|lorem ipsum)\b/i;
 /** Verbs that name work to do, not something a user does. */
 const WORK_VERB = /^(?:add|build|create|implement|ship|launch|release|develop|support|provide|offer|deliver|introduce)\b/i;
+/** Measures of our own output. They say how much we made, not whether any user changed what they do. */
+const VANITY = /\b(?:lines? of code|loc|commits?|pull requests?|prs|tokens?|story points?|velocity|throughput|features? shipped|releases? (?:made|shipped)|tickets? closed|issues? closed)\b/i;
 const MEASURABLE = /\d|\b(?:rate|share|count|number|percent|per|times?|weekly|daily|monthly|within|fewer|more|less|ratio)\b/i;
 
 interface Section {
@@ -140,6 +142,7 @@ export function parseMission(md: string): MissionParse {
       if (FIELDS.every(k => change[k])) {
         if (change.from!.toLowerCase() === change.to!.toLowerCase()) errors.push(`${id} "from" and "to" are the same: that is not a change`);
         if (WORK_VERB.test(change.to!)) warnings.push(`${id} "to" starts with a verb for work ("${change.to!.split(/\s+/)[0]}"): say what users will do, not what we will build`);
+        if (VANITY.test(change.signal!)) warnings.push(`${id} "signal" measures our output (${VANITY.exec(change.signal!)![0]}), not what users do: a signal is something a user does or feels that we can notice`);
         if (!MEASURABLE.test(change.signal!)) warnings.push(`${id} "signal" names nothing countable: how would we notice this change happening?`);
         changes.push(change as BehaviourChange);
       }
