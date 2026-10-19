@@ -161,6 +161,22 @@ export class GitHubAPI {
     }
   }
 
+  async addLabel(prNumber: number, label: string): Promise<void> {
+    try {
+      const owner = process.env.GITHUB_OWNER || 'moizp';
+      const repo = process.env.GITHUB_REPO || 'software-factory';
+
+      await this.octokit.issues.addLabels({
+        owner,
+        repo,
+        issue_number: prNumber,
+        labels: [label]
+      });
+    } catch (error) {
+      throw new Error(`Failed to add label: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   getCachedPRNumber(owner: string, repo: string): number | null {
     const cacheKey = `${owner}/${repo}`;
     return this.prCache.get(cacheKey) || null;

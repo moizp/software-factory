@@ -39,7 +39,7 @@ Start from `templates/monorepo/`: copy `services.json`, `policy.json` (merge int
 | Gate A (build, test, scan) | Resolve changed files to services (plus dependents via `depends_on`, `libs/`, `contracts/`), then run only those services' commands as a matrix |
 | Risk tier | Highest tier across changed services; touching two or more services, `libs/` or `contracts/` raises the floor to R2 or R3 (see the policy's `protected_paths`) |
 | Gate B reviewer | Diff limited to changed services; prompt gets the repo's `00-system.md` plus each changed service's `REVIEW.md`; contracts changes get the architecture lens |
-| Merge policy | Per-service rules in `policy.json` (example: docs-only changes may auto-merge, auth always human; a code change always has a person merge it); engine reads paths, so no code change is needed for this |
+| Merge policy | Per-service rules in `policy.json` (example: agents merge after review by default, auth and the shared paths always need a person); engine reads paths, so no code change is needed for this |
 | Board | Add a `Service` field to the Project; WIP limits stay repo-wide to start, per service lane later |
 | Reviewers | `CODEOWNERS` requests the owning team; on a repo without protection it cannot block a merge |
 | Cost | Reviewer cost scales with changed services, not repo size |

@@ -15,7 +15,7 @@ Backlog → Ready → In progress → In review → Done
 | Backlog | New issue or PR | none |
 | Ready | Issue labelled `agent:ready` (an agent may take it) | none |
 | In progress | Open **draft** PR | **1** |
-| In review | Open PR that is ready for review; a human merges unless labelled `policy:auto` | **2** |
+| In review | Open PR that is ready for review; agents merge after review unless the policy asks for a person (`policy:manual`, `needs-human`) | **2** |
 | Done | PR merged or issue closed | none |
 
 - **Finish before starting.** New work starts only when In progress is below 1 and In review is below 2. A full review column means humans are the bottleneck, so stop starting and clear it.

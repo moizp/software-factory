@@ -15,7 +15,7 @@ The policy is always loaded from the base branch, never from the PR. A PR that e
 ```json
 {
   "version": 1,
-  "default": { "auto_merge": false, "approvals": 1, "require": ["ci"] },
+  "default": { "auto_merge": true, "approvals": 1, "require": ["ci", "reviewer_verdict"] },
   "protected_paths": [".factory/**", ".github/**", ".claude/**", "package.json"],
   "force_manual_labels": ["needs-human"],
   "rules": [
@@ -26,11 +26,11 @@ The policy is always loaded from the base branch, never from the PR. A PR that e
 }
 ```
 
-This repository has no rule that merges code on a reviewer agent's verdict: a person merges every code change, and only docs-only changes merge themselves. The engine can still express such a rule (`auto_merge: true` with `require: ["ci", "reviewer_verdict"]`) for a project that decides otherwise.
+**Agents merge after the review cycle.** By default a change that touches nothing protected merges itself once CI is green and the reviewer agent's verdict is valid; no person is involved. A person is asked only when something absolutely needs one: a protected path changed, a forcing label (`needs-human`) is on the PR, the diff is empty, a rule says so, the reviewer did not approve, CI did not finish green, or the merge call failed. The question is then put at the top of a PR comment ("A person is needed: merge decision", with the reason) and the PR gets the `needs-human` label. A project that wants a person on every merge sets `"default": { "auto_merge": false }`; the engine supports both.
 
 | Field | Meaning |
 |---|---|
-| `default` | Applies when no rule matches. `auto_merge: false` means a human merges. |
+| `default` | Applies when no rule matches. `auto_merge: true` lets agents merge after the checks in `require`; `auto_merge: false` means a human merges. |
 | `protected_paths` | Globs. A PR touching any of them always needs a human, whatever the rules say. |
 | `force_manual_labels` | A label that forces a human. Labels can only tighten, never loosen. |
 | `rules[].match` | All listed conditions must hold: `branch` (globs), `paths_only` (every changed file matches), `paths_any` (at least one matches), `max_files`, `max_lines`. |
@@ -53,7 +53,7 @@ Auto-merges use a merge commit, the same as human merges (see `CONTRIBUTING.md`)
 5. Required checks are the union of the default and the matching rules.
 6. Anything unreadable or invalid falls back to a strict policy: a human merges.
 
-Agents never approve PRs. A reviewer-agent verdict is a required check, not an approval.
+Agents never approve PRs. A reviewer-agent verdict is a required check, not an approval; it is the review cycle's result, and an independent AI review is planned to join it (`docs/NEXT-CAPABILITIES.md`, R5).
 
 ## Where it runs
 

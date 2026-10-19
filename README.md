@@ -233,7 +233,7 @@ To use the API key instead of an account, set only `ANTHROPIC_API_KEY` and leave
 
 ## Governance reference
 
-- **Merge policy** (`.factory/policy.json`, [docs/POLICY.md](docs/POLICY.md)): read from the base branch so a PR cannot loosen its own rules. Protected paths always need a human. Strictest rule wins. Anything unclear fails closed. Docs-only PRs may auto-merge.
+- **Merge policy** (`.factory/policy.json`, [docs/POLICY.md](docs/POLICY.md)): read from the base branch so a PR cannot loosen its own rules. Protected paths always need a human. Strictest rule wins. Anything unclear fails closed. By default agents merge after the review cycle (CI green and a valid reviewer verdict); a person is asked, with the question at the top of the PR and the `needs-human` label, only when the policy or the review cycle needs one.
 - **Board** (`.factory/board.json`, [docs/PROJECT-BOARD.md](docs/PROJECT-BOARD.md)): Backlog, Ready, In progress (WIP 1), In review (WIP 2), Done. The GitHub Project itself is created in the UI.
 - **Releases for apps the factory builds**: release candidate branch from `main`, promoted through `www-test`, `www-demo`, `www-prod` pointers, tagged, merged back. See `.claude/skills/release-process.md` and `templates/release/`. This repo has no releases; `main` is the product.
 - **Repo settings** that cannot live in code: allow merge commits only, auto-delete head branches. Branch protection is off (free private repo), so the rules are enforced by workflows, labels and hooks.

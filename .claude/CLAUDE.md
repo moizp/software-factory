@@ -179,10 +179,10 @@ Load project.config.json
   ├─ Compliance with acceptance criteria
   ↓
   GATE: valid=true?
-  ├─ YES → DONE (reviewed, ready for a person to merge)
+  ├─ YES → DONE (reviewed; merged by the policy, or a person is asked)
   └─ NO → loop back to builders
   ↓
-EXIT: Reviewed code + docs, handed to a person
+EXIT: Reviewed code + docs, merged per policy or escalated to a person
 ```
 
 ## All 12 Agent Roles
@@ -345,7 +345,7 @@ Claude Code will automatically:
    - Customer Support (docs)
 7. **E2E Tester** → Validate workflows
 8. **Reviewer** → Final QA gate
-9. **EXIT:** Reviewed code + docs, handed to a person to merge
+9. **EXIT:** Reviewed code + docs, merged per policy or escalated to a person
 
 ### Single Agent (Debugging)
 

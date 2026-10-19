@@ -779,19 +779,27 @@ export class FactoryOrchestrator {
     if (!decision.autoMerge) {
       const message = `Needs a human merge (${decision.approvals} approval${decision.approvals === 1 ? '' : 's'}): ${decision.reasons.join('; ')}`;
       this.logger.info(message);
-      await this.githubAPI.postComment(this.prNumber, `Policy: ${message}`).catch(() => undefined);
-      return addNote(state, message);
+      return this.askPersonAboutMerge(addNote(state, message), {
+        question: `Please review and merge this PR (${decision.approvals} approval${decision.approvals === 1 ? '' : 's'}).`,
+        why: decision.reasons
+      });
     }
 
     if (decision.require.includes('reviewer_verdict') && this.getLatestGateFor(state, 'reviewer')?.valid !== true) {
-      return addNote(state, 'Auto-merge skipped: reviewer verdict is not valid');
+      return this.askPersonAboutMerge(addNote(state, 'Auto-merge skipped: reviewer verdict is not valid'), {
+        question: 'The reviewer did not approve this change. Send it back for fixes, or merge it anyway?',
+        why: ["the reviewer's verdict is not valid"]
+      });
     }
 
     if (decision.require.includes('ci')) {
       const ci = await this.waitForCi(headSha);
       if (ci !== 'success') {
         this.logger.info(`Auto-merge skipped: CI is ${ci}`);
-        return addNote(state, `Auto-merge skipped: CI is ${ci}`);
+        return this.askPersonAboutMerge(addNote(state, `Auto-merge skipped: CI is ${ci}`), {
+          question: ci === 'failure' ? 'CI failed on this PR. Fix it, or merge anyway?' : `CI did not finish green (${ci}). Check the checks, then merge or fix.`,
+          why: [`CI is ${ci}`]
+        });
       }
     }
 
@@ -800,8 +808,34 @@ export class FactoryOrchestrator {
       return addNote(state, `PR #${this.prNumber} auto-merged (${decision.reasons.join('; ')})`);
     } catch (error) {
       this.logger.warn(`Failed to auto-merge PR: ${error}`);
-      return addNote(state, 'Auto-merge failed; a human needs to merge');
+      return this.askPersonAboutMerge(addNote(state, 'Auto-merge failed; a human needs to merge'), {
+        question: 'The merge itself failed. Please merge this PR by hand.',
+        why: [`the merge call failed: ${error instanceof Error ? error.message : String(error)}`]
+      });
     }
+  }
+
+  /**
+   * The only way a run asks a person to merge. Agents merge after the review cycle; a person is asked only when the policy
+   * demands one or the cycle did not end green. The question is put at the top of a PR comment and the PR gets the
+   * needs-human label, so it cannot be missed.
+   */
+  private async askPersonAboutMerge(state: WorkflowState, ask: { question: string; why: string[] }): Promise<WorkflowState> {
+    const api = this.githubAPI;
+    if (!api || !this.prNumber) return state;
+    const body = [
+      '## A person is needed: merge decision',
+      '',
+      `**${ask.question}**`,
+      '',
+      'Why the factory did not merge it:',
+      ...ask.why.map(w => `- ${w}`),
+      '',
+      'The review cycle for this run is recorded in the workflow notes. Merge the PR, or comment with what to change.'
+    ].join('\n');
+    await api.postComment(this.prNumber, body).catch(() => undefined);
+    await api.addLabel(this.prNumber, 'needs-human').catch(() => undefined);
+    return addNote(state, `Asked a person about the merge: ${ask.question}`);
   }
 
   private async waitForCi(sha: string): Promise<'success' | 'failure' | 'pending' | 'none'> {

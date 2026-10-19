@@ -22,7 +22,7 @@ What to build next, in order, and how we will know each piece works. It combines
 | Author reads feedback and fixes | Guidance only (`.claude/skills/review-loop.md`, 3 rounds); no code drives the loop |
 | Author marks the PR ready | Not built |
 | Final review approves | Runs when installed; shadow mode only comments and labels risk. `ai-review:*` labels are written and read by nothing, and the policy engine ignores them (only `blocked` adds `policy:manual`) |
-| Merge | `policy.json` decides auto or human; only the pipeline's end-of-run step or a person merges. No workflow merges after an approval |
+| Merge | `policy.json` decides auto or human. By default a change that touches nothing protected merges itself after CI and the reviewer verdict; a person is asked, with the question on the PR and the `needs-human` label, only when the policy or the review cycle needs one. Only the pipeline's end-of-run step merges; no workflow merges after an approval |
 | Work continues | The router starts only on the `agent:ready` label; nothing runs after a merge |
 
 No PR in this repo so far has had an independent agent review. Review has been CI plus a person's merge.
@@ -64,9 +64,9 @@ LEARN    keep, iterate or revert; propose a mission change as a PR; back to FEED
 | Tier | Example | Plan approval | Requirements and architecture documents | Review | Merge |
 |---|---|---|---|---|---|
 | R0 | docs, typo | no | no | light | auto |
-| R1 | small fix, one behaviour | no (a delta plan is still written) | no, uses the living design | yes | person |
-| R2 | new feature part | yes | delta only | yes | person |
-| R3 | security, money, data, workflows | yes | full | yes, extra lens | person |
+| R1 | small fix, one behaviour | no (a delta plan is still written) | no, uses the living design | yes | auto after review |
+| R2 | new feature part | yes | delta only | yes | auto after review, unless it touches protected paths |
+| R3 | security, money, data, workflows | yes | full | yes, extra lens | person (these are protected paths) |
 
 ## Capabilities
 
@@ -89,7 +89,7 @@ Sizes are relative (S, M, L), not time. "Done when" is the check that it works, 
 | R3 | Draft-first authoring: the pipeline and the writer commands open drafts; a `markReady` helper (GraphQL `markPullRequestReadyForReview`) | none | S | A pipeline run ends with a draft PR; ready is a separate, logged step |
 | R4 | Review-loop driver: when the review of the current head has findings, the author job runs again with them (max 3 rounds, stale-SHA check, cap goes to `needs-human`, tokens counted in the ledger) | R1, R3 | M | A seeded flaw is found, fixed in a round, and the next review is clean |
 | R5 | Policy reads the review: a new `ai_review` require item. Passes only when status is `complete`, `head_sha` equals the PR head, verdict is `approve`, no open blocker or major finding, tier R0 or R1, and CI is green | R1 | M | Unit tests for every refusal; a stale or degraded review never passes |
-| R6 | Merge worker: a deterministic workflow merges docs-only (`policy:auto`) PRs that pass R5, with a merge commit and `expectedHeadSha`; kill switch; never merges a PR that touches code or protected paths, nor its own change. A person merges everything else | R5 | S | One docs-only PR merges with no person; a PR that touches code does not, however good its review |
+| R6 | Merge worker: a deterministic workflow merges `policy:auto` PRs that pass R5 (the independent AI review) and CI, with a merge commit and `expectedHeadSha`; kill switch; never merges protected paths or its own change; when it cannot merge it asks a person with the question on the PR | R5 | M | One R0 PR and one R2 PR merge with no person; a PR touching a protected path does not, and the person is asked |
 | R7 | Independence and evaluation: the reviewer runs in a separate session and account setting from the author, sees the diff and the PR text as claims only, never the author's reasoning; a seeded-flaw evaluation (planted bugs) decides when to switch from shadow to enforce | R1 | M | A seeded-flaw run shows which planted bugs it found and missed, and a person has read each miss and each false alarm before enforce mode is turned on |
 
 ### M2. Feedback in
@@ -106,7 +106,7 @@ Sizes are relative (S, M, L), not time. "Done when" is the check that it works, 
 |---|---|---|---|---|
 | F4 | Decide and pick up (idea B1): stage-aware labels (`ready:spec`, `ready:build`), smallest-first within WIP, priority `(signal gap x severity) / size`, a person approves what enters WIP, a build without an approved plan bounces back, and `type:feature` and `type:future` labels with a rule that a future item is offered next whenever the last three merged items were features | F2, F3 | M | With five ready issues the router offers the smallest valuable one that fits the limits, and after three feature merges it offers a future item first |
 | F5 | Increment mode: a pipeline kind that skips the product-manager and full architecture when a living design exists in the repo, plans only the delta, and applies the tier table above (plan approval only for R2 and R3) | F6 | L | An R1 increment is built from the living design with no product-manager or full architecture phase and needs no plan approval; cost is reported by `npm run report:usage` as a limit, and a person judges whether the plan and PR were easier to review than a full run's |
-| R8 | After a merge, the router comments the next ready candidates (smallest first, with the futures rule from F4); a person picks which one enters WIP by labelling it | F4, R6 | S | A merge is followed by a comment listing the next candidates; nothing is claimed until a person labels one |
+| R8 | After a merge, the router picks the next ready item (closes the continuous loop); a person decides what is ready by labelling it, and the factory does it | F4, R6 | S | A merge is followed by the next claim with no person involved, inside WIP |
 
 ### M4. Change mode
 
@@ -140,7 +140,7 @@ The five principles in `.claude/skills/principles.md` were checked against the f
 | # | Principle | What the factory does | Done in this change | Decision or capability |
 |---|---|---|---|---|
 | C1 | 4 small testable steps, test first, runtime feedback; 2 code is not cheap | Agents run with `claude -p` and no tools. Each builder returns all its files in one reply. Tests are written after the build by another agent. Nothing runs a test, a typecheck or a browser before review, and the reviewer cannot run commands | Plan phases are at most 15 files with an automated check each; each module has boundary tests; a step with no test file is flagged to the approver; builder prompts say tests come with the code | **Decided:** F6 with T1 is the next large capability, after G1. Until then this principle is only partly met |
-| C2 | 1 people stay strategic directors; approval at critical actions | Docs-only and `fix/*` PRs can merge themselves (the fix rule relies on a reviewer agent's verdict). Plan approval is off unless `FACTORY_PLAN_APPROVAL=1`. R6 (merge worker) and R8 (continue after merge, no person involved) are planned | The reviewer must now show what it tried to break. The plan shows assumed changes to the approver | **Decided:** (a) plan approval is on by default (`FACTORY_PLAN_APPROVAL=0` skips it; the exemption for tiers R0 and R1 arrives with the tier table); (b) the small-fix auto-merge rule is removed from this repository's policy and from the monorepo template, so a code change always has a person merge it, and docs-only stays automatic; (c) R6 merges only docs-only PRs, and R8 proposes the next items while a person picks |
+| C2 | 1 people stay strategic directors; approval at critical actions | Docs-only and `fix/*` PRs can merge themselves (the fix rule relies on a reviewer agent's verdict). Plan approval is off unless `FACTORY_PLAN_APPROVAL=1`. R6 (merge worker) and R8 (continue after merge, no person involved) are planned | The reviewer must now show what it tried to break. The plan shows assumed changes to the approver | **Decided, then revised by the owner:** (a) plan approval is on by default (`FACTORY_PLAN_APPROVAL=0` skips it; the exemption for tiers R0 and R1 arrives with the tier table); (b) the owner reversed the first call on merging: agents merge after the review cycle by default, and a person is asked only when absolutely needed (a protected path, `needs-human`, the reviewer did not approve, CI not green, the merge failed), with the question highlighted on the PR; (c) R6 and R8 return to their original form. The risk the principle names stays: until the independent AI review (R1 to R5, R7) exists, the review cycle is the same factory's reviewer agent plus CI, so protected paths are the real guard |
 | C3 | 2 and 4: spec-driven fantasy; learning over one-shot specifications | The pipeline turns a brief into a whole app in one pass (the factory's own description says "production-ready code"). Change mode does not exist, so existing code would be regenerated, not changed | `/grill` before planning; plan approval; small phases; futures listed | **Decided:** G1 first, then F6 with T1, then F5 before any whole-app work; the factory is described as producing reviewed increments, not production-ready code |
 | C4 | 5 do not over-index on what is easy to count | CI fails below the Jest coverage threshold and the full-run check wants 70% statements. The tester prompt used 70% as a target. Several "done when" lines in this document count tokens, runs or reviews | The tester prompt now calls 70% a floor and an alarm; the reviewer is told never to treat volume, tokens or coverage as evidence of value; the mission check warns on signals that count our own output | **Decided:** coverage stays a floor in CI and in the tester prompt, never a target; the token-based and pass-rate "done when" lines (R7, F2, F5) are replaced by a person's reading of the evidence, with cost kept as a limit |
 | C5 | 2 features and futures | The router's planned priority is `(signal gap x severity) / size`, smallest first. That favours features; nothing reserves time for refactoring | Plans list `futures`; the approver sees them | **Decided (F4):** `type:feature` and `type:future` labels; a future item is offered next whenever the last three merged items were features |
@@ -163,7 +163,7 @@ The WIP limit applies: one at a time unless the owner says otherwise. F5 now dep
 Settled by the owner after the principles check: C1 to C5 (see the table above). Still open: C6 (run the full suite nightly while a project is young) and the four below.
 
 1. **Early review on drafts (R2):** advisory and opt-in is recommended; a review on every push costs money.
-2. **Merge worker rights (R6):** settled, docs-only PRs and nothing that touches code. It still needs a token with merge rights, and branch protection is not available on the free plan, so the workflow and the kill switch are the control.
+2. **Merge worker rights (R6):** settled by the owner: agents merge after the review cycle by default and a person only when absolutely needed. It needs a token with merge rights, and branch protection is not available on the free plan, so the workflow, the protected paths and the kill switch are the control.
 3. **Where signals come from (F3):** analytics, support tickets, app-store reviews or something else decides how F3 is read.
 4. **Who answers feedback to users:** a person, or an agent drafting replies for a person to send.
 

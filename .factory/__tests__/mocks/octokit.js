@@ -12,7 +12,8 @@ module.exports = {
         }
       };
       this.issues = {
-        createComment: jest.fn().mockResolvedValue({})
+        createComment: jest.fn().mockResolvedValue({}),
+        addLabels: jest.fn().mockResolvedValue({})
       };
       this.pulls = {
         create: jest.fn().mockResolvedValue({ data: { number: 1 } }),

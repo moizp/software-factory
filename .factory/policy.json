@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "default": { "auto_merge": false, "approvals": 1, "require": ["ci"] },
+  "default": { "auto_merge": true, "approvals": 1, "require": ["ci", "reviewer_verdict"] },
   "protected_paths": [
     ".factory/**",
     ".github/**",
