@@ -80,7 +80,7 @@ The TypeScript orchestrator (`npm run factory:start`) is the runnable implementa
 - Token tracking: per-phase usage is recorded in each gate and totalled in `state.tokensUsed`. `FACTORY_MAX_TOKENS` (default 600000, 0 disables) pauses the workflow before the next stage once reached; raise it and `factory retry <id>`.
 - Cheap iteration: `npm run factory:start -- "<brief>" --until <agent>` stops after that agent (state `paused`); `factory retry <id>` continues. Use a mock invoker (`npm test`) for anything that doesn't need real model output.
 - Work follows the Kanban template in `.factory/board.json` (see `docs/PROJECT-BOARD.md`): In progress WIP 1, In review WIP 2. The orchestrator refuses to start new work when a limit is reached; `FACTORY_IGNORE_WIP=1` overrides.
-- The PR targets `main`. Auto-merge happens only if `.factory/policy.json` (read from `main`) allows it and the required checks pass; otherwise the PR is left for a human.
+- The PR targets `main`. Auto-merge happens only if `.factory/policy.json` (read from `main`) allows it and the required checks pass; otherwise the PR is left for a human. Today a run opens no PR from the cloud lanes (they do not set `GITHUB_OWNER` and `GITHUB_REPO`), and the branch it would name does not exist, so this step is not exercised by a real run.
 
 Agents in the diagram below that are not in `pipeline.ts` (mcp-configurator, platform-architect, ui-designer) are not yet executed by the orchestrator. See `docs/FACTORY_GAP_ANALYSIS.md`.
 
@@ -367,7 +367,7 @@ claude "Run backend-engineer agent with architect output"
 
 Builders 5-10 run simultaneously (0 token cost):
 - All builders read from same Architect + Platform Architect output
-- Each builder commits to separate GitHub repo
+- Each builder returns a list of the files it would write, with descriptions. Writing the code into a repository, a branch and a pull request is not built yet (F6 and T1 in `docs/NEXT-CAPABILITIES.md`)
 - All builders output valid=true before proceeding to testers
 - Testers run together, then Reviewer gates final output
 

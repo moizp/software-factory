@@ -8,6 +8,7 @@ What to build next, in order, and how we will know each piece works. It combines
 
 **The product pipeline is waterfall-shaped.** One brief runs a fixed chain (`.factory/pipeline.ts`): requirements, analysis, architecture, build, test, e2e, review, docs, each handing the next a finished document, with a plan-approval gate before every build whatever its size. Specifically missing:
 
+- **Code output.** A run produces JSON, not code. The builders return the files they would write (path, language, line count, description), with no contents. Nothing in the orchestrator, the workflows or the scripts creates a branch, writes a file, commits or pushes. The pull-request step needs `GITHUB_OWNER` and `GITHUB_REPO`, which the cloud lanes do not set, and the branch it names (`factory/<id>`) does not exist. A real run today ends with a comment on the issue and the run's state as a workflow artifact. Everything downstream of a pull request (CI on the change, the reviewer's verdict on a diff, the merge policy, the next claim) has never had input from a run. F6 and T1 are the critical path to autonomous development.
 - **Change mode.** The factory cannot modify existing code (README, Status). After a first build, feedback has nowhere to go. This is the largest gap.
 - **Feedback in.** Nothing takes user feedback in, triages it, or ranks it.
 - **Signals.** Nothing records a baseline for a behaviour change's `Signal` or reads it after release.
@@ -88,7 +89,7 @@ Sizes are relative (S, M, L), not time. "Done when" is the check that it works, 
 | R2 | Early review on drafts: advisory, comment only, opt-in label (`review:early`), one per push, capped per day | R1 | S | A draft with the label gets one comment per push, never a verdict label |
 | R3 | Draft-first authoring: the pipeline and the writer commands open drafts; a `markReady` helper (GraphQL `markPullRequestReadyForReview`) | none | S | A pipeline run ends with a draft PR; ready is a separate, logged step |
 | R4 | Review-loop driver: when the review of the current head has findings, the author job runs again with them (max 3 rounds, stale-SHA check, cap goes to `needs-human`, tokens counted in the ledger) | R1, R3 | M | A seeded flaw is found, fixed in a round, and the next review is clean |
-| R5 | Policy reads the review: a new `ai_review` require item. Passes only when status is `complete`, `head_sha` equals the PR head, verdict is `approve`, no open blocker or major finding, tier R0 or R1, and CI is green | R1 | M | Unit tests for every refusal; a stale or degraded review never passes |
+| R5 | Policy reads the review: a new `ai_review` require item, added to `KNOWN_REQUIREMENTS` in `policy-engine.ts` together with the code that checks it (a policy naming a requirement nothing can check does not load). Passes only when status is `complete`, `head_sha` equals the PR head, verdict is `approve`, no open blocker or major finding, tier R0 or R1, and CI is green | R1 | M | Unit tests for every refusal; a stale or degraded review never passes |
 | R6 | Merge worker: a deterministic workflow merges `policy:auto` PRs that pass R5 (the independent AI review) and CI, with a merge commit and `expectedHeadSha`; kill switch; never merges protected paths or its own change; when it cannot merge it asks a person with the question on the PR | R5 | M | One R0 PR and one R2 PR merge with no person; a PR touching a protected path does not, and the person is asked |
 | R7 | Independence and evaluation: the reviewer runs in a separate session and account setting from the author, sees the diff and the PR text as claims only, never the author's reasoning; a seeded-flaw evaluation (planted bugs) decides when to switch from shadow to enforce | R1 | M | A seeded-flaw run shows which planted bugs it found and missed, and a person has read each miss and each false alarm before enforce mode is turned on |
 
@@ -112,7 +113,7 @@ Sizes are relative (S, M, L), not time. "Done when" is the check that it works, 
 
 | ID | What | Depends | Size | Done when |
 |---|---|---|---|---|
-| F6 | Change mode (ideas C1 to C3): read-only research agents that return `file:line` references, a tested worktree script, an artifacts folder per issue, builders that output a patch applied in a worktree and committed, tests run in CI on the result | R3 | L | A feedback fix changes existing code in a worktree, CI runs its tests, review and merge follow the loop |
+| F6 | Change mode (ideas C1 to C3): read-only research agents that return `file:line` references, a tested worktree script, an artifacts folder per issue, builders that output a patch applied in a worktree and committed, tests run in CI on the result | R3 | L | A feedback fix changes existing code in a worktree, CI runs its tests, the reviewer's input is the real diff and not a list of file descriptions, and review and merge follow the loop |
 
 ### M5. Release and learn
 
@@ -163,6 +164,7 @@ The five principles in `.claude/skills/principles.md` were checked against the f
 | C5 | 2 features and futures | The router's planned priority is `(signal gap x severity) / size`, smallest first. That favours features; nothing reserves time for refactoring | Plans list `futures`; the approver sees them | **Decided (F4):** `type:feature` and `type:future` labels; a future item is offered next whenever the last three merged items were features |
 | C6 | 4 tight feedback loops | PRs now run only the tests their change needs and the full suite runs weekly (a choice made earlier). A break the selector misses can live for up to a week | None | Minor. Run the full suite nightly while a project is young, weekly once it is calm. The owner's earlier choice stands until told otherwise |
 | C7 | 1 care in every layer | Only prompts ask for it (errors, logs, migrations, comments that say why) | Builder and reviewer prompts | A prompt cannot guarantee it. A reviewer who lists unseen layers it checked is the nearest check; a person still has to look |
+| C8 | 1 and 5: review is a real check; judge by value, not by output | The merge default lets agents merge after CI and the reviewer's verdict. The reviewer today reads file lists and descriptions, never code, because no code exists; the default is inert only because no run opens a pull request. A policy requirement the merge step could not run used to pass silently | `parsePolicy` now rejects a requirement the merge step cannot check, so a typo or an unbuilt item fails closed to the strict policy | Before F6 lands, the reviewer's input must be the real diff (F6's done-when says so), and R5 (`ai_review`, the independent review) should be in the default `require` before agents merge real changes. Until then protected paths and the strict fallback are the guard |
 
 ## Order
 

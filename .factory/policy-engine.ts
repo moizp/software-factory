@@ -90,6 +90,22 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every(x => typeof x === 'string');
 }
 
+/**
+ * The checks the merge step can run. A requirement it cannot run would pass silently, so a policy that names one does
+ * not load (and loadPolicy then falls back to the strict policy, where a person merges). New checks are added here
+ * together with the code that runs them.
+ */
+export const KNOWN_REQUIREMENTS = ['ci', 'reviewer_verdict'] as const;
+
+function unknownRequirements(items: string[], where: string): void {
+  const unknown = items.filter(i => !(KNOWN_REQUIREMENTS as readonly string[]).includes(i));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Invalid policy: ${where} names ${unknown.join(', ')}, which the merge step cannot check (known: ${KNOWN_REQUIREMENTS.join(', ')}); an unchecked requirement would pass silently`
+    );
+  }
+}
+
 /** Validates the raw JSON; throws with a precise message so bad policies are caught early. */
 export function parsePolicy(raw: unknown): Policy {
   const fail = (msg: string): never => {
@@ -103,6 +119,7 @@ export function parsePolicy(raw: unknown): Policy {
     fail('default needs boolean auto_merge and integer approvals >= 0');
   }
   if (d.require !== undefined && !isStringArray(d.require)) fail('default.require must be string[]');
+  if (d.require !== undefined) unknownRequirements(d.require, 'default.require');
   if (!isStringArray(p.protected_paths)) fail('protected_paths must be string[]');
   if (p.force_manual_labels !== undefined && !isStringArray(p.force_manual_labels)) {
     fail('force_manual_labels must be string[]');
@@ -126,6 +143,7 @@ export function parsePolicy(raw: unknown): Policy {
       fail(`${where}: approvals must be an integer >= 0`);
     }
     if (r.require !== undefined && !isStringArray(r.require)) fail(`${where}: require must be string[]`);
+    if (r.require !== undefined) unknownRequirements(r.require, `${where}.require`);
   });
 
   return p as unknown as Policy;

@@ -1,6 +1,6 @@
 # Software Factory
 
-A multi-agent workflow that turns a project brief into a built, tested, reviewed pull request, plus the working practices (trunk-based flow, merge policy, Kanban limits, AI review) that keep agent-written code safe to merge.
+A multi-agent workflow that turns a project brief into reviewed plans, specifications and file lists (writing the code into a branch and opening a pull request is planned, not built), plus the working practices (trunk-based flow, merge policy, Kanban limits, AI review) that keep agent-written code safe to merge.
 
 The factory follows five principles, written with where each is enforced and what is not yet in `.claude/skills/principles.md`: people direct and agents execute; architectural integrity (deep modules, features and futures); shared understanding (grill, a ubiquitous language, assumed changes made visible); tight feedback loops (small steps, a living wiki); and value over superficial metrics.
 
@@ -37,9 +37,10 @@ PIPELINE (claude -p, one agent per stage; local, hosted Actions, Oracle runner o
 requirements → analysis → architecture → build ×3 parallel → test → e2e → review → docs
         each stage: JSON envelope validated, invalid = stop, `factory retry` resumes
   ▼
-branch + pull request into main
+today: JSON artifacts, a result comment on the issue, and the run's state as a workflow artifact
+planned (F6, T1): code written in a worktree, a branch, and a pull request into main
   ▼
-VERIFICATION (GitHub Actions, no PR code runs with secrets)
+VERIFICATION of a pull request (GitHub Actions, no PR code runs with secrets)
   ├─ policy-check   labels policy:auto or policy:manual from .factory/policy.json (read from main)
   ├─ pr-lint        title, body, commits: attribution fails, AI tells warn, evidence by risk tier
   ├─ factory-test   build + tests
