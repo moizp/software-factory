@@ -1,6 +1,6 @@
 # The factory as an MCP server: feasibility and effectiveness
 
-Assessed in October 2026 against `main` after the HumanLayer additions (H1 to H6). The question: could projects that use the factory get its parts through an MCP server, more efficiently and reliably than they do now? The short answer is **yes for the deterministic parts, as a thin local wrapper, after packaging; no for running the pipeline**. Numbers come from a throwaway spike (below); what could not be tested here is listed at the end.
+Assessed in October 2026 against `main` after the HumanLayer additions (H1 to H6), and checked again after `docs/HUMANLAYER-VERIFIED.md` merged (see "After the HumanLayer check"). The question: could projects that use the factory get its parts through an MCP server, more efficiently and reliably than they do now? The short answer is **yes for the deterministic parts, as a thin local wrapper, after packaging; no for running the pipeline**. Numbers come from a throwaway spike (below); what could not be tested here is listed at the end.
 
 ## Verdict
 
@@ -59,9 +59,9 @@ Facts read from the SDK itself: protocol version `2025-11-25`; **default request
 
 ## Principles check
 
-- **People direct (1).** A tool that answers a question or approves a plan lets the model approve its own plan, since plan approval is a typed question answered with `approve`. No `answer`, `approve` or `merge` tool. Any tool that changes state is human-confirmed (elicitation) and off in headless runs.
+- **People direct (1).** A tool that answers a question or approves a plan lets the model approve its own plan, since plan approval is a typed question answered with `approve`. No `answer`, `approve` or `merge` tool. Any tool that changes state is human-confirmed (elicitation) and off in headless runs. No tool of ours sets `agent:ready` or a `ready:*` label either: a person does. The GitHub MCP server can set a label in a model-driven session, so the factory's guidance says not to.
 - **Deep modules (2).** Four tools over 45 modules is the shape we want. Keep the surface small: coarse tools with an enum, not one tool per checker. About ten tools is the ceiling for context cost.
-- **Shared understanding (3).** `factory_context` returns what the architect would see. That makes H4 (each agent's pack and the precedence order) inspectable by a person.
+- **Shared understanding (3).** `factory_context` takes an `agent` and returns what that agent would see: only the inputs its contract names, in H4's precedence order. That makes the packs inspectable by a person.
 - **Feedback loops (4).** The measured speed-up is the point.
 - **Value over metrics (5).** Do not count tool calls or token savings as value. The measure is whether sessions catch declaration errors earlier.
 - **Treat results as data.** Tool output that quotes issue or wiki text goes back into the model's context. Return it marked as quoted data, as the pipeline does.
@@ -71,7 +71,8 @@ Facts read from the SDK itself: protocol version `2025-11-25`; **default request
 ```
 S0 package the core     bin + files + exports, semver, one install route that works for a private repo    S
  ▼
-S1 local stdio server   ≤ 6 read-only tools, structured output, annotations; run from dist, not ts-node   S–M
+S1 local stdio server   ≤ 6 read-only tools (`factory_context(agent)` among them), structured output,        S–M
+ │                      annotations; run from dist, not ts-node
  │                      tests with the SDK's in-memory client; gates: start < 500 ms, definitions < 1k tokens
  ▼
 S2 read-only status     workflows, pending questions, handoffs, events; links to the issue or PR           S–M
@@ -81,6 +82,15 @@ S3 decision (remote)    only after M0 has run for real, a second project needs i
 ```
 
 S0 and S1 fit before or beside H2, H4 and H5. H4 gives `factory_context(agent)` its meaning, and H6's lessons page becomes one more resource. S1 should not wait for the independent review loop; it has no merge power.
+
+## After the HumanLayer check
+
+`docs/HUMANLAYER-VERIFIED.md` merged after this assessment. It does not mention MCP, so it gives no design to copy, but it supports the verdict:
+
+- **Approvals stay with a person.** Their approvals happen inside the session or app at fixed points, and auto-advance never crosses design to outline or outline to implementation (row 1 of its table). That matches "no approve or answer tool".
+- **Execution stays near the code.** Their sessions run on a daemon on any host, survive suspend, and are marked failed but resumable after a missed heartbeat (row 9). That is the start-and-poll shape, and our Actions lanes and sweep already play that part. A remote factory service would be a copy of their hosted app and cloud, which is the cost S3 has to justify.
+- **Agents never set ready states** (row 6). Added to the guardrails above.
+- **Per-agent inputs and a precedence order** (row 7, H4) turn `factory_context` into `factory_context(agent)`. H6's lessons page becomes one more resource.
 
 ## Not verified here
 
