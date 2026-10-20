@@ -54,14 +54,12 @@ Rules the flow enforces: `main` is the only long-lived branch, short-lived `feat
 
 ## Quick start: run the pipeline locally
 
-Needs Node 24 (the only supported version; `.nvmrc` pins it) and the `claude` CLI logged in. Runs use your Claude plan (default model `claude-sonnet-5-5`, effort `medium`).
+Needs Node 24 (the only supported version; `.nvmrc` pins it) and the `claude` CLI logged in. Runs use your Claude plan (default model `claude-sonnet-5-5`, effort `medium`). The full walk-through, with the result to expect at each step, is [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ```bash
 git clone https://github.com/moizp/software-factory && cd software-factory
 npm install
-cp scripts/credentials.sh.template scripts/credentials.sh   # fill in, then:
-source scripts/credentials.sh
-npm run build && npm test                                    # 240+ tests, no model calls
+npm run verify -- --quick                                    # no model calls; writes verify-report.md to paste into a session
 
 # cheap first run: stop after one agent, then continue
 npm run factory:start -- "A todo app with user accounts" --until software-architect
@@ -69,7 +67,7 @@ npm run factory:list
 npm run factory:retry <workflow-id>                          # resume; validated stages are kept
 ```
 
-`factory:start` runs `scripts/validate-setup.sh` first, which expects `GITHUB_TOKEN`, `DB_PASSWORD` and `STRIPE_MCP_KEY` in the environment. To skip that check: `npx ts-node .factory/cli.ts start "<brief>"`.
+`npm run verify` checks the environment, the agent contracts, your declarations and the merge policy, and runs the whole pipeline with a model-free agent (plan approval, repair, retry, questions, token cap). `--live` adds the real product manager (a few tokens), `--github` checks the repository's labels, workflows and secret names through `gh`. `npm run validate-setup` is the separate check for MCP credentials.
 
 **Declare the project's mission first.** Copy `templates/project/MISSION.md` to the project root, or run `/mission` in Claude Code to be interviewed, and check it with `npm run mission:check`. It states what you aim to achieve together with your users and the behaviour changes you expect in them (`BC1`, `BC2`, ...). The product manager must tie every feature to a behaviour change or mark it out of mission, the architect's plan shows which ones it serves, and the reviewer flags drift. Without a `MISSION.md` the pipeline runs but adds a note; `FACTORY_REQUIRE_MISSION=1` makes it a requirement. Guide: `.claude/skills/mission.md`.
 

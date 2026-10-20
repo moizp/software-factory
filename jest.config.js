@@ -15,6 +15,7 @@ module.exports = {
     '!.factory/__tests__/**',
     '!.factory/cli.ts',
     '!.factory/policy-cli.ts',
+    '!.factory/verify-cli.ts',
     '!.factory/test.ts',
     '!.factory/github-integration.ts',
     '!.factory/claude-bridge.ts',

@@ -10,3 +10,4 @@ scripts/credentials.sh
 coverage/
 logs/
 metrics/
+verify-report.md

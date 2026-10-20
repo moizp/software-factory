@@ -99,7 +99,7 @@ describe('documentation drift', () => {
   ).scripts;
   const builtins = new Set(['install', 'ci', 'start', 'test', 'init', 'audit']);
   const docs = [
-    'README.md', 'QUICKSTART.md', 'CONTRIBUTING.md', '.claude/CLAUDE.md',
+    'README.md', 'QUICKSTART.md', 'CONTRIBUTING.md', '.claude/CLAUDE.md', 'docs/GETTING-STARTED.md',
     'docs/CONFIGURATION.md', 'docs/ORCHESTRATION.md'
   ];
 
