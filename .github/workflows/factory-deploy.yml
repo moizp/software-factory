@@ -14,6 +14,10 @@ on:
       - '.factory/**'
       - 'dist/**'
 
+# Read-only by default; this workflow only checks and prints
+permissions:
+  contents: read
+
 jobs:
   check-readiness:
     runs-on: ubuntu-latest

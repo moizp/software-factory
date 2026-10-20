@@ -36,7 +36,7 @@ The policy is always loaded from the base branch, never from the PR. A PR that e
 | `rules[].match` | All listed conditions must hold: `branch` (globs), `paths_only` (every changed file matches), `paths_any` (at least one matches), `max_files`, `max_lines`. |
 | `rules[].auto_merge` | `true` allows auto-merge, `false` forces a human. |
 | `rules[].approvals` | Human approvals needed when the PR is not auto-merged. |
-| `rules[].require` / `default.require` | Checks that must pass before merging: `ci` (all check runs green), `reviewer_verdict` (the reviewer agent returned `valid: true`). |
+| `rules[].require` / `default.require` | Checks that must pass before merging: `ci` (all check runs green), `reviewer_verdict` (the reviewer agent returned `valid: true`). Only these two exist. A policy that names any other requirement does not load and falls back to the strict policy (a person merges), because a requirement nothing checks would pass silently. |
 
 Globs: `*` matches within a directory, `**` crosses directories, `?` one character.
 

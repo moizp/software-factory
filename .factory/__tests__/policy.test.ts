@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
 import {
-  Policy, STRICT_POLICY, evaluatePolicy, globToRegExp, loadPolicy, parsePolicy, prInfoFromGit
+  KNOWN_REQUIREMENTS, Policy, STRICT_POLICY, evaluatePolicy, globToRegExp, loadPolicy, parsePolicy, prInfoFromGit
 } from '../policy-engine';
 import { FactoryOrchestrator } from '../orchestrator';
 import { GitHubAPI } from '../github-integration';
@@ -48,9 +48,26 @@ describe('parsePolicy', () => {
     ['rule without match', { ...repoPolicy, rules: [{ auto_merge: true }] }],
     ['rule with empty match', { ...repoPolicy, rules: [{ match: {}, auto_merge: true }] }],
     ['negative max_files', { ...repoPolicy, rules: [{ match: { max_files: -1 }, auto_merge: true }] }],
-    ['non-boolean auto_merge', { ...repoPolicy, rules: [{ match: { branch: ['x'] }, auto_merge: 'yes' }] }]
+    ['non-boolean auto_merge', { ...repoPolicy, rules: [{ match: { branch: ['x'] }, auto_merge: 'yes' }] }],
+    ['an unknown default requirement', { ...repoPolicy, default: { ...repoPolicy.default, require: ['ci', 'reviewer-verdict'] } }],
+    ['an unknown rule requirement', { ...repoPolicy, rules: [{ match: { branch: ['x'] }, auto_merge: true, require: ['ai_review'] }] }]
   ])('rejects %s', (_name, raw) => {
     expect(() => parsePolicy(raw)).toThrow(/Invalid policy/);
+  });
+
+  it('says which requirement it cannot check and which it can', () => {
+    expect(() => parsePolicy({ ...repoPolicy, default: { ...repoPolicy.default, require: ['ci', 'ai_review'] } }))
+      .toThrow('default.require names ai_review, which the merge step cannot check (known: ci, reviewer_verdict)');
+    expect(() => parsePolicy({ ...repoPolicy, rules: [{ name: 'x', match: { branch: ['x'] }, auto_merge: true, require: ['reviewer-verdict'] }] }))
+      .toThrow('rules[0]');
+  });
+
+  it('only names requirements that the merge step runs, here and in the shipped templates', () => {
+    expect(KNOWN_REQUIREMENTS).toEqual(['ci', 'reviewer_verdict']);
+    for (const file of [path.join('.factory', 'policy.json'), path.join('templates', 'monorepo', 'policy.json')]) {
+      const raw = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', file), 'utf-8'));
+      expect(() => parsePolicy(raw)).not.toThrow();
+    }
   });
 });
 
@@ -184,6 +201,17 @@ describe('loadPolicy and prInfoFromGit', () => {
 
   it('falls back to the strict policy when the ref has no policy', () => {
     expect(loadPolicy('does-not-exist', dir)).toEqual(STRICT_POLICY);
+  });
+
+  it('falls back to the strict policy, where a person merges, when the base policy names a requirement nothing can check', () => {
+    git('checkout', '-q', 'main');
+    git('checkout', '-q', '-b', 'typo');
+    fs.writeFileSync(path.join(dir, '.factory', 'policy.json'), JSON.stringify({ ...repoPolicy, default: { ...repoPolicy.default, require: ['ci', 'reveiwer_verdict'] } }));
+    git('commit', '-q', '-am', 'typo in the policy');
+    const loaded = loadPolicy('typo', dir);
+    expect(loaded).toEqual(STRICT_POLICY);
+    expect(evaluatePolicy(loaded, { branch: 'feature/y', files: ['src/a.ts'], changedLines: 3, labels: [] }).autoMerge).toBe(false);
+    git('checkout', '-q', 'feature/x');
   });
 
   it('lists changed files and lines, so a PR editing the policy is caught', () => {
