@@ -38,6 +38,7 @@ Each command you ran with its result, such as `npm test`: 418 passed. Add manual
 How to undo it safely. For most changes: revert the merge commit. Name anything a revert does not undo (data, issues, labels, secrets).
 ```
 
+5b. **Interface changes.** If the diff touches components, pages, styles or other interface files, add an `## Evidence` section with the before and after pictures from `npm run evidence:capture` and `npm run evidence:publish` (`.claude/skills/visual-evidence.md`), or `Not applicable: <reason>`. `gate:check` fails an R2 or R3 change that has neither.
 6. **Check the text**: `npm run gate:check -- --base origin/main --head HEAD --branch "$(git branch --show-current)" --title "<title>" --body-file "$(git rev-parse --git-dir)/pr-body.md"`. Errors must be fixed. Warnings should be fixed: remove em dashes, filler and chatbot phrasing, and add the missing evidence it names.
 7. **Rules for the text.** No attribution lines of any kind (no "Generated with Claude Code", no session or model links, no `Co-Authored-By`). Plain sentences, no em dashes, no marketing words. Do not claim anything you did not verify; "not run" is an acceptable and honest answer.
 8. **Show** the title and the body. Create the pull request only if the user asked for it. If a tool adds a footer or link to the body when creating the PR, edit the PR afterwards and remove it.

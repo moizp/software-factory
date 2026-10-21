@@ -1,5 +1,6 @@
 import type { Mission } from './mission';
 import { missionIds } from './mission';
+import { VisualCheck, parseVisualChecks } from './evidence/checks';
 
 /**
  * The architect's implementation plan: ordered phases, each with the files it touches and the checks that show it is
@@ -16,6 +17,8 @@ export interface PlanPhase {
   files: string[];
   automated_checks: string[];
   manual_checks: string[];
+  /** Screens a change to the interface is photographed on, before and after. Absent when the phase touches no interface. */
+  visual_checks?: VisualCheck[];
 }
 
 /** A deep module: a small, stable interface in front of a complicated inside, with tests at the boundary. */
@@ -131,13 +134,16 @@ export function parsePlan(raw: unknown, opts: { mission?: Mission } = {}): Parse
     if (automated.checks.length === 0) {
       return { ok: false, error: `${where} needs at least one command in automated_checks: a step small enough to test is a step with a test, and a manual check alone cannot show it is done` };
     }
+    const visual = parseVisualChecks(p.visual_checks, `${where}.visual_checks`);
+    if (!visual.ok) return { ok: false, error: visual.error };
     out.push({
       name: p.name.trim(),
       ...(isString(p.goal) && p.goal.trim() ? { goal: p.goal.trim() } : {}),
       serves,
       files: files.files,
       automated_checks: automated.checks,
-      manual_checks: manual.checks
+      manual_checks: manual.checks,
+      ...(visual.value.length ? { visual_checks: visual.value } : {})
     });
   }
   const modules = parseModules(raw.modules);
@@ -220,6 +226,7 @@ export function renderPlanSummary(plan: ImplementationPlan, maxChars = 6000, mis
     lines.push(`   - Files (${p.files.length}): ${p.files.slice(0, 8).join(', ')}${p.files.length > 8 ? `, and ${p.files.length - 8} more` : ''}`);
     p.automated_checks.forEach(c => lines.push(`   - Automated: \`${c}\``));
     p.manual_checks.forEach(c => lines.push(`   - Manual: ${c}`));
+    (p.visual_checks ?? []).forEach(v => lines.push(`   - Picture: ${v.path} at ${v.widths.join(', ')} px${v.state ? ` (${v.state})` : ''}, before and after`));
     if (!hasTestFile(p.files)) lines.push('   - No test file is planned in this step');
   });
   lines.push(`Modules (${plan.modules.length}): ${plan.modules.map(m => `${m.name} [${m.interface.join(', ')}]`).join('; ')}`);
