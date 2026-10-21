@@ -11,6 +11,8 @@
     "dev": "ts-node",
     "validate-setup": "bash scripts/validate-setup.sh",
     "verify": "ts-node .factory/verify-cli.ts",
+    "evidence:capture": "ts-node .factory/evidence-cli.ts capture",
+    "evidence:publish": "ts-node .factory/evidence-cli.ts publish",
     "factory:start": "ts-node .factory/cli.ts start",
     "factory:status": "ts-node .factory/cli.ts status",
     "factory:list": "ts-node .factory/cli.ts list",

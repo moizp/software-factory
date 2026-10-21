@@ -1,11 +1,12 @@
 import { envChecks } from './checks/env';
+import { evidenceChecks } from './checks/evidence';
 import { githubChecks } from './checks/github';
 import { liveChecks } from './checks/live';
 import { mockChecks } from './checks/mock';
 import { offlineChecks } from './checks/offline';
 import { Check, Ctx, Row, Tier, fail } from './types';
 
-export const ALL_CHECKS: Check[] = [...envChecks, ...offlineChecks, ...mockChecks, ...liveChecks, ...githubChecks];
+export const ALL_CHECKS: Check[] = [...envChecks, ...offlineChecks, ...evidenceChecks, ...mockChecks, ...liveChecks, ...githubChecks];
 export const TIERS: Tier[] = ['env', 'offline', 'mock', 'live', 'github'];
 
 /** Which tiers a run includes. `github` is opt-in; `live` always shows one row saying how to ask for it. */
