@@ -11,4 +11,4 @@ coverage/
 logs/
 metrics/
 verify-report.md
-evidence/
+/evidence/
