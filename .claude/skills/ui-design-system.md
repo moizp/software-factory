@@ -294,7 +294,7 @@ Text Secondary: neutral-400
 
 ## Component Library Setup
 
-### Tailwind Config
+### Tailwind Config (only when the project's `stack.frontend.styling` is tailwind; the default is CSS custom properties)
 ```javascript
 module.exports = {
   theme: {

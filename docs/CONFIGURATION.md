@@ -33,7 +33,7 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
   "name": "MySaaS",
   "description": "Multi-tenant SaaS for team collaboration",
   "type": "saas",
-  "stack": "ts-react-node"
+  "stack": "ts-sveltekit-node"
 }
 ```
 
@@ -44,9 +44,9 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 - `monorepo` — Multiple packages
 
 **Valid `stack` values:**
-- `ts-react-node` — TypeScript + React + Express/Node.js
-- `ts-react-fastapi` — TypeScript + React + Python FastAPI
-- `ts-react-go` — TypeScript + React + Go (Gin)
+- `ts-sveltekit-node` — TypeScript + SvelteKit + Express/Node.js (the default for a web frontend)
+- `python-fastapi` — SvelteKit + Python FastAPI
+- `ts-react-node` — TypeScript + React + Express/Node.js (only when asked for)
 - `py-django` — Python Django
 - `go-htmx` — Go + HTMX
 - `custom` — Specify all components manually
@@ -167,11 +167,11 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 ```json
 {
   "frontend": {
-    "framework": "react|vue|svelte|angular",
+    "framework": "sveltekit (default)|react|vue|angular",
     "language": "typescript|javascript",
-    "styling": "tailwind|styled-components|css-in-js",
-    "state_management": "tanstack-query|zustand|redux|pinia",
-    "build_tool": "vite|webpack|next"
+    "styling": "scoped-css (default)|tailwind|styled-components",
+    "state_management": "svelte-runes (default)|tanstack-query|zustand|redux|pinia",
+    "build_tool": "vite (SvelteKit)|webpack|next"
   }
 }
 ```
@@ -179,13 +179,28 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 **Recommended Setup:**
 ```json
 {
-  "framework": "react",
+  "framework": "sveltekit",
   "language": "typescript",
-  "styling": "tailwind",
-  "state_management": "tanstack-query",
+  "styling": "scoped-css",
+  "state_management": "svelte-runes",
   "build_tool": "vite"
 }
 ```
+
+### Boundaries (shared code)
+
+Shared code is framework-agnostic: a core layer of plain TypeScript that imports no framework and nothing from outside the project. Components, routes, stores and handlers are adapters that import the core. `npm run boundaries:check` enforces it; configure it here (these are the defaults):
+
+```json
+{
+  "boundaries": {
+    "core": ["src/lib/core/**"],
+    "allow": []
+  }
+}
+```
+
+`allow` names the few packages the core may import, each a decision a person approved in the plan's `new_dependencies`.
 
 ### Infrastructure Configuration
 
@@ -267,7 +282,7 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 **Example:**
 ```json
 {
-  "design_system": "Custom (Tailwind CSS)",
+  "design_system": "Custom (CSS custom properties)",
   "accessibility_target": "WCAG 2.1 AA",
   "responsive_breakpoints": [
     "mobile: <640px",
@@ -396,7 +411,7 @@ ENABLE_NOTIFICATIONS=true
 {
   "name": "BlogApp",
   "type": "web-app",
-  "stack": "ts-react-node",
+  "stack": "ts-sveltekit-node",
   "features": ["content-management", "search"],
   
   "mcp_servers": {
@@ -423,9 +438,9 @@ ENABLE_NOTIFICATIONS=true
   },
   
   "frontend": {
-    "framework": "react",
+    "framework": "sveltekit",
     "language": "typescript",
-    "styling": "tailwind"
+    "styling": "scoped-css"
   },
   
   "testing": {
@@ -447,7 +462,7 @@ export DB_PASSWORD="postgres://localhost/blog"
 {
   "name": "ProjectManager",
   "type": "saas",
-  "stack": "ts-react-node",
+  "stack": "ts-sveltekit-node",
   "features": [
     "user-auth",
     "multi-tenant",
@@ -681,7 +696,7 @@ echo "DB_PASSWORD: ${DB_PASSWORD:0:20}..."
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| `Unknown stack` | Invalid `stack` value | Use: `ts-react-node`, `py-fastapi`, `go-gin`, or `custom` |
+| `Unknown stack` | Invalid `stack` value | Use: `ts-sveltekit-node`, `python-fastapi`, `go-htmx`, `ts-react-node`, or `custom` |
 | `Missing required server` | MCP not in config | Add to `mcp_servers` with `required: true` |
 | `Auth failed` | Wrong credential | Regenerate API key, update credentials.sh |
 | `Database won't connect` | Wrong host/port | Check `config.host` and `config.port` match your DB |

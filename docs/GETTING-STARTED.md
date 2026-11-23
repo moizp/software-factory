@@ -63,6 +63,8 @@ Each step is an interview in Claude Code, a checker you can run, and a row in th
 | Language | `/language` | `npm run language:check` | `project.language` |
 | `CLAUDE.md` | `/claude-md` | `npm run claudemd:check` | `project.claudemd` |
 
+**Stack and structure.** With no `frontend` in `project.config.json` the agents build a web front-end with SvelteKit and TypeScript, scoped CSS from your design tokens and Svelte's own state, with no UI libraries. Declare another stack there and the agents are told it (`project.stack` shows what they will see). Shared code goes in `src/lib/core` as plain TypeScript that imports no framework and nothing from outside the project; components, routes and stores are adapters that import it. `npm run boundaries:check` (`project.boundaries`) fails when the core breaks that, and `boundaries.core` and `boundaries.allow` in `project.config.json` change where the core is and which packages it may import. Plans list `new_dependencies` with the in-house alternative, and you approve each one.
+
 Before the first real piece of work run `/grill`. The pipeline runs without any of these (it adds a note), and `FACTORY_REQUIRE_MISSION=1`, `FACTORY_REQUIRE_CHARACTER=1`, `FACTORY_REQUIRE_LOOKFEEL=1` and `FACTORY_REQUIRE_LANGUAGE=1` make each one mandatory. Run `npm run verify -- --quick` again after each; `mock.project-declarations` runs the pipeline on a copy of your own files.
 
 ## 4. Spend a few tokens

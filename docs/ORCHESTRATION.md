@@ -24,7 +24,7 @@ Complete guide to autonomous multi-agent orchestration workflow—from GitHub is
               ↓
     [Parallel: Builder Phase (Zero Token Cost)]
       ├─ Backend Engineer → API server + auth
-      ├─ Frontend Engineer → React components
+      ├─ Frontend Engineer → Svelte/SvelteKit components
       ├─ Infrastructure Engineer → Docker + CI/CD
       ├─ Automation Tester → Unit + integration tests
       └─ Customer Support → Documentation
@@ -149,13 +149,13 @@ Generates:
 **Output:** `{ valid: true, components: **, pages: **, hooks: ** }`
 
 Generates:
-- React components (20+) with TypeScript
-- TanStack Query integration (data fetching)
-- Zustand store (state management)
-- Tailwind CSS styling
+- Svelte components (20+) with TypeScript, in SvelteKit routes
+- A framework-free core layer (`src/lib/core`) for shared code
+- `load` functions for data and Svelte runes for interface state (no state library)
+- Scoped CSS from design tokens (CSS custom properties)
 - Responsive layouts (mobile/tablet/desktop)
 - Dark mode support
-- React Testing Library tests
+- Vitest tests (core on its own, components mounted with Svelte's `mount`)
 - Form validation + error handling
 
 #### 4c: Infrastructure Engineer
@@ -666,9 +666,9 @@ factory/{issue-number}/
 │   ├── src/
 │   ├── tests/
 │   └── migrations/
-├── frontend/               # React + TypeScript
-│   ├── src/components/
-│   ├── src/hooks/
+├── frontend/               # SvelteKit + TypeScript
+│   ├── src/lib/core/       # framework-free shared code
+│   ├── src/lib/components/
 │   └── tests/
 ├── infrastructure/         # Docker + CI/CD
 │   ├── Dockerfile

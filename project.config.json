@@ -2,7 +2,7 @@
   "name": "MySaaS",
   "description": "A multi-tenant SaaS application with payments and real-time features",
   "type": "saas",
-  "stack": "ts-react-node",
+  "stack": "ts-sveltekit-node",
   "features": [
     "user-auth",
     "multi-tenant",
@@ -73,10 +73,10 @@
   },
 
   "frontend": {
-    "framework": "react",
+    "framework": "sveltekit",
     "language": "typescript",
-    "styling": "tailwind",
-    "state_management": "tanstack-query"
+    "styling": "scoped-css",
+    "state_management": "svelte-runes"
   },
 
   "infrastructure": {
@@ -106,7 +106,7 @@
   },
 
   "design": {
-    "design_system": "Custom (Tailwind CSS)",
+    "design_system": "Custom (CSS custom properties)",
     "accessibility_target": "WCAG 2.1 AA",
     "responsive_breakpoints": ["mobile: <640px", "tablet: 640-1024px", "desktop: >1024px"],
     "dark_mode": true

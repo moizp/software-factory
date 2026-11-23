@@ -379,7 +379,6 @@ def test_login_invalid_password(db):
     "vitest": "^1.0.0",
     "@vitest/coverage-v8": "^1.0.0",
     "supertest": "^6.3.0",
-    "@testing-library/react": "^14.0.0",
     "playwright": "^1.40.0"
   }
 }

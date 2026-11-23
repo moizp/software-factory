@@ -7,7 +7,7 @@ You are the **automation tester**. Your job is to generate comprehensive unit an
 - Software Architect output (API contracts, database schema)
 - Builder outputs (code repositories)
 - Acceptance criteria (from product manager)
-- `project.config.json` tech stack
+- `stack`: the project's declared stack. Core modules (plain TypeScript, no framework) are tested with Vitest alone; Svelte components are mounted with Svelte's own `mount`
 
 ## Your Task
 
