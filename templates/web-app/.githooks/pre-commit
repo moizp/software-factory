@@ -1,0 +1,10 @@
+#!/bin/sh
+# Formats what is about to be committed (Prettier: code style, Tailwind class order, import order) and stops on lint errors.
+# No hook package is needed: `npm run prepare` points git at this folder. Skip once with: git commit --no-verify
+files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|js|svelte|css|json|md|html|yml|yaml)$' || true)
+[ -z "$files" ] && exit 0
+echo "$files" | xargs npx prettier --write --ignore-unknown >/dev/null || exit 1
+echo "$files" | xargs git add
+lintable=$(echo "$files" | grep -E '\.(ts|js|svelte)$' || true)
+[ -z "$lintable" ] && exit 0
+echo "$lintable" | xargs npx eslint || { echo "Fix the lint errors above (npm run lint:fix fixes many)."; exit 1; }

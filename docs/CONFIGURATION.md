@@ -169,7 +169,7 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
   "frontend": {
     "framework": "sveltekit (default)|react|vue|angular",
     "language": "typescript|javascript",
-    "styling": "scoped-css (default)|tailwind|styled-components",
+    "styling": "tailwind (default)|scoped-css|styled-components",
     "state_management": "svelte-runes (default)|tanstack-query|zustand|redux|pinia",
     "build_tool": "vite (SvelteKit)|webpack|next"
   }
@@ -181,11 +181,27 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 {
   "framework": "sveltekit",
   "language": "typescript",
-  "styling": "scoped-css",
+  "styling": "tailwind",
   "state_management": "svelte-runes",
   "build_tool": "vite"
 }
 ```
+
+### CSS budget
+
+Hand-written CSS is capped so it cannot grow forever (`npm run css:check`, `.claude/skills/styling.md`). Defaults:
+
+```json
+{
+  "css_budget": {
+    "authored_kb": 20,
+    "svelte_style_lines": 30,
+    "built_gzip_kb": 50
+  }
+}
+```
+
+Never raise a number to pass the check; restructure, or ask a person.
 
 ### Boundaries (shared code)
 
@@ -282,7 +298,7 @@ Shared code is framework-agnostic: a core layer of plain TypeScript that imports
 **Example:**
 ```json
 {
-  "design_system": "Custom (CSS custom properties)",
+  "design_system": "Custom (Tailwind CSS, tokens in @theme)",
   "accessibility_target": "WCAG 2.1 AA",
   "responsive_breakpoints": [
     "mobile: <640px",
@@ -440,7 +456,7 @@ ENABLE_NOTIFICATIONS=true
   "frontend": {
     "framework": "sveltekit",
     "language": "typescript",
-    "styling": "scoped-css"
+    "styling": "tailwind"
   },
   
   "testing": {

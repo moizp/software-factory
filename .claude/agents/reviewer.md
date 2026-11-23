@@ -86,6 +86,7 @@ You are the **quality assurance gate keeper**. Your job is to verify that code f
 - [ ] All acceptance criteria from analyzer met
 - [ ] Be a sceptic: the code was written by a model. Look for what is wrong, not for what is right, and list under `review.challenges` what you tried to find wrong (edge cases, failure paths, needless complexity, duplication, hidden internals), one sentence each. List under `review.not_verified` what you could not check
 - [ ] Modules: each plan module's code keeps to its `interface`, hides its `hides`, and has `boundary_tests`; a leaked internal or a wrapper that hides nothing goes in `review.issues`
+- [ ] Developer experience: formatting, class order and import order are automated (`npm run fix`, never by hand); `npm run check:all` is among the checks; `css:check` stays in budget and no budget was raised; a local setup exists (`.env.example`, `doctor`, compose for dependencies, README troubleshooting); a gap goes in `review.issues`
 - [ ] Frame-agnostic core and few imports: shared code sits in core modules (`layer: core`) that import no framework and nothing from outside the project; each package in `new_dependencies` or `dependencies_added` is justified against writing it in-house, and a small one imported anyway goes in `review.issues`
 - [ ] Care: unseen layers are finished too (error handling, logs, migrations, naming, comments that explain why)
 - [ ] `plan.assumed_changes` and `plan.futures` are in your summary so a person sees them; do not approve work that depends on a change nobody agreed to

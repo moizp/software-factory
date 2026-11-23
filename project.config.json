@@ -72,10 +72,16 @@
     "api_style": "rest"
   },
 
+  "css_budget": {
+    "authored_kb": 20,
+    "svelte_style_lines": 30,
+    "built_gzip_kb": 50
+  },
+
   "frontend": {
     "framework": "sveltekit",
     "language": "typescript",
-    "styling": "scoped-css",
+    "styling": "tailwind",
     "state_management": "svelte-runes"
   },
 
@@ -106,7 +112,7 @@
   },
 
   "design": {
-    "design_system": "Custom (CSS custom properties)",
+    "design_system": "Custom (Tailwind CSS, tokens in @theme)",
     "accessibility_target": "WCAG 2.1 AA",
     "responsive_breakpoints": ["mobile: <640px", "tablet: 640-1024px", "desktop: >1024px"],
     "dark_mode": true

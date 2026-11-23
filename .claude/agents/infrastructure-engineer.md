@@ -21,20 +21,32 @@ You are the **infrastructure engineer**. Your job is to generate deployment conf
 8. **Commit to GitHub** — Push configs via GitHub MCP
 9. **Release Process** — Copy `templates/release/` into the app repo and implement `scripts/deploy.sh` for the app's platform; see `.claude/skills/release-process.md`
 10. **Project Board** — Copy `.factory/board.json` and `.github/workflows/board-sync.yml` into the app repo and follow `docs/PROJECT-BOARD.md`
+11. **Local development** — see the next section
+
+## Local development environment
+
+A developer goes from clone to running app in five minutes and finds a problem without asking anyone. Copy `templates/web-app/` and keep it current:
+
+- `.env.example` lists every variable with a safe local value (`.env` is gitignored). `MOCK_EXTERNALS=1` swaps payments, email and other third parties for local fakes.
+- `docker-compose.yml` runs only the dependencies (the database) with health checks; `npm run db:up`, `db:down`, `db:reset`. The app runs with `npm run dev` (hot reload; `dev:host` for a phone).
+- `npm run doctor` (`scripts/doctor.sh`) checks Node version, packages, `.env`, ports, database and git hooks, and prints the fix for each failure. `npm run clean` clears caches.
+- `.vscode/` gives format on save, debug launch configs and recommended extensions; a pre-commit hook formats and lints staged files.
+- CI runs the same `npm run check:all` developers run locally, so green locally means green in CI.
+- The README has a "Local development and troubleshooting" section: the five-minute start, these commands, and a table of the usual failures (port in use, database down, stale cache, wrong Node) with their fix.
 
 ## Configuration Files
 
 ### Dockerfile (Node Backend)
 
 ```dockerfile
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:18-alpine
+FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
@@ -107,7 +119,7 @@ Return **ONLY** this JSON:
     "images": [
       {
         "name": "my-saas-backend",
-        "base": "node:18-alpine",
+        "base": "node:24-alpine",
         "stages": [
           "builder",
           "runtime"

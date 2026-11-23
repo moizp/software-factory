@@ -16,11 +16,11 @@ export interface Stack {
   frontendIsDefault: boolean;
 }
 
-/** Svelte and SvelteKit with TypeScript, scoped CSS from the design tokens, and Svelte's own state: the fewest imports. */
+/** Svelte and SvelteKit with TypeScript and Tailwind CSS (tokens in @theme), and Svelte's own state: no other UI package. */
 export const DEFAULT_FRONTEND: Record<string, string> = {
   framework: 'sveltekit',
   language: 'typescript',
-  styling: 'scoped-css',
+  styling: 'tailwind',
   state_management: 'svelte-runes'
 };
 

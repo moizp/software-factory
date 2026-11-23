@@ -11,19 +11,19 @@
       "context": 8000
     },
     "software-architect": {
-      "instructions": 4250,
+      "instructions": 4300,
       "context": 12000
     },
     "backend-engineer": {
-      "instructions": 1850,
+      "instructions": 1950,
       "context": 16000
     },
     "frontend-engineer": {
-      "instructions": 2850,
+      "instructions": 3200,
       "context": 16000
     },
     "infrastructure-engineer": {
-      "instructions": 2350,
+      "instructions": 2600,
       "context": 16000
     },
     "automation-tester": {
@@ -35,7 +35,7 @@
       "context": 20000
     },
     "reviewer": {
-      "instructions": 3400,
+      "instructions": 3500,
       "context": 40000
     },
     "customer-support": {

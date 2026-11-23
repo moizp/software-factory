@@ -152,7 +152,8 @@ Generates:
 - Svelte components (20+) with TypeScript, in SvelteKit routes
 - A framework-free core layer (`src/lib/core`) for shared code
 - `load` functions for data and Svelte runes for interface state (no state library)
-- Scoped CSS from design tokens (CSS custom properties)
+- Tailwind CSS with the design tokens in `@theme` (hand-written CSS capped by `npm run css:check`)
+- Prettier (class and import sorting), ESLint, a pre-commit hook and `npm run check:all` from `templates/web-app/`
 - Responsive layouts (mobile/tablet/desktop)
 - Dark mode support
 - Vitest tests (core on its own, components mounted with Svelte's `mount`)

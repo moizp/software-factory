@@ -13,17 +13,17 @@ const put = (dir: string, rel: string, text: string) => { fs.mkdirSync(path.dirn
 const defaults = { core: DEFAULT_CORE, allow: [] as string[] };
 
 describe('the stack agents are told', () => {
-  it('defaults to SvelteKit, TypeScript, scoped CSS and Svelte runes when the project declares no frontend', () => {
+  it('defaults to SvelteKit, TypeScript, Tailwind and Svelte runes when the project declares no frontend', () => {
     const s = parseStack({ name: 'x', stack: 'ts-sveltekit-node', backend: { language: 'typescript', database: 'postgres' } });
     expect(s.frontend).toEqual(DEFAULT_FRONTEND);
     expect(s.frontendIsDefault).toBe(true);
-    expect(DEFAULT_FRONTEND).toEqual({ framework: 'sveltekit', language: 'typescript', styling: 'scoped-css', state_management: 'svelte-runes' });
+    expect(DEFAULT_FRONTEND).toEqual({ framework: 'sveltekit', language: 'typescript', styling: 'tailwind', state_management: 'svelte-runes' });
     expect(s.database).toBe('postgres');
     expect(renderStackLine(s)).toContain('sveltekit');
     expect(renderStackLine(s)).toContain('the default');
   });
   it('lets a project declare another frontend, and keeps only short string values', () => {
-    const s = parseStack({ frontend: { framework: 'react', language: 'typescript', styling: 'tailwind', 'bad key!': 'x', extra: 5, long: 'y'.repeat(200) } });
+    const s = parseStack({ frontend: { framework: 'react', language: 'typescript', styling: 'css-modules', 'bad key!': 'x', extra: 5, long: 'y'.repeat(200) } });
     expect(s.frontendIsDefault).toBe(false);
     expect(s.frontend.framework).toBe('react');
     expect(s.frontend['bad key!']).toBeUndefined();
@@ -47,10 +47,14 @@ describe('the stack agents are told', () => {
     expect(read('.claude', 'agents', 'analyzer.md')).toContain('`ts-sveltekit-node` (default)');
     for (const a of ['frontend-engineer', 'software-architect', 'analyzer', 'backend-engineer', 'automation-tester']) expect(read('.claude', 'agents', `${a}.md`)).toContain('`stack`');
   });
-  it('leaves no React, Tailwind or TanStack default in the prompts that run', () => {
+  it('leaves no React or TanStack default in the prompts that run, and names Tailwind as the styling', () => {
     for (const a of ['frontend-engineer', 'analyzer', 'software-architect', 'backend-engineer', 'ui-designer', 'automation-tester']) {
       const text = read('.claude', 'agents', `${a}.md`);
       expect(text).not.toMatch(/tanstack|React Testing Library|lucide-react|react-router|tailwind\.config|Next\.js/i);
+    }
+    expect(read('.claude', 'agents', 'frontend-engineer.md')).toContain('Tailwind CSS (`@tailwindcss/vite`)');
+    expect(JSON.parse(read('project.config.json')).frontend.styling).toBe('tailwind');
+    {
     }
     expect(read('.claude', 'agents', 'frontend-engineer.md')).not.toMatch(/Based on stack \(React/);
   });

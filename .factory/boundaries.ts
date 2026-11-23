@@ -50,6 +50,8 @@ export function parseBoundaries(raw: unknown): { ok: true; value: Boundaries } |
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.svelte-kit', '.next', 'coverage']);
 const CODE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
 const ADAPTER_FILE = /\.(?:svelte|tsx|jsx|vue|astro)$/;
+/** A test may import its test runner: only the code that ships is held to the core's rules. */
+const TEST_FILE = /(?:\.(?:test|spec)\.[a-z]+$|(?:^|\/)__tests__\/)/;
 
 function walk(root: string, dir = ''): string[] {
   const out: string[] = [];
@@ -104,10 +106,10 @@ export interface Report {
   violations: Violation[];
 }
 
-/** Every core file of the project at `root`, checked. Component files in the core are violations too. */
+/** Every core file of the project at `root`, checked, except tests. Component files in the core are violations too. */
 export function checkProject(root: string, b: Boundaries): Report {
   const matchers = b.core.map(globToRegExp);
-  const files = walk(root).filter(f => matchers.some(m => m.test(f)));
+  const files = walk(root).filter(f => matchers.some(m => m.test(f)) && !TEST_FILE.test(f));
   const violations: Violation[] = [];
   let scanned = 0;
   for (const f of files) {
