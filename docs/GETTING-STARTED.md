@@ -92,7 +92,19 @@ A run that stops leaves `workflows/<id>.handoff.md`: why, what was done, and the
 
 What a run produces today: structured requirements, an analysis, an architecture and an implementation plan, file lists with descriptions from the three builders, test and e2e plans, a review verdict, and documentation. It does not write code into a branch or open a pull request yet (see `docs/NEXT-CAPABILITIES.md`, F6 and T1). The verification proves the pipeline, not the quality of generated code.
 
-## 6. GitHub lanes (optional)
+## 6. Before and after pictures (projects with a UI)
+
+An agent that changes what people see photographs it before and after, and puts both in the pull request and on the issue ([the rules](../.claude/skills/visual-evidence.md)).
+
+```bash
+npm install -D playwright && npx playwright install chromium     # in the project
+# project.config.json: "preview": { "command": "npm run dev", "url": "http://localhost:3000" }
+npm run verify -- --quick       # project.preview and offline.evidence show it is ready
+```
+
+The architect lists `visual_checks` (screens and widths) in the plan you approve. The builder then runs `npm run evidence:capture -- --label before`, makes the change, runs it with `--label after`, and `npm run evidence:publish -- --issue <n> --commit <sha>` writes an `## Evidence` table for the PR and the issue. Pictures are stored on an `evidence` branch, never on main. The PR text check asks for them whenever the diff touches interface files.
+
+## 7. GitHub lanes (optional)
 
 For agents that pick up issues labelled `agent:ready` in GitHub Actions (design: [CLOUD-RUNNERS.md](CLOUD-RUNNERS.md)):
 
@@ -104,7 +116,7 @@ npm run verify -- --github --issue 12       # what the lanes did for issue 12: l
 
 Set the secret `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) and the variable `AGENTS_ENABLED=true` in the repository settings by hand. The report lists names only, never values. Nothing here has run end to end in Actions yet: a `PASS` means the setup is in place, and the first labelled issue is the real test. Paste `--issue` output to have a stuck run diagnosed.
 
-## 7. Read a failure
+## 8. Read a failure
 
 | Row | Usual cause | Fix |
 |---|---|---|
@@ -114,6 +126,7 @@ Set the secret `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) and the var
 | `project.*` FAIL | A declaration has a placeholder or a missing field | The report lists each problem; edit the file, run the check named in section 3 |
 | `project.policy` | A policy that would auto-merge a protected change, or names a requirement the merge step cannot check | `docs/POLICY.md` |
 | `mock.*` | The orchestrator or a contract changed | Paste the report; the notes show where the run stopped |
+| `offline.evidence` | Chromium cannot take a picture, or two captures of the same page differ | `npx playwright install chromium`; paste the report if the bytes differ |
 | `live.agents` | The model broke a contract twice, or `claude` is not logged in | Paste the report |
 
 Pasting `verify-report.md` into a session gives the whole picture in one message: versions, every row, the output of every failure and the next steps in order.

@@ -1,6 +1,7 @@
 import { Policy } from '../policy-engine';
 import { classifyRisk } from '../review/risk';
 import { Tier } from '../review/types';
+import { checkVisualEvidence } from '../evidence/ui-paths';
 import { checkEvidence, EvidenceIssue } from './evidence';
 import { lintProse, Violation } from './prose-lint';
 
@@ -42,6 +43,7 @@ export function lintPr(input: PrLintInput): PrLintReport {
 
   const add = (i: EvidenceIssue) => warnings.push(`${i.rule}: ${i.message}`);
   checkEvidence(input.body, tier).forEach(add);
+  for (const v of checkVisualEvidence(input.body, input.files, tier)) (v.severity === 'error' ? errors : warnings).push(`${v.rule}: ${v.message}`);
 
   return { tier, errors, warnings };
 }
