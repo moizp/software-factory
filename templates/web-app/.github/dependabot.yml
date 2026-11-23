@@ -1,0 +1,38 @@
+# Keeps dependencies current: one grouped pull request a week for minor and patch updates, one per package for majors.
+# Fewer dependencies means fewer of these; remove a package instead of updating it when you can.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: UTC
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: UTC
+    commit-message:
+      prefix: chore
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: UTC
+    commit-message:
+      prefix: chore

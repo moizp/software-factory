@@ -1,0 +1,61 @@
+name: Dependency review (factory)
+
+# Weekly. Dependabot opens the update pull requests (.github/dependabot.yml); this job covers what it cannot see (the MCP
+# server versions pinned in project.config.json and the web-app template) and known vulnerabilities, and keeps one issue
+# open while anything needs attention.
+on:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+      - run: npm ci
+      - name: Known vulnerabilities in what ships
+        id: audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee "$RUNNER_TEMP/audit.txt"
+      - name: Pinned tools behind their latest release
+        id: pins
+        continue-on-error: true
+        run: node templates/web-app/scripts/pins-check.cjs project.config.json templates/web-app/.mcp.json 2>&1 | tee "$RUNNER_TEMP/pins.txt"
+      - name: Packages with a newer version (information)
+        run: npm outdated 2>&1 | tee "$RUNNER_TEMP/outdated.txt" || true
+      - uses: actions/github-script@v7
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          PINS: ${{ steps.pins.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const read = (f) => { try { return fs.readFileSync(`${process.env.RUNNER_TEMP}/${f}`, 'utf-8').slice(0, 6000); } catch { return ''; } };
+            const label = 'dependencies';
+            const { owner, repo } = context.repo;
+            try { await github.rest.issues.getLabel({ owner, repo, name: label }); }
+            catch { await github.rest.issues.createLabel({ owner, repo, name: label, color: '0366d6', description: 'Dependency updates and review' }); }
+            const open = (await github.rest.issues.listForRepo({ owner, repo, labels: label, state: 'open', per_page: 1 })).data[0];
+            const problems = [];
+            if (process.env.AUDIT === 'failure') problems.push('## Vulnerabilities\n```\n' + read('audit.txt') + '\n```');
+            if (process.env.PINS === 'failure') problems.push('## Pinned tools behind\n```\n' + read('pins.txt') + '\n```');
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            if (problems.length === 0) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Nothing needs attention any more: ${run}\n\nClosing.` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            const body = [`Weekly dependency review: ${run}`, ...problems, '', 'Update the pinned versions by hand (Dependabot cannot see them): `SVELTE_MCP_VERSION` and `PLAYWRIGHT_MCP_VERSION` in `.factory/mcp.ts`, `project.config.json`, `templates/web-app/.mcp.json`, `scripts/setup-mcp.sh` and the docs, then run `npm test` (a test keeps them equal). For vulnerabilities, update or remove the package.'].join('\n\n');
+            if (open) await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title: 'Dependencies need attention', labels: [label], body });

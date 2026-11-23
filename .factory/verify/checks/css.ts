@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { checkDependencies } from '../../deps';
 import { checkDevEx } from '../../devex';
 import { addCommand, checkMcp, serversFor } from '../../mcp';
 import { loadStack } from '../../stack';
@@ -8,6 +9,19 @@ import { Check, Ctx, fail, pass, skip, warn } from '../types';
 const budgetScript = (ctx: Ctx): string => path.join(ctx.factoryRoot, 'templates', 'web-app', 'scripts', 'css-budget.cjs');
 
 export const webAppChecks: Check[] = [
+  {
+    id: 'project.deps',
+    tier: 'offline',
+    title: 'Few dependencies: each one is another package to keep updated',
+    run: ctx => {
+      const r = checkDependencies(ctx.projectDir);
+      if (!r.applicable) return skip('no package.json');
+      const counts = `${r.runtime} runtime and ${r.dev} dev package(s); budget ${r.budget.runtime} and ${r.budget.dev}`;
+      return r.over.length === 0
+        ? pass(counts)
+        : warn(`over budget: ${r.over.join('; ')}`, counts, 'Remove a package or write the small piece in-house; keep one only if the plan\'s new_dependencies says why (.claude/skills/developer-experience.md)');
+    }
+  },
   {
     id: 'project.mcp',
     tier: 'offline',

@@ -49,7 +49,7 @@ Start from `templates/web-app/` (Prettier with Tailwind class and import sorting
 
 ## Dependencies
 
-Write small things yourself and import little. Before adding a package, ask whether you could write it in about 100 lines you can test (formatting, class joins, debounce, validation, small state machines, fetch wrappers, icons as inline SVG): if so, write it. Import only what is hard to get right or unsafe to hand-write (cryptography, authentication protocols, HTML sanitising, time zones, parsers for complex standards, the framework itself, Tailwind CSS, and the build, format, lint and test tools). List every package you add in `dependencies_added`, each `{"name", "why", "own_alternative"}` (`[]` if none).
+Every package is one more to keep updated, audited and patched for the life of the project, so fewer packages means less upkeep. Write small things yourself and import little. Before adding a package, ask whether you could write it in about 100 lines you can test (formatting, class joins, debounce, validation, small state machines, fetch wrappers, icons as inline SVG): if so, write it. Import only what is hard to get right or unsafe to hand-write (cryptography, authentication protocols, HTML sanitising, time zones, parsers for complex standards, the framework itself, Tailwind CSS, and the build, format, lint and test tools). List every package you add in `dependencies_added`, each `{"name", "why", "own_alternative"}` (`[]` if none).
 
 ## Code Generation Process
 

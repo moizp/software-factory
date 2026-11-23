@@ -31,7 +31,8 @@ A developer goes from clone to running app in five minutes and finds a problem w
 - `docker-compose.yml` runs only the dependencies (the database) with health checks; `npm run db:up`, `db:down`, `db:reset`. The app runs with `npm run dev` (hot reload; `dev:host` for a phone).
 - `npm run doctor` (`scripts/doctor.sh`) checks Node version, packages, `.env`, ports, database and git hooks, and prints the fix for each failure. `npm run clean` clears caches.
 - `.vscode/` gives format on save, debug launch configs and recommended extensions; a pre-commit hook formats and lints staged files.
-- CI runs the same `npm run check:all` developers run locally, so green locally means green in CI.
+- CI runs the same `npm run check:all` developers run locally, so green locally means green in CI (`templates/web-app/.github/workflows/ci.yml`).
+- Dependencies stay current without a person remembering: copy `templates/web-app/.github/dependabot.yml` (one grouped weekly pull request for minor and patch updates, majors on their own) and `.github/workflows/dependency-review.yml` (weekly audit and a check of pinned MCP versions, one issue while anything needs attention).
 - The README has a "Local development and troubleshooting" section: the five-minute start, these commands, and a table of the usual failures (port in use, database down, stale cache, wrong Node) with their fix.
 
 ## Configuration Files

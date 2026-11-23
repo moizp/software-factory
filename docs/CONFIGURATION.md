@@ -187,6 +187,19 @@ Complete schema and setup guide for project.config.json, MCP servers, and enviro
 }
 ```
 
+### Dependency budget
+
+Each package is upkeep for the life of the project, so the count is shown and capped (`project.deps` in `npm run verify`, a warning when over). Defaults:
+
+```json
+{
+  "dependency_budget": {
+    "runtime": 15,
+    "dev": 30
+  }
+}
+```
+
 ### CSS budget
 
 Hand-written CSS is capped so it cannot grow forever (`npm run css:check`, `.claude/skills/styling.md`). Defaults:

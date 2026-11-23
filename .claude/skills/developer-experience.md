@@ -23,10 +23,22 @@ Good developer experience is what keeps a codebase healthy while agents and peop
 | `package.additions.json` | The scripts and the pinned dev dependencies to merge into `package.json` |
 | `scripts/doctor.sh` | Checks Node version, packages, `.env`, ports, database and hooks; prints the fix for each |
 | `scripts/css-budget.cjs` | The CSS growth check (`.claude/skills/styling.md`) |
+| `scripts/pins-check.cjs` | Compares versions pinned in `.mcp.json` with the latest release |
+| `.github/dependabot.yml`, `.github/workflows/` | Weekly dependency updates, CI running `check:all`, and a weekly dependency review that opens one issue while anything needs attention |
+| `.mcp.json` | The Svelte MCP, pinned (`.claude/skills/mcp-setup.md`) |
 | `.env.example`, `docker-compose.yml` | The environment and the database for local work |
 | `src/lib/core/money.ts` and its test | A core module and a test, to show the layout and prove the setup |
 
 Scripts: `dev`, `dev:host` (phone on the same network), `build`, `preview`, `check`, `format`, `format:check`, `lint`, `lint:fix`, `fix` (format and lint fix), `test`, `test:watch`, `css:check`, `check:all`, `clean`, `doctor`, `db:up`, `db:down`, `db:reset`.
+
+## Dependencies: fewer, and kept current
+
+Every package is one more to keep updated, audited and patched for as long as the project lives, and each one is another way for a release to break. So the project keeps few, and keeps the ones it has current without anyone having to remember.
+
+- **Fewer.** Write small things in-house; import only what is hard or unsafe to hand-write (`.claude/skills/principles.md`). The plan lists `new_dependencies` with why the in-house alternative lost, and `dependency_budget` in `project.config.json` (default 15 runtime, 30 dev) is shown by `project.deps` in `npm run verify`. Over budget is a warning: remove one, or say why one earns its place. Removing a package is as good as updating it.
+- **Updated weekly, automatically.** `.github/dependabot.yml` opens one grouped pull request a week for minor and patch updates, one per package for majors, and one for the actions the workflows use (npm, GitHub Actions and the compose images). CI runs `check:all` on each; a person merges, because a dependency manifest is a protected path.
+- **What Dependabot cannot see.** The MCP servers pinned in `.mcp.json` and `project.config.json` are checked by `scripts/pins-check.cjs`; `.github/workflows/dependency-review.yml` runs it every Monday with `npm audit --omit=dev --audit-level=high`, and keeps one issue labelled `dependencies` open while a pin is behind or a vulnerability is found, closing it when clear.
+- **Never** update by loosening a pin, skipping a failing test, or adding `--force`. A major update that needs work becomes a task of its own. `typescript` stays at `~6.0` until typescript-eslint supports 7.
 
 ## Local environment
 

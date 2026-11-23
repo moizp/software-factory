@@ -88,6 +88,11 @@
     "api_style": "rest"
   },
 
+  "dependency_budget": {
+    "runtime": 15,
+    "dev": 30
+  },
+
   "css_budget": {
     "authored_kb": 20,
     "svelte_style_lines": 30,
