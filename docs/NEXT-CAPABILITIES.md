@@ -150,6 +150,14 @@ Checked against docs.humanlayer.com in October 2026. Each one is a prompt, confi
 
 T1's first version stays small: one builder in a worktree, typecheck and tests after each phase, on a change the size of an R1 slice. Research sub-agents (C1) and more than one repository come after it works.
 
+**Phase 2 spike (run 23 November 2026): rejected as a branch, kept as a patch.** A branch `spike/phase2-check` (one commit, 6 October) tried the T1 loop with real model calls: a git worktree per run with a commit per node (`worktree.ts`), a build, gate and feedback loop with an iteration cap that stops early when the same failure repeats (`loopback.ts`), and a builder started as `claude -p --tools Read,Write,Edit,Glob,Grep --permission-mode acceptEdits --max-budget-usd` inside the worktree. Run again with `claude` 2.1.304 and `claude-sonnet-5-5`: one attempt (3 turns, 14,128 tokens, $0.019 API-equivalent) wrote `add.js` and `add.test.js`, the gate (`node --test`) passed, one commit landed on `factory/spike-1`, and the main checkout was untouched; its 6 unit tests pass and every flag it uses exists in the installed CLI. It was not merged because nothing would call it until F6 and T1 (code is not cheap), the branch was 112 commits behind and carries a throwaway script, and it leaves open the questions that must be answered before a builder is given tools:
+1. Whether `Read` and `Glob` can reach files outside the worktree (the home directory, other repositories), and how to confine them.
+2. The builder inherits the whole environment, tokens included, so it needs a scrubbed one.
+3. Issue text is untrusted and reaches the builder's prompt (prompt injection), so what the builder can read must not include secrets.
+4. The spike's gate was a trivial `node --test`; the real gates (typecheck, lint, tests, `check:all`, `boundaries:check`, `css:check`) are untested in the loop.
+
+The code is archived as `docs/archive/phase2-spike.patch`, a plain diff of its five files, which applies cleanly to `main` as of 23 November 2026 (`git apply docs/archive/phase2-spike.patch`; check again before using it). Start T1 from it once those four are answered.
+
 Not taken from HumanLayer, because they add machinery without enough return here: their 18 Linear workflow states, Slack automations, multiplayer prompting, cloud-synced task folders (we commit artifacts), and a separate PRD and TDD stage for every change (R3 only, if ever).
 
 ## Principles check

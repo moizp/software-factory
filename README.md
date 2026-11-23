@@ -24,7 +24,7 @@ Be clear about what is proven.
 | Merge policy, WIP guard, board sync | Works, used on this repo's own PRs |
 | PR text check (`pr-lint.yml`) | Works. Runs on every PR; superseded runs are cancelled by a concurrency group |
 | AI review code (`.factory/review/`) | Built and unit-tested. **Never run in GitHub Actions or against the live API.** Setup below is how to test it |
-| Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike exists on branch `spike/phase2-check` |
+| Changing existing code (change mode), writing code into worktrees, draft PR creation | Not built. A spike was run, not merged, and archived as `docs/archive/phase2-spike.patch` (see F6 and T1 in `docs/NEXT-CAPABILITIES.md`) |
 | What is built next (review loop, feedback-driven flow, change mode) | Planned in [docs/NEXT-CAPABILITIES.md](docs/NEXT-CAPABILITIES.md): milestones M0 to M5 with a check for each capability |
 | Cloud lanes (Actions, Oracle VM, Buddy.works) | All five slices are merged and unit-tested: router, `route.yml`, `agent-job.yml`, Oracle runner scripts, Buddy burst lane, daily `sweep.yml`. **None has run for real yet.** See [Cloud lanes](#cloud-lanes-running-agents-off-your-machine) |
 

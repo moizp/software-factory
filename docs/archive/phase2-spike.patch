@@ -1,0 +1,286 @@
+diff --git a/.factory/__tests__/phase2-spike.test.ts b/.factory/__tests__/phase2-spike.test.ts
+new file mode 100644
+index 0000000..a52127c
+--- /dev/null
++++ b/.factory/__tests__/phase2-spike.test.ts
+@@ -0,0 +1,96 @@
++import * as fs from 'fs';
++import * as os from 'os';
++import * as path from 'path';
++import { execFileSync } from 'child_process';
++import { changedFiles, commitAll, createRunWorktree, removeRunWorktree } from '../worktree';
++import { loopBack } from '../loopback';
++import { buildBuilderArgs } from '../claude-bridge';
++
++function scratchRepo(): string {
++  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wt-repo-'));
++  const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf-8' });
++  git('init', '-q', '-b', 'main');
++  git('config', 'user.email', 't@example.com');
++  git('config', 'user.name', 't');
++  fs.writeFileSync(path.join(dir, 'README.md'), 'x\n');
++  git('add', '-A');
++  git('commit', '-q', '-m', 'base');
++  return dir;
++}
++
++describe('run worktree', () => {
++  it('commits per node on its own branch and leaves the main checkout untouched', () => {
++    const repo = scratchRepo();
++    const wt = createRunWorktree(repo, 'run-1', 'main');
++    expect(wt.branch).toBe('factory/run-1');
++
++    fs.writeFileSync(path.join(wt.dir, 'a.js'), 'module.exports = 1;\n');
++    const first = commitAll(wt, 'feat: add a');
++    expect(first).toMatch(/^[0-9a-f]{40}$/);
++    expect(commitAll(wt, 'feat: nothing changed')).toBeNull();
++
++    fs.writeFileSync(path.join(wt.dir, 'b.js'), 'module.exports = 2;\n');
++    commitAll(wt, 'feat: add b');
++
++    expect(changedFiles(wt, 'main').sort()).toEqual(['a.js', 'b.js']);
++    expect(fs.existsSync(path.join(repo, 'a.js'))).toBe(false);
++    const log = execFileSync('git', ['log', '--format=%s', 'main..factory/run-1'], { cwd: repo, encoding: 'utf-8' });
++    expect(log.trim().split('\n')).toEqual(['feat: add b', 'feat: add a']);
++
++    removeRunWorktree(wt);
++    expect(fs.existsSync(wt.dir)).toBe(false);
++  });
++
++  it('rejects multi-line commit messages', () => {
++    const repo = scratchRepo();
++    const wt = createRunWorktree(repo, 'run-2', 'main');
++    fs.writeFileSync(path.join(wt.dir, 'a.js'), '1');
++    expect(() => commitAll(wt, 'feat: a\n\nbody')).toThrow(/single line/);
++  });
++});
++
++describe('loopBack', () => {
++  it('passes after feedback and counts iterations', async () => {
++    const feedbackSeen: Array<string | null> = [];
++    let n = 0;
++    const outcome = await loopBack({
++      attempt: async (_i, feedback) => { feedbackSeen.push(feedback); },
++      gate: async () => (++n < 3 ? { passed: false, feedback: `fail ${n}` } : { passed: true, feedback: '' }),
++      maxIterations: 5
++    });
++    expect(outcome.status).toBe('passed');
++    expect(outcome.iterations).toBe(3);
++    expect(feedbackSeen).toEqual([null, 'fail 1', 'fail 2']);
++  });
++
++  it('escalates at the iteration cap', async () => {
++    let n = 0;
++    const outcome = await loopBack({
++      attempt: async () => undefined,
++      gate: async () => ({ passed: false, feedback: `different ${++n}` }),
++      maxIterations: 3
++    });
++    expect(outcome).toMatchObject({ status: 'escalated', iterations: 3 });
++    expect((outcome as any).reason).toMatch(/after 3 iterations/);
++  });
++
++  it('escalates early when the same failure repeats, saving tokens', async () => {
++    const outcome = await loopBack({
++      attempt: async () => undefined,
++      gate: async () => ({ passed: false, feedback: 'same error' }),
++      maxIterations: 5
++    });
++    expect(outcome).toMatchObject({ status: 'escalated', iterations: 2 });
++    expect((outcome as any).reason).toMatch(/repeated/);
++  });
++});
++
++describe('builder args', () => {
++  it('restricts tools, accepts edits and caps spend', () => {
++    const args = buildBuilderArgs(['Read', 'Write'], 0.25);
++    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Write');
++    expect(args[args.indexOf('--permission-mode') + 1]).toBe('acceptEdits');
++    expect(args[args.indexOf('--max-budget-usd') + 1]).toBe('0.25');
++    expect(args).toContain('--no-session-persistence');
++  });
++});
+diff --git a/.factory/claude-bridge.ts b/.factory/claude-bridge.ts
+index b0a1d70..cd3ee3d 100644
+--- a/.factory/claude-bridge.ts
++++ b/.factory/claude-bridge.ts
+@@ -191,9 +191,33 @@ async function invokeClaudeAgentViaCli(
+   prompt: string,
+   timeout: number = agentTimeoutMs()
+ ): Promise<CliResult> {
++  return runClaude(buildCliArgs(), prompt, agentCwd(), timeout);
++}
++
++/** Args for a builder that edits files inside a worktree (only the listed tools, spend capped). */
++export function buildBuilderArgs(tools: string[], maxBudgetUsd: number): string[] {
++  return [
++    '-p', '--output-format', 'json', '--no-session-persistence',
++    '--model', agentModel(), '--effort', agentEffort(),
++    '--tools', tools.join(','), '--permission-mode', 'acceptEdits',
++    '--max-budget-usd', String(maxBudgetUsd)
++  ];
++}
++
++/** Runs a builder in `cwd` (a git worktree). It writes files with the given tools; the caller commits. */
++export async function invokeClaudeBuilder(
++  prompt: string,
++  cwd: string,
++  options: { tools?: string[]; maxBudgetUsd?: number; timeout?: number } = {}
++): Promise<CliResult> {
++  const args = buildBuilderArgs(options.tools ?? ['Read', 'Write', 'Edit', 'Glob', 'Grep'], options.maxBudgetUsd ?? 0.5);
++  return runClaude(args, prompt, cwd, options.timeout ?? agentTimeoutMs());
++}
++
++async function runClaude(args: string[], prompt: string, cwd: string, timeout: number): Promise<CliResult> {
+   // Async spawn (not execSync) so parallel stages really run concurrently
+   return new Promise<CliResult>((resolve, reject) => {
+-    const child = spawn('claude', buildCliArgs(), { stdio: ['pipe', 'pipe', 'pipe'], cwd: agentCwd() });
++    const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'], cwd });
+     let stdout = '';
+     let stderr = '';
+     let settled = false;
+diff --git a/.factory/loopback.ts b/.factory/loopback.ts
+new file mode 100644
+index 0000000..dfde077
+--- /dev/null
++++ b/.factory/loopback.ts
+@@ -0,0 +1,43 @@
++/**
++ * Build -> gate -> feedback -> rebuild, with a hard iteration cap.
++ * Ends as "passed" or "escalated" (a human needs to look); it never loops forever.
++ */
++export interface GateResult {
++  passed: boolean;
++  /** What failed, handed back to the builder as feedback */
++  feedback: string;
++}
++
++export type LoopOutcome =
++  | { status: 'passed'; iterations: number; history: GateResult[] }
++  | { status: 'escalated'; iterations: number; history: GateResult[]; reason: string };
++
++export async function loopBack(options: {
++  attempt: (iteration: number, feedback: string | null) => Promise<void>;
++  gate: () => Promise<GateResult>;
++  maxIterations: number;
++  /** Stop early if the same failure repeats this many times in a row (default 2) */
++  maxRepeatedFailures?: number;
++}): Promise<LoopOutcome> {
++  const { attempt, gate, maxIterations } = options;
++  const maxRepeats = options.maxRepeatedFailures ?? 2;
++  const history: GateResult[] = [];
++  let feedback: string | null = null;
++
++  for (let iteration = 1; iteration <= maxIterations; iteration++) {
++    await attempt(iteration, feedback);
++    const result = await gate();
++    history.push(result);
++    if (result.passed) {
++      return { status: 'passed', iterations: iteration, history };
++    }
++
++    const tail = history.slice(-maxRepeats);
++    if (tail.length === maxRepeats && tail.every(r => r.feedback === result.feedback)) {
++      return { status: 'escalated', iterations: iteration, history, reason: `the same failure repeated ${maxRepeats} times` };
++    }
++    feedback = result.feedback;
++  }
++
++  return { status: 'escalated', iterations: maxIterations, history, reason: `still failing after ${maxIterations} iterations` };
++}
+diff --git a/.factory/spike/phase2-spike.ts b/.factory/spike/phase2-spike.ts
+new file mode 100644
+index 0000000..162f0f8
+--- /dev/null
++++ b/.factory/spike/phase2-spike.ts
+@@ -0,0 +1,44 @@
++import * as fs from 'fs';
++import * as os from 'os';
++import * as path from 'path';
++import { execFileSync, spawnSync } from 'child_process';
++import { createRunWorktree, commitAll, changedFiles } from '../worktree';
++import { loopBack } from '../loopback';
++import { invokeClaudeBuilder } from '../claude-bridge';
++
++(async () => {
++  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'spike-app-'));
++  const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf-8' });
++  git('init', '-q', '-b', 'main');
++  git('config', 'user.email', 't@example.com'); git('config', 'user.name', 't');
++  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ name: 'spike-app', version: '1.0.0' }));
++  git('add', '-A'); git('commit', '-q', '-m', 'chore: scratch app');
++
++  const wt = createRunWorktree(repo, 'spike-1', 'main');
++  let totalTokens = 0, totalCost = 0, calls = 0;
++
++  const task = 'Create add.js exporting a CommonJS function add(a, b) that returns a + b, and add.test.js using node:test and node:assert that tests it (positive, negative, zero). Only create those two files. Do not run anything.';
++
++  const outcome = await loopBack({
++    maxIterations: 2,
++    attempt: async (i, feedback) => {
++      const prompt = feedback ? `${task}\n\nThe gate failed with:\n${feedback}\nFix it.` : task;
++      const r = await invokeClaudeBuilder(prompt, wt.dir, { maxBudgetUsd: 0.3, timeout: 240000 });
++      calls++; totalTokens += r.usage?.totalTokens ?? 0; totalCost += r.usage?.costUsd ?? 0;
++      console.log(`attempt ${i}: ${r.usage?.totalTokens} tokens, turns ${r.usage?.turns}, reply: ${r.text.slice(0, 120).replace(/\n/g, ' ')}`);
++      const sha = commitAll(wt, `feat: builder attempt ${i}`);
++      console.log(`  committed: ${sha ? sha.slice(0, 7) : 'nothing changed'}`);
++    },
++    gate: async () => {
++      const t = spawnSync('node', ['--test'], { cwd: wt.dir, encoding: 'utf-8' });
++      const passed = t.status === 0;
++      console.log(`  gate: ${passed ? 'PASS' : 'FAIL'}`);
++      return { passed, feedback: passed ? '' : (t.stdout + t.stderr).slice(0, 1500) };
++    }
++  });
++
++  console.log(JSON.stringify({ status: outcome.status, iterations: outcome.iterations, calls, totalTokens, apiEquivalentUsd: totalCost.toFixed(4) }));
++  console.log('files changed vs main:', changedFiles(wt, 'main'));
++  console.log('commits:', git('log', '--format=%h %s', 'main..factory/spike-1').trim().split('\n'));
++  console.log('main checkout untouched:', !fs.existsSync(path.join(repo, 'add.js')));
++})().catch(e => { console.error('SPIKE ERROR', e.message); process.exit(1); });
+diff --git a/.factory/worktree.ts b/.factory/worktree.ts
+new file mode 100644
+index 0000000..aa9d7a6
+--- /dev/null
++++ b/.factory/worktree.ts
+@@ -0,0 +1,40 @@
++import { execFileSync } from 'child_process';
++import * as fs from 'fs';
++import * as os from 'os';
++import * as path from 'path';
++
++/** A per-run git worktree: builders write files here, the factory commits after each node. */
++export interface RunWorktree {
++  repoDir: string;
++  dir: string;
++  branch: string;
++}
++
++function git(cwd: string, ...args: string[]): string {
++  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
++}
++
++export function createRunWorktree(repoDir: string, runId: string, baseRef = 'HEAD'): RunWorktree {
++  const branch = `factory/${runId}`;
++  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'factory-wt-')), runId);
++  git(repoDir, 'worktree', 'add', '-q', '-b', branch, dir, baseRef);
++  return { repoDir, dir, branch };
++}
++
++/** Commits everything in the worktree with a single-line message. Returns the sha, or null if nothing changed. */
++export function commitAll(wt: RunWorktree, message: string): string | null {
++  if (message.includes('\n')) throw new Error('Commit messages must be a single line');
++  git(wt.dir, 'add', '-A');
++  if (git(wt.dir, 'status', '--porcelain') === '') return null;
++  git(wt.dir, '-c', 'user.name=software-factory', '-c', 'user.email=factory@users.noreply.github.com', 'commit', '-q', '-m', message);
++  return git(wt.dir, 'rev-parse', 'HEAD');
++}
++
++export function changedFiles(wt: RunWorktree, baseRef: string): string[] {
++  const out = git(wt.dir, 'diff', '--name-only', `${baseRef}...HEAD`);
++  return out ? out.split('\n') : [];
++}
++
++export function removeRunWorktree(wt: RunWorktree): void {
++  git(wt.repoDir, 'worktree', 'remove', '--force', wt.dir);
++}
