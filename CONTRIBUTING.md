@@ -13,7 +13,12 @@ main (trunk, always releasable)
 
 ## Releases
 
-The factory itself has no release cadence and no deploy environments. `main` is the product; tag a version (`git tag -a vX.Y.Z`) only when you want a reference point.
+The factory itself has no deploy environments, and releases when someone decides to. It is at 1.0.0 (see `CHANGELOG.md`), and from 1.0.0 a change to the agent contracts, the policy format, the project declaration files or the `npm run` commands the docs name is a breaking change. To release:
+
+1. On a `chore/release-vX.Y.Z` branch run `npm run version:next` to see the version the commits since the last tag call for, then `npm run version:bump` (or `-- --version X.Y.Z`). It writes `package.json`, `package-lock.json` and a `CHANGELOG.md` section. Read the section and edit it, then open the pull request (a protected path, so a person merges).
+2. After it merges, run **Factory Release** in the Actions tab with the version. It checks the files agree, tags `main` and publishes a GitHub release with that changelog section.
+
+`npm run version:check` (also in CI) fails when `package.json` and `package-lock.json` disagree.
 
 Apps **built by** the factory do have a cadence: release candidate branches cut from `main`, promoted through `www-test` → `www-demo` → `www-prod`, tagged and merged back. That process, its workflow templates and the free-plan caveats are in `.claude/skills/release-process.md` and `templates/release/`. The infrastructure-engineer agent installs them into each generated app.
 

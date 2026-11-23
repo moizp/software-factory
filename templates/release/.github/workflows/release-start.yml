@@ -1,14 +1,17 @@
 name: Release Start
 
-# Cuts release/vX.Y.Z from main (or from a tag for a hotfix) and opens a draft PR
-# back to main. The draft PR is the tracker for the whole release.
+# Cuts release/vX.Y.Z from main (or from a tag for a hotfix), writes the version into package.json and
+# package-lock.json and a section into CHANGELOG.md (scripts/version.cjs), and opens a draft PR back to main.
+# The draft PR is the tracker for the whole release. Leave the version empty to take it from the conventional
+# commits since the last tag: breaking is major, feat is minor, fix and perf are patch.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version without the v prefix, e.g. 1.4.0'
-        required: true
+        description: 'Version without the v prefix, e.g. 1.4.0. Empty: worked out from the commits since the last tag'
+        required: false
+        default: ''
       base:
         description: 'Base ref (default main; use a tag such as v1.4.0 for a hotfix)'
         required: false
@@ -30,6 +33,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Work out the version
+        run: |
+          if [ -z "$VERSION" ]; then
+            PLAN=$(node scripts/version.cjs next --json --since "$(git describe --tags --abbrev=0 --match 'v[0-9]*' "origin/$BASE" 2>/dev/null || true)") \
+              || { echo "Nothing to release since the last tag (only docs, chores, tests or refactors). Run again with a version to release anyway."; exit 1; }
+            VERSION=$(echo "$PLAN" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).next")
+            echo "Version from the commits: $VERSION"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
       - name: Validate version and one-RC-at-a-time
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must be X.Y.Z"; exit 1; }
@@ -50,7 +63,14 @@ jobs:
 
       - name: Create release branch and draft PR
         run: |
-          git push origin "$BASE_REF:refs/heads/release/v$VERSION"
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git checkout -q -b "release/v$VERSION" "$BASE_REF"
+          SINCE=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$BASE_REF" 2>/dev/null || true)
+          node scripts/version.cjs bump --version "$VERSION" ${SINCE:+--since "$SINCE"}
+          git add package.json package-lock.json CHANGELOG.md 2>/dev/null || git add package.json CHANGELOG.md
+          git commit -q -m "chore: release v$VERSION"
+          git push origin "release/v$VERSION"
           cat > body.md <<BODY
           Tracker for release **v$VERSION**. Fixes during stabilisation are PRs targeting \`release/v$VERSION\`.
 

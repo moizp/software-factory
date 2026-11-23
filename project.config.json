@@ -1,5 +1,6 @@
 {
   "name": "MySaaS",
+  "factory_version": "1.0.0",
   "description": "A multi-tenant SaaS application with payments and real-time features",
   "type": "saas",
   "stack": "ts-sveltekit-node",
