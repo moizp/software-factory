@@ -1,0 +1,40 @@
+{
+  "_comment": "Merge into the app's package.json. typescript stays below 6.1 until typescript-eslint supports TypeScript 7. Versions are the ones this template was tested with (SvelteKit 3, Vite 8, Tailwind 4).",
+  "scripts": {
+    "dev": "vite dev",
+    "dev:host": "vite dev --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync && git config core.hooksPath .githooks || true",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "fix": "npm run format && npm run lint:fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "css:check": "node scripts/css-budget.cjs",
+    "check:all": "npm run format:check && npm run lint && npm run check && npm test && npm run css:check",
+    "clean": "rm -rf .svelte-kit build node_modules/.vite coverage",
+    "doctor": "bash scripts/doctor.sh",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait db"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.24.1",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "prettier-plugin-svelte": "^4.2.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
+  }
+}

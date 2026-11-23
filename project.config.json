@@ -2,7 +2,7 @@
   "name": "MySaaS",
   "description": "A multi-tenant SaaS application with payments and real-time features",
   "type": "saas",
-  "stack": "ts-react-node",
+  "stack": "ts-sveltekit-node",
   "features": [
     "user-auth",
     "multi-tenant",
@@ -51,6 +51,22 @@
       "description": "Auth and realtime sync",
       "endpoint": "https://supabase-mcp.example.com",
       "auth": "env:SUPABASE_KEY"
+    },
+    "svelte": {
+      "type": "stdio",
+      "required": true,
+      "description": "Svelte and SvelteKit documentation and svelte-autofixer, used for any Svelte front-end",
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp@0.1.31"],
+      "applies_when": { "frontend.framework": "sveltekit" }
+    },
+    "playwright": {
+      "type": "stdio",
+      "required": false,
+      "description": "A real browser for exploring and debugging the running app",
+      "command": "npx",
+      "args": ["@playwright/mcp@0.0.86", "--headless"],
+      "applies_when": { "frontend.framework": "sveltekit" }
     }
   },
 
@@ -72,11 +88,22 @@
     "api_style": "rest"
   },
 
+  "dependency_budget": {
+    "runtime": 15,
+    "dev": 30
+  },
+
+  "css_budget": {
+    "authored_kb": 20,
+    "svelte_style_lines": 30,
+    "built_gzip_kb": 50
+  },
+
   "frontend": {
-    "framework": "react",
+    "framework": "sveltekit",
     "language": "typescript",
     "styling": "tailwind",
-    "state_management": "tanstack-query"
+    "state_management": "svelte-runes"
   },
 
   "infrastructure": {
@@ -106,7 +133,7 @@
   },
 
   "design": {
-    "design_system": "Custom (Tailwind CSS)",
+    "design_system": "Custom (Tailwind CSS, tokens in @theme)",
     "accessibility_target": "WCAG 2.1 AA",
     "responsive_breakpoints": ["mobile: <640px", "tablet: 640-1024px", "desktop: >1024px"],
     "dark_mode": true

@@ -310,7 +310,7 @@ Return **ONLY** this JSON:
     "handoff_ready": true
   },
   "icon_library": {
-    "provider": "lucide-react",
+    "provider": "inline SVG, no icon package",
     "icons_needed": [
       "dashboard",
       "invoice",

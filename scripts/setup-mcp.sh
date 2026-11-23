@@ -33,10 +33,10 @@ add_server() {
     
     if eval "$command" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Configured"
-        ((SERVERS_CONFIGURED++))
+        SERVERS_CONFIGURED=$((SERVERS_CONFIGURED + 1))
     else
         echo -e "${RED}✗${NC} Failed"
-        ((SERVERS_FAILED++))
+        SERVERS_FAILED=$((SERVERS_FAILED + 1))
     fi
 }
 
@@ -52,6 +52,17 @@ else
     echo "   Install: npm install -g @anthropic-ai/claude-code"
     exit 1
 fi
+
+# Servers the stack calls for. Project scope, so they are shared through .mcp.json.
+# A Svelte or SvelteKit front-end gets the official Svelte MCP (documentation and svelte-autofixer), pinned to a version.
+framework=$(node -p "try{require('./project.config.json').frontend.framework}catch(e){''}" 2>/dev/null)
+case "$framework" in
+    sveltekit|svelte)
+        echo ""
+        echo "🧩 Configuring stack servers (Svelte)..."
+        add_server "Svelte" "claude mcp add -t stdio -s project svelte -- npx -y @sveltejs/mcp@0.1.31"
+        ;;
+esac
 
 # Add HTTP-based servers (if needed)
 echo ""

@@ -1,0 +1,23 @@
+{
+  "useTabs": true,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "printWidth": 100,
+  "plugins": [
+    "@ianvs/prettier-plugin-sort-imports",
+    "prettier-plugin-svelte",
+    "prettier-plugin-tailwindcss"
+  ],
+  "importOrder": [
+    "<BUILTIN_MODULES>",
+    "<THIRD_PARTY_MODULES>",
+    "^\\$(app|env|service-worker)(/.*)?$",
+    "^\\$lib/core/(.*)$",
+    "^\\$lib/(.*)$",
+    "^[./]"
+  ],
+  "importOrderTypeScriptVersion": "5.0.0",
+  "overrides": [{ "files": "*.svelte", "options": { "parser": "svelte" } }],
+  "tailwindStylesheet": "./src/routes/layout.css",
+  "tailwindFunctions": ["cn", "clsx"]
+}

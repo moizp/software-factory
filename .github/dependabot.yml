@@ -1,0 +1,30 @@
+# Keeps the factory's own dependencies current: one grouped pull request a week for minor and patch updates, one per
+# package for majors, and one for the actions the workflows use. Dependency manifests are protected paths, so a person
+# merges these. Fewer dependencies means fewer of these pull requests.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: UTC
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: UTC
+    commit-message:
+      prefix: chore
+    groups:
+      actions:
+        patterns: ['*']

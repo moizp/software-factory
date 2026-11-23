@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug the dev server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev"
+    },
+    {
+      "name": "Debug the current test file",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npx vitest run ${relativeFile}"
+    }
+  ]
+}

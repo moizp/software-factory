@@ -111,10 +111,10 @@ describe('the orchestrator uses the pack', () => {
       return { phase: agent, valid: true, ...stubPayload(agent), usage };
     }) as any;
     await new FactoryOrchestrator(invoker, false, undefined, retryConfig).executeWorkflow('Build', 1, {}, undefined, { until: 'reviewer' });
-    expect(seen['backend-engineer']).toEqual(['productManagerOutput', 'analyzerOutput', 'architectOutput']);
+    expect(seen['backend-engineer']).toEqual(['stack', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
     expect(seen['backend-engineer']).toEqual(seen['frontend-engineer']);
     expect(seen['backend-engineer']).toEqual(seen['infrastructure-engineer']);
-    expect(seen['software-architect']).toEqual(['brief', 'productManagerOutput', 'analyzerOutput']);
+    expect(seen['software-architect']).toEqual(['brief', 'stack', 'productManagerOutput', 'analyzerOutput']);
     expect(seen['reviewer']).toEqual(['allArtifacts', 'planCheck']);
   });
 

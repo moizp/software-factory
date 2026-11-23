@@ -294,7 +294,7 @@ Text Secondary: neutral-400
 
 ## Component Library Setup
 
-### Tailwind Config
+### Tailwind Config (the default styling; tokens in v4 go in `@theme` in `src/routes/layout.css`, see `.claude/skills/styling.md`)
 ```javascript
 module.exports = {
   theme: {

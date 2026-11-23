@@ -97,6 +97,10 @@ describe('documentation drift', () => {
   const scripts: Record<string, string> = JSON.parse(
     fs.readFileSync(path.join(root, 'package.json'), 'utf-8')
   ).scripts;
+  // Docs also describe the scripts of an app built from templates/web-app, which are defined in its package.additions.json
+  const appScripts: Record<string, string> = JSON.parse(
+    fs.readFileSync(path.join(root, 'templates', 'web-app', 'package.additions.json'), 'utf-8')
+  ).scripts;
   const builtins = new Set(['install', 'ci', 'start', 'test', 'init', 'audit']);
   const docs = [
     'README.md', 'QUICKSTART.md', 'CONTRIBUTING.md', '.claude/CLAUDE.md', 'docs/GETTING-STARTED.md',
@@ -107,7 +111,7 @@ describe('documentation drift', () => {
     const text = fs.readFileSync(path.join(root, doc), 'utf-8');
     const missing = new Set<string>();
     for (const match of text.matchAll(/npm run ([\w:-]+)/g)) {
-      if (!builtins.has(match[1]) && !scripts[match[1]]) missing.add(match[1]);
+      if (!builtins.has(match[1]) && !scripts[match[1]] && !appScripts[match[1]]) missing.add(match[1]);
     }
     expect([...missing]).toEqual([]);
   });

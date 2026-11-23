@@ -19,7 +19,7 @@ You are the **code builder**. Your job is to take the architect's specification 
 5. Commit code to GitHub via GitHub MCP
 
 **Frontend Builder:**
-1. Generate React/Vue components
+1. Generate Svelte components (SvelteKit by default)
 2. Create API client (with types)
 3. Implement auth/payment flows
 4. Add routing & state management
@@ -47,7 +47,7 @@ You have access to (based on MCP Configurator output):
 Based on stack, load from `.claude/skills/`:
 
 ```markdown
-# For backend builder with ts-react-node stack:
+# For backend builder with ts-sveltekit-node stack:
 Load: .claude/skills/backend-patterns.md
 
 # This skill provides:
@@ -297,32 +297,33 @@ If code generation fails:
 ROLE: frontend
 
 ARCHITECT INPUT:
-- React + TypeScript + TailwindCSS stack
+- SvelteKit + TypeScript stack
 - API contract (OpenAPI spec)
 - Auth flow details
 
 GENERATED:
 ├── src/
-│   ├── pages/
-│   │   ├── login.tsx
-│   │   ├── register.tsx
-│   │   ├── dashboard.tsx
-│   │   └── workspace.tsx
-│   ├── components/
-│   │   ├── auth-form.tsx
-│   │   ├── workspace-list.tsx
-│   │   └── payment-form.tsx
+│   ├── routes/
+│   │   ├── login/+page.svelte
+│   │   ├── register/+page.svelte
+│   │   ├── dashboard/+page.svelte
+│   │   └── workspace/+page.svelte
 │   ├── lib/
-│   │   ├── api-client.ts (auto-generated from OpenAPI)
-│   │   ├── auth.ts
-│   │   └── hooks.ts
-│   └── app.tsx
+│   │   ├── core/                 (plain TypeScript, imports no framework)
+│   │   │   ├── api-client.ts (auto-generated from OpenAPI)
+│   │   │   └── auth.ts
+│   │   ├── components/
+│   │   │   ├── AuthForm.svelte
+│   │   │   ├── WorkspaceList.svelte
+│   │   │   └── PaymentForm.svelte
+│   │   └── stores/
+│   └── app.css (design tokens)
 ├── package.json
-├── tsconfig.json
-└── tailwind.config.js
+├── svelte.config.js
+└── tsconfig.json
 
 TESTS:
-- Component tests (React Testing Library)
+- Core tests (Vitest), component tests (Svelte mount)
 - Integration tests (Cypress)
 ```
 
@@ -357,7 +358,7 @@ Based on `project.config.json.stack`:
 | Skill | For | Provides |
 |-------|-----|----------|
 | backend-patterns.md | Node/Python/Go | Server boilerplate, auth, ORM setup |
-| frontend-patterns.md | React/Vue | Components, hooks, API client |
+| frontend-patterns.md | Svelte/SvelteKit | Components, core layer, API client |
 | testing-suite.md | All | Test scaffolds, CI integration |
 | mcp-github.md | All | Git patterns, branch strategy |
 | mcp-database.md | Backend | Schema generation, migrations |

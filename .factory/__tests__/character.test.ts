@@ -268,7 +268,7 @@ describe('the orchestrator with a character', () => {
     for (const agent of ['product-manager', 'analyzer', 'software-architect', 'backend-engineer', 'infrastructure-engineer', 'automation-tester', 'e2e-tester']) {
       expect(r.of(agent)[0].input.character).toBeUndefined();
     }
-    expect(Object.keys(r.of('frontend-engineer')[0].input)).toEqual(['character', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
+    expect(Object.keys(r.of('frontend-engineer')[0].input)).toEqual(['character', 'stack', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
   });
 
   it('asks the frontend engineer again when it ignores the character, and fails one that keeps ignoring it', async () => {

@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+  "[svelte]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "files.eol": "\n",
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "tailwindCSS.classFunctions": ["cn", "clsx"],
+  "tailwindCSS.experimental.configFile": "src/routes/layout.css",
+  "css.lint.unknownAtRules": "ignore"
+}

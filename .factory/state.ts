@@ -8,6 +8,7 @@ import type { LookFeel } from './lookfeel';
 import type { Character } from './character';
 import type { Term } from './language';
 import type { Mission } from './mission';
+import type { Stack } from './stack';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
@@ -63,6 +64,8 @@ export interface WorkflowState {
   character?: Character;
   /** The project's ubiquitous language (the current glossary) when the workflow started. */
   language?: Term[];
+  /** The project's stack (project.config.json, or the SvelteKit default) when the workflow started. */
+  stack?: Stack;
 }
 
 

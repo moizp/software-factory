@@ -71,9 +71,13 @@ export const mockChecks: Check[] = [
       ['frontend-engineer', 'lookfeel', true], ['frontend-engineer', 'character', true], ['customer-support', 'character', true],
       ['reviewer', 'lookfeel', true], ['reviewer', 'character', true],
       ['product-manager', 'language', true], ['backend-engineer', 'language', true], ['reviewer', 'language', true],
-      ['infrastructure-engineer', 'mission', false], ['infrastructure-engineer', 'character', false]
+      ['infrastructure-engineer', 'mission', false], ['infrastructure-engineer', 'character', false],
+      ['analyzer', 'stack', true], ['software-architect', 'stack', true], ['backend-engineer', 'stack', true], ['frontend-engineer', 'stack', true],
+      ['reviewer', 'stack', false], ['product-manager', 'stack', false]
     ];
     for (const [agent, key, want] of expect) if (has(agent, key) !== want) problems.push(`${agent} ${want ? 'was not given' : 'was given'} "${key}"`);
+    const fe = inputsOf('frontend-engineer')[0]?.stack as { frontend?: { framework?: string } } | undefined;
+    if (fe?.frontend?.framework !== 'sveltekit') problems.push(`the frontend engineer was told the framework is ${fe?.frontend?.framework}, expected the SvelteKit default`);
     const tokens = state.tokensUsed ?? 0;
     if (tokens !== calls.length * 100) problems.push(`tokensUsed is ${tokens}, expected ${calls.length * 100} for ${calls.length} calls`);
     const { events } = readEvents(state.id);
@@ -83,7 +87,7 @@ export const mockChecks: Check[] = [
     if (diff.length) problems.push(`the event log does not replay to the saved state: ${diff.join(', ')}`);
     if (!fs.existsSync(handoffPath(state.id)) && state.status !== 'completed') problems.push('a stopped run left no handoff file');
     return problems.length === 0
-      ? `completed in ${calls.length} agent calls; mission, character, look and feel and language reached the right agents; ${events.length} events replay to the saved state`
+      ? `completed in ${calls.length} agent calls; mission, character, look and feel, language and stack reached the right agents; ${events.length} events replay to the saved state`
       : fail(`${problems.length} problem(s)`, `${bullets(problems)}\n\nLast notes:\n${notes(state)}`, 'Run `npx jest .factory/__tests__/orchestrator.test.ts` and read the first failure');
   })),
 

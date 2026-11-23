@@ -31,6 +31,18 @@ export interface PlanModule {
   hides: string;
   /** Tests that exercise the module through its interface only. */
   boundary_tests: string[];
+  /**
+   * "core": plain TypeScript that imports no framework and nothing from outside the project (shared code, framework
+   * agnostic). "adapter": components, routes, stores, handlers and database access, which import the core.
+   */
+  layer?: 'core' | 'adapter';
+}
+
+/** An import from outside the project that the plan proposes, and why writing it in-house was not chosen. */
+export interface NewDependency {
+  name: string;
+  why: string;
+  own_alternative: string;
 }
 
 /** A change to people, roles, workflows, skills or protocols that the plan assumes will happen alongside the code. */
@@ -52,6 +64,8 @@ export interface ImplementationPlan {
   assumed_changes: AssumedChange[];
   /** Empty means no health work was seen; the key itself must be present. */
   futures: Future[];
+  /** Packages the plan adds. Absent means the plan did not say; an empty list says it adds none. */
+  new_dependencies?: NewDependency[];
 }
 
 const MAX_PHASES = 12;
@@ -152,7 +166,30 @@ export function parsePlan(raw: unknown, opts: { mission?: Mission } = {}): Parse
   if (!changes.ok) return changes;
   const futures = parseFutures(raw.futures);
   if (!futures.ok) return futures;
-  return { ok: true, plan: { phases: out, modules: modules.modules, assumed_changes: changes.changes, futures: futures.futures } };
+  const deps = parseNewDependencies(raw.new_dependencies);
+  if (!deps.ok) return deps;
+  return {
+    ok: true,
+    plan: { phases: out, modules: modules.modules, assumed_changes: changes.changes, futures: futures.futures, ...(deps.deps ? { new_dependencies: deps.deps } : {}) }
+  };
+}
+
+const MAX_NEW_DEPENDENCIES = 10;
+
+function parseNewDependencies(raw: unknown): { ok: true; deps?: NewDependency[] } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true };
+  if (!Array.isArray(raw)) return { ok: false, error: 'implementation_plan.new_dependencies must be a list of {"name", "why", "own_alternative"} (an empty list says the plan adds none)' };
+  if (raw.length > MAX_NEW_DEPENDENCIES) return { ok: false, error: `implementation_plan.new_dependencies has more than ${MAX_NEW_DEPENDENCIES} packages; write the small ones in-house` };
+  const deps: NewDependency[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const d = raw[i];
+    const where = `implementation_plan.new_dependencies[${i}]`;
+    if (!isRecord(d) || !text(d.name) || !text(d.why, MIN_TEXT) || !text(d.own_alternative, MIN_TEXT)) {
+      return { ok: false, error: `${where} must be {"name": the package, "why": what it gives that is not worth writing, "own_alternative": what writing it in-house would take and why that is the worse choice}` };
+    }
+    deps.push({ name: d.name.trim(), why: d.why.trim(), own_alternative: d.own_alternative.trim() });
+  }
+  return { ok: true, deps };
 }
 
 type Result<K extends string, T> = ({ ok: true } & Record<K, T>) | { ok: false; error: string };
@@ -180,9 +217,11 @@ function parseModules(raw: unknown): Result<'modules', PlanModule[]> {
     if (!text(m.hides, MIN_TEXT)) return { ok: false, error: `${where}.hides must say what is kept inside the module, or it is a shallow wrapper` };
     const tests = Array.isArray(m.boundary_tests) ? m.boundary_tests : null;
     if (!tests || tests.length === 0 || !tests.every(x => text(x))) return { ok: false, error: `${where}.boundary_tests must list at least one test that exercises the module through its interface only` };
+    if (m.layer !== undefined && m.layer !== 'core' && m.layer !== 'adapter') return { ok: false, error: `${where}.layer must be "core" (plain TypeScript, no framework) or "adapter" (components, routes, stores, handlers, database access)` };
     modules.push({
       name: m.name.trim(), purpose: m.purpose.trim(), interface: (api as string[]).map(x => x.trim()),
-      hides: m.hides.trim(), boundary_tests: (tests as string[]).map(x => x.trim())
+      hides: m.hides.trim(), boundary_tests: (tests as string[]).map(x => x.trim()),
+      ...(m.layer ? { layer: m.layer as 'core' | 'adapter' } : {})
     });
   }
   return { ok: true, modules };
@@ -229,7 +268,17 @@ export function renderPlanSummary(plan: ImplementationPlan, maxChars = 6000, mis
     (p.visual_checks ?? []).forEach(v => lines.push(`   - Picture: ${v.path} at ${v.widths.join(', ')} px${v.state ? ` (${v.state})` : ''}, before and after`));
     if (!hasTestFile(p.files)) lines.push('   - No test file is planned in this step');
   });
-  lines.push(`Modules (${plan.modules.length}): ${plan.modules.map(m => `${m.name} [${m.interface.join(', ')}]`).join('; ')}`);
+  lines.push(`Modules (${plan.modules.length}): ${plan.modules.map(m => `${m.name}${m.layer ? ` (${m.layer})` : ''} [${m.interface.join(', ')}]`).join('; ')}`);
+  const core = plan.modules.filter(m => m.layer === 'core').length;
+  const adapters = plan.modules.filter(m => m.layer === 'adapter').length;
+  lines.push(core + adapters === 0
+    ? 'Layers: no module says whether it is core (framework-free shared code) or adapter'
+    : `Layers: ${core} core, ${adapters} adapter${plan.modules.length - core - adapters ? `, ${plan.modules.length - core - adapters} not stated` : ''}`);
+  lines.push(plan.new_dependencies === undefined
+    ? 'New dependencies: not stated'
+    : plan.new_dependencies.length
+      ? `New dependencies: ${plan.new_dependencies.map(d => `${d.name} (${d.why}; in-house instead: ${d.own_alternative})`).join('; ')}`
+      : 'New dependencies: none');
   lines.push(plan.assumed_changes.length
     ? `Assumed changes to how people work: ${plan.assumed_changes.map(c => `${c.change} (affects ${c.affects})`).join('; ')}`
     : 'Assumed changes to how people work: none');

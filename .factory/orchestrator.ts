@@ -17,6 +17,7 @@ import { languageFile, languageForAgents, languageHits, loadLanguage, renderLang
 import { characterFile, characterForAgents, loadCharacter, renderCharacterLine, requireCharacter } from './character';
 import { loadLookFeel, lookFeelFile, lookFeelForAgents, renderLookFeelLine, requireLookFeel } from './lookfeel';
 import { loadMission, missionForAgents, parseDeclaration, renderMissionLine, requireMission, missionFile } from './mission';
+import { renderStackLine, loadStack, stackForAgents } from './stack';
 import { saveHandoff } from './handoff';
 import { contextBudget } from './prompts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
@@ -266,6 +267,15 @@ export class FactoryOrchestrator {
     next = addNote(next, `Character loaded: ${renderCharacterLine(load.result.character)}`);
     for (const w of load.result.warnings) next = addNote(next, `Character advice: ${w}`);
     return next;
+  }
+
+  /**
+   * Reads the stack from project.config.json (SvelteKit and TypeScript when the project declares no frontend). Agents never
+   * see the config file, so this is how a declared stack reaches them. It never stops a run.
+   */
+  private attachStack(state: WorkflowState): WorkflowState {
+    const stack = loadStack();
+    return addNote({ ...state, stack }, `Stack: ${renderStackLine(stack)}`);
   }
 
   /**
@@ -654,6 +664,7 @@ export class FactoryOrchestrator {
       if (state.status !== 'failed') state = this.attachCharacter(state);
       if (state.status !== 'failed') state = this.attachLookFeel(state);
       if (state.status !== 'failed') state = this.attachLanguage(state);
+      if (state.status !== 'failed') state = this.attachStack(state);
       if (state.status === 'failed') {
         saveWorkflowState(state);
         return state;
@@ -976,31 +987,35 @@ export class FactoryOrchestrator {
     const character = state.character ? { character: characterForAgents(state.character) } : {};
     // ... and every agent that names things uses the project's shared vocabulary
     const language = state.language ? { language: languageForAgents(state.language) } : {};
+    // ... and the agents that choose or build with a framework are told which one the project uses
+    const stack = state.stack ? { stack: stackForAgents(state.stack) } : {};
 
     switch (agent) {
       case 'product-manager':
         return { brief: state.issueBrief, ...mission, ...language };
       case 'analyzer':
-        return { brief: state.issueBrief, productManagerOutput: pm, ...mission, ...language };
+        return { brief: state.issueBrief, productManagerOutput: pm, ...stack, ...mission, ...language };
       case 'software-architect':
-        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer, ...mission, ...language };
+        return { brief: state.issueBrief, productManagerOutput: pm, analyzerOutput: analyzer, ...stack, ...mission, ...language };
       case 'backend-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...language };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack, ...language };
       case 'infrastructure-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack };
       case 'frontend-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...character, ...lookfeel, ...language };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack, ...character, ...lookfeel, ...language };
       case 'automation-tester':
         return {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
           architectOutput: architect,
-          productManagerOutput: pm
+          productManagerOutput: pm,
+          ...stack
         };
       case 'e2e-tester':
         return {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
           testerOutput: this.getLatestArtifactByPhase(state, 'automation-tester'),
-          productManagerOutput: pm
+          productManagerOutput: pm,
+          ...stack
         };
       case 'reviewer':
         return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...this.languageCheck(state), ...mission, ...character, ...lookfeel, ...language };

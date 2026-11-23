@@ -309,7 +309,7 @@ describe('the orchestrator with a look and feel', () => {
       expect(r.of(agent)[0].input.lookfeel).toBeUndefined();
     }
     // stable parts first: the declared look and feel is the same for every call, the other outputs are not
-    expect(Object.keys(r.of('frontend-engineer')[0].input)).toEqual(['lookfeel', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
+    expect(Object.keys(r.of('frontend-engineer')[0].input)).toEqual(['lookfeel', 'stack', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
   });
 
   it('asks the frontend engineer again when it ignores the declaration, and fails one that keeps ignoring it', async () => {

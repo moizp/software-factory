@@ -63,6 +63,14 @@ Each step is an interview in Claude Code, a checker you can run, and a row in th
 | Language | `/language` | `npm run language:check` | `project.language` |
 | `CLAUDE.md` | `/claude-md` | `npm run claudemd:check` | `project.claudemd` |
 
+**Stack and structure.** With no `frontend` in `project.config.json` the agents build a web front-end with SvelteKit, TypeScript and Tailwind (your design tokens in `@theme`) and Svelte's own state, with no other UI libraries. Declare another stack there and the agents are told it (`project.stack` shows what they will see). Shared code goes in `src/lib/core` as plain TypeScript that imports no framework and nothing from outside the project; components, routes and stores are adapters that import it. `npm run boundaries:check` (`project.boundaries`) fails when the core breaks that, and `boundaries.core` and `boundaries.allow` in `project.config.json` change where the core is and which packages it may import. Plans list `new_dependencies` with the in-house alternative, and you approve each one.
+
+**Developer experience and CSS.** A web app starts from `templates/web-app/`: Prettier sorts Tailwind classes and imports on save and on commit, ESLint, `npm run check:all` (the same command CI runs), `npm run doctor` for local problems, `.env.example` and a compose file for dependencies. Hand-written CSS is capped by `npm run css:check` (`css_budget` in `project.config.json`). `project.devex` and `project.css` in `npm run verify` check a project for both. Guides: `.claude/skills/developer-experience.md`, `.claude/skills/styling.md`.
+
+**Dependencies.** Keep few: each package is upkeep for the life of the project. `project.deps` in `npm run verify` shows the count against `dependency_budget`, and plans list `new_dependencies` for you to approve. Updates are automatic: `.github/dependabot.yml` opens one grouped pull request a week (merge it when CI is green), and `.github/workflows/dependency-review.yml` audits and checks pinned MCP versions every Monday, keeping one `dependencies` issue open while anything needs attention. Web apps get the same from `templates/web-app/.github/`.
+
+**MCP servers.** A Svelte or SvelteKit app registers the official Svelte MCP in `.mcp.json` (copy `templates/web-app/.mcp.json`), so every Claude Code session looks Svelte APIs up in the current docs and runs `svelte-autofixer` on components. `project.mcp` in `npm run verify` checks it. The pipeline's own agents cannot call MCP tools yet.
+
 Before the first real piece of work run `/grill`. The pipeline runs without any of these (it adds a note), and `FACTORY_REQUIRE_MISSION=1`, `FACTORY_REQUIRE_CHARACTER=1`, `FACTORY_REQUIRE_LOOKFEEL=1` and `FACTORY_REQUIRE_LANGUAGE=1` make each one mandatory. Run `npm run verify -- --quick` again after each; `mock.project-declarations` runs the pipeline on a copy of your own files.
 
 ## 4. Spend a few tokens

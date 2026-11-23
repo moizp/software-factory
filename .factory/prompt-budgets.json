@@ -7,23 +7,23 @@
       "context": 4000
     },
     "analyzer": {
-      "instructions": 1550,
+      "instructions": 1650,
       "context": 8000
     },
     "software-architect": {
-      "instructions": 4100,
+      "instructions": 4350,
       "context": 12000
     },
     "backend-engineer": {
-      "instructions": 1650,
+      "instructions": 2000,
       "context": 16000
     },
     "frontend-engineer": {
-      "instructions": 2250,
+      "instructions": 3400,
       "context": 16000
     },
     "infrastructure-engineer": {
-      "instructions": 2350,
+      "instructions": 2700,
       "context": 16000
     },
     "automation-tester": {
@@ -35,7 +35,7 @@
       "context": 20000
     },
     "reviewer": {
-      "instructions": 3300,
+      "instructions": 3550,
       "context": 40000
     },
     "customer-support": {
