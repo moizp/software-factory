@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { mcpForAgents } from './mcp';
 
 /**
  * The stack a project declares in project.config.json, and the default when it declares none. Agents run without tools
@@ -60,7 +61,14 @@ export function loadStack(cwd: string = process.cwd()): Stack {
 }
 
 export function stackForAgents(s: Stack): Record<string, unknown> {
-  return { ...(s.id ? { id: s.id } : {}), frontend: s.frontend, backend: s.backend, ...(s.database ? { database: s.database } : {}) };
+  const mcp = mcpForAgents(s);
+  return {
+    ...(s.id ? { id: s.id } : {}),
+    frontend: s.frontend,
+    backend: s.backend,
+    ...(s.database ? { database: s.database } : {}),
+    ...(mcp.length ? { mcp_servers: mcp } : {})
+  };
 }
 
 export function renderStackLine(s: Stack): string {

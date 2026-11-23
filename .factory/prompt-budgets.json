@@ -19,7 +19,7 @@
       "context": 16000
     },
     "frontend-engineer": {
-      "instructions": 3200,
+      "instructions": 3400,
       "context": 16000
     },
     "infrastructure-engineer": {
@@ -35,7 +35,7 @@
       "context": 20000
     },
     "reviewer": {
-      "instructions": 3500,
+      "instructions": 3550,
       "context": 40000
     },
     "customer-support": {

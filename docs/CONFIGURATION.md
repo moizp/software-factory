@@ -203,6 +203,10 @@ Hand-written CSS is capped so it cannot grow forever (`npm run css:check`, `.cla
 
 Never raise a number to pass the check; restructure, or ask a person.
 
+### MCP servers by stack
+
+`mcp_servers` also takes `stdio` servers (`command`, `args`) with `applies_when` (a stack value that selects them). A Svelte or SvelteKit front-end gets the official Svelte MCP, pinned (`@sveltejs/mcp@0.1.31`), registered with `claude mcp add -t stdio -s project svelte -- npx -y @sveltejs/mcp@0.1.31` or by copying `templates/web-app/.mcp.json`. See `.claude/skills/mcp-setup.md`.
+
 ### Boundaries (shared code)
 
 Shared code is framework-agnostic: a core layer of plain TypeScript that imports no framework and nothing from outside the project. Components, routes, stores and handlers are adapters that import the core. `npm run boundaries:check` enforces it; configure it here (these are the defaults):

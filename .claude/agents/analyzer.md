@@ -16,7 +16,7 @@ Analyze and output a structured JSON spec that the next agents (MCP Configurator
 1. **Validate project config** — Check required fields exist
 2. **Confirm tech stack** — Match `stack` to known patterns; a web frontend with no declared framework is SvelteKit
 3. **Extract features** — Parse features list into implementable requirements
-4. **Identify MCP servers** — Which external tools does this project need?
+4. **Identify MCP servers** — Which external tools does this project need? Add every server in `stack.mcp_servers` (a Svelte or SvelteKit front-end needs the `svelte` server: official docs and `svelte-autofixer`)
 5. **Database schema outline** — Sketch the entity relationships
 6. **API surface** — What endpoints/functions will be needed?
 
@@ -81,6 +81,11 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
       }
     ],
     "mcp_servers_required": {
+      "svelte": {
+        "type": "stdio",
+        "reason": "Svelte and SvelteKit documentation and svelte-autofixer for the front-end",
+        "required": true
+      },
       "github": {
         "type": "built-in",
         "reason": "Source control and CI/CD",
@@ -143,8 +148,8 @@ Return **ONLY** this JSON structure (no preamble, no markdown):
   },
   "next_inputs": {
     "mcp_servers_to_configure": [
-      "github",
-      "postgres"
+      "svelte",
+      "github"
     ],
     "credentials_needed": [
       "GITHUB_TOKEN",

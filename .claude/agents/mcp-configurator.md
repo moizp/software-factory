@@ -185,6 +185,16 @@ If `required: false`, attempt setup but don't fail:
 }
 ```
 
+## Servers the stack calls for
+
+Besides the servers in `project.config.json.mcp_servers`, register the servers `stack.mcp_servers` lists. For a Svelte or SvelteKit front-end that is the official Svelte MCP, at project scope so it is shared through `.mcp.json` (copy `templates/web-app/.mcp.json`, or run the command):
+
+```bash
+claude mcp add -t stdio -s project svelte -- npx -y @sveltejs/mcp@0.1.31
+```
+
+It needs no credentials. The local server runs on the machine; the hosted one (`https://mcp.svelte.dev/mcp`) receives the code it checks, so it is not the default. Playwright (`npx @playwright/mcp@0.0.86 --headless`) is optional, to explore the running app. Keep versions pinned.
+
 ## Tool Mappings
 
 Document what each server provides so builders know how to use them:
@@ -197,6 +207,12 @@ Document what each server provides so builders know how to use them:
     "create_pull_request": "Create PR for review",
     "read_file": "Read source files for context",
     "list_issues": "Query open issues"
+  },
+  "svelte": {
+    "list-sections": "List the Svelte and SvelteKit documentation sections",
+    "get-documentation": "Fetch the current documentation for sections",
+    "svelte-autofixer": "Static analysis of Svelte code; run until it reports nothing",
+    "playground-link": "A playground link for code not written to a file"
   },
   "postgres": {
     "execute_query": "Run SQL queries",

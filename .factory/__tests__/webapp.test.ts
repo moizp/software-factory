@@ -4,7 +4,10 @@ import * as os from 'os';
 import * as path from 'path';
 import { REQUIRED_SCRIPTS, checkDevEx } from '../devex';
 import { runChecks } from '../verify';
-import { webAppChecks } from '../verify/checks/css';
+import { webAppChecks as allWebAppChecks } from '../verify/checks/css';
+
+// The MCP row has its own tests; these rows are the developer-experience and CSS ones
+const webAppChecks = allWebAppChecks.filter(c => c.id !== 'project.mcp');
 
 const root = path.join(__dirname, '..', '..');
 const T = path.join(root, 'templates', 'web-app');

@@ -51,6 +51,22 @@
       "description": "Auth and realtime sync",
       "endpoint": "https://supabase-mcp.example.com",
       "auth": "env:SUPABASE_KEY"
+    },
+    "svelte": {
+      "type": "stdio",
+      "required": true,
+      "description": "Svelte and SvelteKit documentation and svelte-autofixer, used for any Svelte front-end",
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp@0.1.31"],
+      "applies_when": { "frontend.framework": "sveltekit" }
+    },
+    "playwright": {
+      "type": "stdio",
+      "required": false,
+      "description": "A real browser for exploring and debugging the running app",
+      "command": "npx",
+      "args": ["@playwright/mcp@0.0.86", "--headless"],
+      "applies_when": { "frontend.framework": "sveltekit" }
     }
   },
 

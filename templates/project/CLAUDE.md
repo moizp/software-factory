@@ -16,6 +16,7 @@ Claude Code reads this file at the start of every interactive session. It points
 - Pull requests target `main`; merge with a merge commit, never squash or rebase; delete the branch after
 - Commits are one line, conventional (`feat:`, `fix:`, `docs:`, `chore:`), 50 characters or fewer, with no attribution lines
 - `.factory/policy.json` decides what may merge without a person; protected paths always need one
+- MCP: `.mcp.json` registers the Svelte MCP for Svelte work: look APIs up with `get-documentation`, run `svelte-autofixer` on every component until clean
 - Secrets live in <where>; never in the repo, the wiki or a PR
 
 ## Skill routing

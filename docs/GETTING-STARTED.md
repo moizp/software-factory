@@ -67,6 +67,8 @@ Each step is an interview in Claude Code, a checker you can run, and a row in th
 
 **Developer experience and CSS.** A web app starts from `templates/web-app/`: Prettier sorts Tailwind classes and imports on save and on commit, ESLint, `npm run check:all` (the same command CI runs), `npm run doctor` for local problems, `.env.example` and a compose file for dependencies. Hand-written CSS is capped by `npm run css:check` (`css_budget` in `project.config.json`). `project.devex` and `project.css` in `npm run verify` check a project for both. Guides: `.claude/skills/developer-experience.md`, `.claude/skills/styling.md`.
 
+**MCP servers.** A Svelte or SvelteKit app registers the official Svelte MCP in `.mcp.json` (copy `templates/web-app/.mcp.json`), so every Claude Code session looks Svelte APIs up in the current docs and runs `svelte-autofixer` on components. `project.mcp` in `npm run verify` checks it. The pipeline's own agents cannot call MCP tools yet.
+
 Before the first real piece of work run `/grill`. The pipeline runs without any of these (it adds a note), and `FACTORY_REQUIRE_MISSION=1`, `FACTORY_REQUIRE_CHARACTER=1`, `FACTORY_REQUIRE_LOOKFEEL=1` and `FACTORY_REQUIRE_LANGUAGE=1` make each one mandatory. Run `npm run verify -- --quick` again after each; `mock.project-declarations` runs the pipeline on a copy of your own files.
 
 ## 4. Spend a few tokens

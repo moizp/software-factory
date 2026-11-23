@@ -1,11 +1,31 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { checkDevEx } from '../../devex';
-import { Check, Ctx, fail, pass, skip } from '../types';
+import { addCommand, checkMcp, serversFor } from '../../mcp';
+import { loadStack } from '../../stack';
+import { Check, Ctx, fail, pass, skip, warn } from '../types';
 
 const budgetScript = (ctx: Ctx): string => path.join(ctx.factoryRoot, 'templates', 'web-app', 'scripts', 'css-budget.cjs');
 
 export const webAppChecks: Check[] = [
+  {
+    id: 'project.mcp',
+    tier: 'offline',
+    title: 'The MCP servers the stack calls for are configured (the Svelte MCP for a Svelte app)',
+    run: ctx => {
+      const stack = loadStack(ctx.projectDir);
+      const r = checkMcp(ctx.projectDir, stack);
+      if (!r.applicable) return skip('not a SvelteKit app: no stack-specific MCP servers to check', 'A SvelteKit app registers the Svelte MCP in .mcp.json (templates/web-app/.mcp.json)');
+      const wanted = serversFor(stack);
+      if (r.missingRequired.length) {
+        const cmds = wanted.filter(s => r.missingRequired.includes(s.id)).map(addCommand);
+        return fail(`missing: ${r.missingRequired.join(', ')}`, cmds.join('\n'), 'Copy templates/web-app/.mcp.json to the project root, or run the command shown (.claude/skills/mcp-setup.md)');
+      }
+      if (r.unpinned.length) return warn(`not pinned to a version: ${r.unpinned.join(', ')}`, undefined, 'Pin the package version in .mcp.json so a bump is a reviewed change');
+      const optional = r.missingOptional.length ? `; optional, not configured: ${r.missingOptional.join(', ')}` : '';
+      return pass(`${wanted.filter(s => s.level === 'required').map(s => s.id).join(', ')} configured${optional}`);
+    }
+  },
   {
     id: 'project.devex',
     tier: 'offline',

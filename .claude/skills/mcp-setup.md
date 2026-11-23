@@ -69,6 +69,21 @@ claude mcp add stripe --transport http stripe-mcp https://stripe-mcp.example.com
 claude mcp add slack --transport http slack-mcp https://slack-mcp.example.com
 ```
 
+## Servers by stack
+
+The stack decides which servers a project uses, and a server made for the framework beats the model's memory of it. The registry is `.factory/mcp.ts`; `stack.mcp_servers` hands the matching ones to the agents; `.mcp.json` at the project root shares them with every Claude Code session.
+
+| Stack | Server | For | Start it with |
+|---|---|---|---|
+| Svelte or SvelteKit (required) | `svelte`: official Svelte MCP | `list-sections` and `get-documentation` (current Svelte and SvelteKit docs), `svelte-autofixer` (static analysis; run until it reports nothing), `playground-link` | `claude mcp add -t stdio -s project svelte -- npx -y @sveltejs/mcp@0.1.31` |
+| Svelte or SvelteKit (optional) | `playwright`: Microsoft's Playwright MCP | Driving a real browser against the running app, to explore and debug | `claude mcp add -t stdio -s project playwright -- npx @playwright/mcp@0.0.86 --headless` |
+
+- **Local, not hosted.** The Svelte server also runs hosted at `https://mcp.svelte.dev/mcp` (Svelte says it does not log or store code), but the hosted one receives the code it checks. Local is the default; choosing the hosted one is a decision a person makes.
+- **Pinned.** Versions are exact, so a bump is a reviewed change. `npm run verify` warns about an unpinned server (`project.mcp`).
+- **Tailwind has no official MCP server.** Its docs are not covered by the Svelte server; ask for documentation from the project's own `node_modules` or a person rather than adding a third-party documentation service without a decision.
+- **Who can call them.** Interactive Claude Code sessions use `.mcp.json` (copy `templates/web-app/.mcp.json`). The pipeline's agents run headless without tools today: they are told which servers apply (`stack.mcp_servers`) and must say in `mcp_operations` when a tool was not available, and the reviewer treats such Svelte code as not checked. Builders that run in a worktree with tools (change mode, F6 and T1) will call them.
+- The Svelte docs suggest putting its `svelte-task` prompt in `CLAUDE.md`; the project template carries a short rule instead (`templates/project/CLAUDE.md`).
+
 ## Credential Requirements
 
 ### Required Credentials

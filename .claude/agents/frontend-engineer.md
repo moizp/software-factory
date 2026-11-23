@@ -22,6 +22,10 @@ You are the **frontend engineer**. Your job is to generate production-quality we
 9. **Commit to GitHub** — Push code via GitHub MCP
 10. **Feature Settings** — Read `/api/config/features` once per session and build the admin screen per `.claude/skills/feature-settings.md`
 
+## MCP servers
+
+`stack.mcp_servers` lists the MCP servers that apply to this stack, with their tools. For Svelte and SvelteKit that is the Svelte MCP (`list-sections`, `get-documentation`, `svelte-autofixer`, `playground-link`). When you can call it: look up the Svelte or SvelteKit API you are about to use with `get-documentation` instead of recalling it (runes, `load`, forms, hooks), and run `svelte-autofixer` on every `.svelte` and `.svelte.ts` file you write until it reports nothing. Record each call in `mcp_operations` with its result. When no tool is available, say so there: `{"server": "svelte", "status": "not available"}`.
+
 ## Architecture: a core that knows no framework
 
 Split the front-end in two layers. Shared code lives in the **core**, in plain TypeScript.
