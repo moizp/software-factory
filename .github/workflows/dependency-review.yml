@@ -16,8 +16,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.x
           cache: npm
@@ -32,7 +32,7 @@ jobs:
         run: node templates/web-app/scripts/pins-check.cjs project.config.json templates/web-app/.mcp.json 2>&1 | tee "$RUNNER_TEMP/pins.txt"
       - name: Packages with a newer version (information)
         run: npm outdated 2>&1 | tee "$RUNNER_TEMP/outdated.txt" || true
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         env:
           AUDIT: ${{ steps.audit.outcome }}
           PINS: ${{ steps.pins.outcome }}

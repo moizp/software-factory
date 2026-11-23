@@ -22,7 +22,7 @@ jobs:
       # Input goes through the environment, never into the script text.
       VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0

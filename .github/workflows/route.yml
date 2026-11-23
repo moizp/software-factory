@@ -48,9 +48,9 @@ jobs:
       lease_comment: ${{ steps.decide.outputs.lease_comment }}
       author: ${{ steps.decide.outputs.author }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.x
           cache: npm
@@ -85,7 +85,7 @@ jobs:
       ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue }}
       BUDDY_WEBHOOK_URL: ${{ secrets.BUDDY_WEBHOOK_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Start the Buddy pipeline
         run: bash .factory/route/trigger-buddy.sh

@@ -23,7 +23,7 @@ jobs:
       PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
     steps:
       - name: Checkout base branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
@@ -31,7 +31,7 @@ jobs:
       - name: Fetch PR head
         run: git fetch origin "pull/$PR_NUMBER/head:pr-head"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.x
           cache: npm
