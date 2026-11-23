@@ -112,6 +112,9 @@ jobs:
       - name: Check TypeScript compilation
         run: npm run build
 
+      - name: Version files agree
+        run: npm run version:check
+
       - name: Verify test structure
         run: |
           echo "Checking test files exist..."

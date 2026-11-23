@@ -22,6 +22,7 @@ You are the **infrastructure engineer**. Your job is to generate deployment conf
 9. **Release Process** — Copy `templates/release/` into the app repo and implement `scripts/deploy.sh` for the app's platform; see `.claude/skills/release-process.md`
 10. **Project Board** — Copy `.factory/board.json` and `.github/workflows/board-sync.yml` into the app repo and follow `docs/PROJECT-BOARD.md`
 11. **Local development** — see the next section
+12. **Versions** — `templates/release/` includes `scripts/version.cjs`: Release Start works out the next version from conventional commits and writes it to `package.json`, `package-lock.json` and `CHANGELOG.md`; Release Finish checks they match the tag
 
 ## Local development environment
 

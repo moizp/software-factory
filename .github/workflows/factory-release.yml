@@ -1,0 +1,44 @@
+name: Factory Release
+
+# Tags main and publishes a GitHub release for a version the repository already declares: package.json and
+# package-lock.json carry it and CHANGELOG.md has its section (both written by `npm run version:bump` in a pull request,
+# merged like any other). Run it from the Actions tab after that pull request is merged.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v prefix, e.g. 1.0.0. Must match package.json and have a CHANGELOG.md section'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Input goes through the environment, never into the script text.
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: The version files say this release
+        run: node templates/release/scripts/version.cjs check --version "$VERSION"
+
+      - name: Not released before
+        run: |
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then echo "Tag v$VERSION already exists"; exit 1; fi
+
+      - name: Tag main and publish the release
+        run: |
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          node templates/release/scripts/version.cjs notes --version "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"

@@ -33,6 +33,9 @@ jobs:
             || { echo "www-prod is not at the release tip; promote to prod first"; exit 1; }
           echo "SHA=$SHA" >> "$GITHUB_ENV"
 
+      - name: The version files say this release
+        run: node scripts/version.cjs check --version "$VERSION"
+
       - name: Tag the shipped commit
         run: |
           git config user.name "release-bot"

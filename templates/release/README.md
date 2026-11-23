@@ -7,6 +7,7 @@ templates/release/.github/workflows/release-start.yml   → .github/workflows/
 templates/release/.github/workflows/promote.yml         → .github/workflows/
 templates/release/.github/workflows/release-finish.yml  → .github/workflows/
 templates/release/scripts/deploy.sh                     → scripts/deploy.sh   (implement per platform)
+templates/release/scripts/version.cjs                   → scripts/version.cjs (versions and changelog; no dependencies)
 ```
 
 One-time setup in the app repo:

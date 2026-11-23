@@ -13,6 +13,16 @@ main ── Release Start ──> release/vX.Y.Z  (+ draft PR → main = release
         Release Finish: tag vX.Y.Z on the shipped commit, merge RC back to main, delete RC
 ```
 
+## Versioning
+
+The version is a number the project declares in `package.json`, `package-lock.json` (both of its fields) and `CHANGELOG.md`, and a tag `vX.Y.Z` on the shipped commit. `scripts/version.cjs` (copied from `templates/release/scripts/`, no dependencies) keeps them in step.
+
+- **Choosing it.** From the conventional commits since the last tag: a breaking change (`type!:` or a `BREAKING CHANGE:` line) is major, `feat` is minor, `fix` and `perf` are patch. Before 1.0.0 a breaking change is minor and a feature is patch. Docs, chore, test, ci, style, build and refactor commits alone mean nothing to release. `node scripts/version.cjs next` shows the answer and why.
+- **Writing it.** Release Start with the version left empty works it out, creates `release/vX.Y.Z`, and commits `chore: release vX.Y.Z` on it: `package.json`, `package-lock.json` and a new `CHANGELOG.md` section (breaking changes, features, fixes, performance). A person can type a version instead, which wins, and is how a hotfix or a release with only chores is made.
+- **Checking it.** Release Finish runs `node scripts/version.cjs check --version X.Y.Z` before it tags: the lock file, `package.json` and the changelog must all say this release, so the tag and the files never disagree. `npm run verify` shows the same disagreement as `project.version`.
+- **Review the changelog.** It is generated from commit subjects, so it is only as clear as they are; a person reads it in the release pull request and edits it there.
+- **Never** edit the version by hand in one file, tag without the check, or reuse a tag.
+
 ## Rules
 
 - `main` is the trunk; short-lived branches PR into it. There is no `develop`.
