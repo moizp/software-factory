@@ -6,8 +6,8 @@ import { REQUIRED_SCRIPTS, checkDevEx } from '../devex';
 import { runChecks } from '../verify';
 import { webAppChecks as allWebAppChecks } from '../verify/checks/css';
 
-// The MCP row has its own tests; these rows are the developer-experience and CSS ones
-const webAppChecks = allWebAppChecks.filter(c => c.id !== 'project.mcp');
+// The MCP and dependency rows have their own tests; these rows are the developer-experience and CSS ones
+const webAppChecks = allWebAppChecks.filter(c => ['project.devex', 'project.css'].includes(c.id));
 
 const root = path.join(__dirname, '..', '..');
 const T = path.join(root, 'templates', 'web-app');
