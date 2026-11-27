@@ -174,3 +174,44 @@ A job waiting in the queue for a long time counts as dead after 30 minutes witho
 - Slice 4 has never run on Buddy. Unknown: the exact JSON the webhook accepts for variables (`burst.sh` has a fallback that finds the issue by labels), whether the Free plan's runner image has `gh` and Node 24, the maximum run time of a free pipeline, and what a GB-minute costs on the runner you get.
 - Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
 - Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.
+
+## 7. Option: Railway sandboxes (not built)
+
+Sources, read on 27 November 2026: Railway's guide [Use Agents in Railway Sandboxes](https://railway.com/guides/agents-in-sandboxes) and its documentation pages `docs.railway.com/sandboxes`, `/cli/sandbox`, `/pricing/plans` and `/pricing/free-plan`. Nothing here was run on Railway.
+
+**What it is.** A sandbox is an isolated Linux VM you create on demand, run commands in and destroy. It lives in a Railway environment, and the default image has git, Node, npm and the agent harnesses (Claude Code, Codex, OpenCode, Pi). The TypeScript SDK (`bun add railway`) needs Node 22 or newer.
+
+| Need | What the documentation says |
+|---|---|
+| Create and run | `railway sandbox create`, `exec [--detach] [--timeout <SECONDS>] -- bash -lc '...'`, `destroy`, `ssh`, `forward`; `--json` on the commands; the SDK returns `exitCode`, `stdout`, `stderr`, `timedOut` and does not throw on a non-zero exit. Without a timeout a command runs until it exits |
+| Code in | `git clone` inside the sandbox; a private repository works by passing a token, for example `railway sandbox create --variable GH_TOKEN=$(gh auth token)` and `gh repo clone`; `files.write` in the SDK |
+| Snapshot and branch | `checkpoint create <name>` (a named disk snapshot, kept until deleted, outlives its sandbox) and `fork` (files kept, running processes not); a fork does not inherit the source's variables; templates are cached build steps |
+| Secrets | the `env` option (`--variable`) bakes values into every command for the sandbox's life and "including secrets", and may reference Railway variables such as `${{shared.NPM_TOKEN}}`; how they are stored is not stated |
+| Network | always outbound internet through a NAT gateway; `ISOLATED` is the default (cannot reach the environment's services); `PRIVATE` joins the environment's private network |
+| Unattended use | a project token (`RAILWAY_TOKEN`, scoped to one environment, recommended) or `RAILWAY_API_TOKEN` (needs `RAILWAY_ENVIRONMENT_ID`); with no linked project the CLI needs `--project` and `--environment` |
+| CI | no GitHub Actions integration is described |
+
+**Limits by plan**
+
+| Plan | Sandboxes and checkpoints per environment | Size (default / maximum) | Idle timeout |
+|---|---|---|---|
+| Free, Trial | 10 and 10 | 2 vCPU / 2 GB, both | default 5 minutes, 1 to 5, cannot be turned off |
+| Hobby ($5 a month, includes $5 of usage) | 50 and 50 | 4 vCPU / 4 GB, up to 8 / 8 | default 30 minutes, 1 to 120, or 0 for none |
+| Pro | 100 and 100 | 8 vCPU / 8 GB, up to 24 / 24 | as Hobby |
+
+An idle sandbox is destroyed; a running `exec` (also a detached one) defers that. Disk size and the longest total lifetime are not stated in what I read.
+
+**Price.** Per second, for CPU actually used (about $50 per vCPU per month), memory in use ($50 per GB per month) and egress ($0.05 per GB). The Free plan includes $1 of usage a month with no card (when it is used up, services stop until the next cycle); a new Trial gets a one-time $5 for 30 days. Railway's own worked example: a 20-minute agent task averaging 1 GB and 30% of a vCPU costs about 3 cents, so 50 tasks cost about $1.50 before egress. That is Railway's estimate for one kind of task, not a measurement of a factory run. A running sandbox that is idle still bills for its memory.
+
+**Where it fits.** It is a place to run code, not a free pool for the pipeline, so it is not a fourth lane beside Actions, Oracle and Buddy: nothing describes it as a GitHub Actions runner. It fits the gap in `docs/NEXT-CAPABILITIES.md` (F6, T1): the factory's agents have no tools, so nothing runs tests, `check:all`, `layout:guard` or `evidence:capture` before review. A sandbox could be that place, one per builder run, with a checkpoint after dependencies are installed and a fork per retry or parallel phase. Against the Oracle VM (free, 2 OCPU and 12 GB shared by two sessions) it is metered but small, isolates every run in its own VM, and on the Free plan is limited to 2 vCPU and 2 GB, which a SvelteKit build plus Chromium may not fit (not measured).
+
+**How to keep it an option.** F6 should define the interface it needs, small and its own: `create(repo, ref)`, `exec(command)` returning exit code and output, `checkpoint`, `fork`, `destroy`. A git worktree on the Oracle runner, an Actions job and a Railway sandbox are then three backends of that interface, chosen by a setting, and no code outside the backend names Railway. Credentials stay as in section 3: a lane-scoped GitHub token (contents, pull requests, issues, no admin) passed as a sandbox variable, a Railway project token limited to one environment, and never a checkpoint with a login baked in, because anyone with access to the environment can create a sandbox from it. Keep `ISOLATED` (the default) so a sandbox cannot reach any other service of the project.
+
+**Not known, and to be measured before adopting**
+- Disk size, the longest lifetime, and what the free $1 buys in real factory runs (a SvelteKit install, build, test and `layout:guard` run).
+- Whether 2 GB is enough on the Free plan, or Hobby's 4 GB is needed.
+- How secrets in `env` are stored, and whether anything in the sandbox can read them back (assume yes: every command can).
+- Whether Claude Code in the default image runs unattended with the writer's token, without an interactive login.
+- Whether the CLI or SDK runs cleanly from an Actions job with a project token.
+
+**Decision rule.** Cost is not the barrier; the order is. Do not build this until T1's first version exists on a local worktree. Then run one real R1 slice in a sandbox, record the cost and each item above, and adopt it only if it beats the Oracle worktree on cost, isolation or speed.
