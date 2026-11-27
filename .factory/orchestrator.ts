@@ -18,6 +18,7 @@ import { characterFile, characterForAgents, loadCharacter, renderCharacterLine, 
 import { loadLookFeel, lookFeelFile, lookFeelForAgents, renderLookFeelLine, requireLookFeel } from './lookfeel';
 import { loadMission, missionForAgents, parseDeclaration, renderMissionLine, requireMission, missionFile } from './mission';
 import { renderStackLine, loadStack, stackForAgents } from './stack';
+import { loadUiRules, uiRulesForAgents } from './uirules';
 import { saveHandoff } from './handoff';
 import { contextBudget } from './prompts';
 import { MAX_QUESTIONS_PER_PHASE, HumanRequest, answersFor, newExchange, parseRequest, pendingExchange, questionsAsked } from './human';
@@ -179,7 +180,8 @@ export class FactoryOrchestrator {
         validateAgentResponse(response, agentName, {
           ...(state.mission ? { mission: state.mission, declared: parseDeclaration(state.issueBrief) } : {}),
           ...(state.lookfeel ? { lookfeel: state.lookfeel } : {}),
-          ...(state.character ? { character: state.character } : {})
+          ...(state.character ? { character: state.character } : {}),
+          ...(state.uiRules ? { uiRules: true } : {})
         });
       } catch (error) {
         validationError = error instanceof Error ? error.message : String(error);
@@ -276,6 +278,13 @@ export class FactoryOrchestrator {
   private attachStack(state: WorkflowState): WorkflowState {
     const stack = loadStack();
     return addNote({ ...state, stack }, `Stack: ${renderStackLine(stack)}`);
+  }
+
+  /** Reads the standing UI rules (the project's UI-RULES.md, or the factory's). An unusable file is a note, never a stop. */
+  private attachUiRules(state: WorkflowState): WorkflowState {
+    const load = loadUiRules();
+    if ('error' in load) return addNote(state, `UI rules not used: ${load.error}`);
+    return addNote({ ...state, uiRules: load.rules }, `UI rules loaded (${load.rules.source}): ${load.rules.rules.length} rules, ${load.rules.checklist.length} checklist items`);
   }
 
   /**
@@ -665,6 +674,7 @@ export class FactoryOrchestrator {
       if (state.status !== 'failed') state = this.attachLookFeel(state);
       if (state.status !== 'failed') state = this.attachLanguage(state);
       if (state.status !== 'failed') state = this.attachStack(state);
+      if (state.status !== 'failed') state = this.attachUiRules(state);
       if (state.status === 'failed') {
         saveWorkflowState(state);
         return state;
@@ -989,6 +999,8 @@ export class FactoryOrchestrator {
     const language = state.language ? { language: languageForAgents(state.language) } : {};
     // ... and the agents that choose or build with a framework are told which one the project uses
     const stack = state.stack ? { stack: stackForAgents(state.stack) } : {};
+    // ... and whoever builds or judges an interface is handed the standing rules for it
+    const uiRules = state.uiRules ? { ui_rules: uiRulesForAgents(state.uiRules) } : {};
 
     switch (agent) {
       case 'product-manager':
@@ -1002,7 +1014,7 @@ export class FactoryOrchestrator {
       case 'infrastructure-engineer':
         return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack };
       case 'frontend-engineer':
-        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack, ...character, ...lookfeel, ...language };
+        return { architectOutput: architect, analyzerOutput: analyzer, productManagerOutput: pm, ...stack, ...uiRules, ...character, ...lookfeel, ...language };
       case 'automation-tester':
         return {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
@@ -1015,10 +1027,11 @@ export class FactoryOrchestrator {
           builderOutputs: this.getAllArtifactsByPhases(state, builders),
           testerOutput: this.getLatestArtifactByPhase(state, 'automation-tester'),
           productManagerOutput: pm,
-          ...stack
+          ...stack,
+          ...uiRules
         };
       case 'reviewer':
-        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...this.languageCheck(state), ...mission, ...character, ...lookfeel, ...language };
+        return { allArtifacts: compactArtifacts(state.artifacts), planCheck: this.planCheck(state), ...this.languageCheck(state), ...uiRules, ...mission, ...character, ...lookfeel, ...language };
       case 'customer-support':
         return { allArtifacts: compactArtifacts(state.artifacts), brief: state.issueBrief, ...character, ...lookfeel, ...language };
     }

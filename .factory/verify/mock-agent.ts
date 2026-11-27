@@ -66,6 +66,9 @@ export function conformingInvoker(scenario: Scenario = {}) {
       if (state.lookfeel) {
         payload.look_and_feel = { style: 'Follows the declared style', materials: 'Uses the declared materials', motion: 'Uses the declared motion', sound: 'Uses the declared sound rules', interaction: 'Uses the declared interaction feel', deviations: [] };
       }
+      if (state.uiRules) {
+        payload.layout_check = { rows: ['reader controls'], worst_case: '4 digit page numbers and the longest label', spacing: 'gap-2 on the row, px-2 and min-w-[10ch] on the counter', limits_changed: false };
+      }
       if (state.character) {
         payload.character_fit = { traits: 'Words and states follow the declared traits', moments: 'Each moment follows the declared behaviour', deviations: [] };
       }

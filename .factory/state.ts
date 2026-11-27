@@ -9,6 +9,7 @@ import type { Character } from './character';
 import type { Term } from './language';
 import type { Mission } from './mission';
 import type { Stack } from './stack';
+import type { UiRules } from './uirules';
 
 export type Phase = AgentName | 'completed' | 'failed';
 
@@ -66,6 +67,8 @@ export interface WorkflowState {
   language?: Term[];
   /** The project's stack (project.config.json, or the SvelteKit default) when the workflow started. */
   stack?: Stack;
+  /** The standing rules for web interfaces (UI-RULES.md, or the factory's default) when the workflow started. */
+  uiRules?: UiRules;
 }
 
 

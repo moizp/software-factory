@@ -18,7 +18,7 @@ beforeEach(() => { process.env.FACTORY_DATA_DIR = fs.mkdtempSync(path.join(dir, 
 afterEach(() => { delete process.env.FACTORY_DATA_DIR; delete process.env.FACTORY_IGNORE_WIP; });
 
 const gate = (phase: string, valid = true, error?: string) => ({ phase, valid, timestamp: '2026-10-19T10:00:00Z', ...(error ? { error } : {}) }) as any;
-const start = (over: Partial<WorkflowState> = {}): WorkflowState => ({ ...createWorkflowState('Build', 7, { a: 1 }), id: 'wf-ev', ...over }) as WorkflowState;
+const start = (over: Partial<WorkflowState> = {}): WorkflowState => ({ ...createWorkflowState('Build', 7, { a: 1 }), id: 'wf-ev', startedAt: '2026-10-19T10:00:00.000Z', updatedAt: '2026-10-19T10:00:00.000Z', ...over }) as WorkflowState;
 const types = (bodies: Array<{ type: string }>) => bodies.map(b => b.type);
 
 describe('diffStates', () => {

@@ -5,7 +5,7 @@ Good developer experience is what keeps a codebase healthy while agents and peop
 ## Principles
 
 1. **Automate what a tool can decide.** Formatting, Tailwind class order and import order are never argued in review and never done by hand: `npm run fix`.
-2. **One command checks everything.** `npm run check:all` runs `format:check`, `lint`, `check` (svelte-check), `test` and `css:check`. CI runs the same command, so green locally means green in CI.
+2. **One command checks everything.** `npm run check:all` runs `format:check`, `lint`, `check` (svelte-check), `test`, `css:check` and `compat:check`. CI runs the same command, so green locally means green in CI.
 3. **Feedback is fast and local.** `npm run dev` hot-reloads; `npm run test:watch` and `check:watch` run on save; a pre-commit hook formats and lints what is committed.
 4. **A failure says what to do.** Scripts and errors name the fix (`npm run doctor`, hook messages, error pages).
 5. **No hidden setup.** Every environment variable is in `.env.example` with a safe local value; third parties are faked with `MOCK_EXTERNALS=1`; dependencies run with `docker compose`.
@@ -29,7 +29,7 @@ Good developer experience is what keeps a codebase healthy while agents and peop
 | `.env.example`, `docker-compose.yml` | The environment and the database for local work |
 | `src/lib/core/money.ts` and its test | A core module and a test, to show the layout and prove the setup |
 
-Scripts: `dev`, `dev:host` (phone on the same network), `build`, `preview`, `check`, `format`, `format:check`, `lint`, `lint:fix`, `fix` (format and lint fix), `test`, `test:watch`, `css:check`, `check:all`, `clean`, `doctor`, `db:up`, `db:down`, `db:reset`.
+Scripts: `dev`, `dev:host` (phone on the same network), `build`, `preview`, `check`, `format`, `format:check`, `lint`, `lint:fix`, `fix` (format and lint fix), `test`, `test:watch`, `css:check`, `compat:check`, `layout:guard`, `layout:prove`, `check:all`, `clean`, `doctor`, `db:up`, `db:down`, `db:reset`.
 
 ## Dependencies: fewer, and kept current
 

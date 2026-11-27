@@ -1,6 +1,7 @@
 {
   "name": "MySaaS",
   "factory_version": "1.0.0",
+  "git_identity": { "name": "moizp", "email": "amoizp@yahoo.com" },
   "description": "A multi-tenant SaaS application with payments and real-time features",
   "type": "saas",
   "stack": "ts-sveltekit-node",

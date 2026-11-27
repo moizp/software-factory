@@ -22,3 +22,6 @@ jobs:
       - run: npm ci
       - run: npm run check:all
       - run: npm run build
+      # reads the real page: rows of controls, 5 widths, every theme, 3 text sizes, worst-case content (templates/web-app/UI-RULES.md)
+      - run: npx playwright install --with-deps chromium
+      - run: npm run layout:guard

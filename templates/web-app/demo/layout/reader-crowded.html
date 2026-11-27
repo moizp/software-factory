@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reader controls (crowded)</title>
+<style>
+/* Plain-CSS mirror of the Tailwind classes named in each comment, so the guard runs on a static page with no build. */
+:root { color-scheme: light dark; --bg: #fff; --fg: #111827; --line: #6b7280; --ring: #2563eb; }
+[data-theme="dark"] { --bg: #111827; --fg: #f9fafb; --line: #9ca3af; --ring: #93c5fd; }
+html { font-size: 16px; }
+body { margin: 0; padding: 1rem; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+.row { display: flex; align-items: center; gap: 2px; }          /* flex items-center gap-0.5 */
+.btn { width: 2.75rem; height: 2.75rem; flex-shrink: 0; border: 1px solid var(--line); border-radius: 9999px; background: transparent; color: inherit; font: inherit; cursor: pointer; } /* size-11 shrink-0 rounded-full border focus-visible:ring-[5px] */
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 5px var(--ring); }  /* focus-visible:ring-[5px] */
+.counter { /* the counter is as wide as its digits and has no padding or gap around it */ }                                            /* (no classes: width follows the digits) */
+</style>
+</head>
+<body data-hydrated>
+<main>
+  <h1>Chapter 1</h1>
+  <div class="row" data-layout-row="reader controls">
+    <button class="btn" aria-label="Previous page">&lsaquo;</button>
+    <span class="counter" data-guard-kind="counter" data-guard-name="page counter" data-guard-worst="999 / 999|9999 / 9999">5 / 105</span>
+    <button class="btn" aria-label="Next page">&rsaquo;</button>
+  </div>
+</main>
+</body>
+</html>

@@ -17,6 +17,10 @@ Web front-ends use Tailwind CSS (v4, through `@tailwindcss/vite`) with the desig
 5. **Budgets.** `npm run css:check` (`scripts/css-budget.cjs`) fails on: hand-written CSS over `css_budget.authored_kb` (default 20 KB), a `<style>` block over `svelte_style_lines` (30), the same three or more declarations written twice, more than 10 `@apply`, and built CSS over `built_gzip_kb` (50 KB gzipped) once a build exists. It runs in `check:all`, in the pre-commit flow and in CI.
 6. **A budget is not a target to raise.** Never raise a number to pass the check: restructure, or ask a person. A raise is a reviewed change to `project.config.json` with a reason.
 
+## Room between things
+
+Crowding is fixed with a Tailwind utility on the element (`gap-2`, `px-2`, `min-w-[12ch]`, `flex-wrap`, `shrink-0`), never a custom rule, and never by removing the focus ring. `npm run layout:guard` checks it on the real page; see `.claude/skills/layout-guard.md` and `templates/web-app/UI-RULES.md`.
+
 ## Reviewing a style change
 
 - Did it reuse a component or utility, or add a rule? A new rule needs a sentence on why a utility could not do it.

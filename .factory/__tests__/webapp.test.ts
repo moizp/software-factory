@@ -169,3 +169,44 @@ describe('the verify rows for a web app', () => {
     expect(rows[1].next).toContain('never raise a budget');
   });
 });
+
+describe('the project.layout verify row', () => {
+  const layoutRow = allWebAppChecks.filter(c => c.id === 'project.layout');
+  const ctx = (projectDir: string) => ({ factoryRoot: root, projectDir, flags: { quick: true, live: false as const, github: false, createLabels: false, brief: 'b', tokenCap: 1 } });
+  const withScripts = (): string => {
+    const dir = project();
+    put(dir, 'src/routes/+page.svelte', '<div data-layout-row="reader"></div>');
+    for (const f of ['layout-guard.cjs', 'css-compat.cjs']) fs.copyFileSync(path.join(T, 'scripts', f), (fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true }), path.join(dir, 'scripts', f)));
+    return dir;
+  };
+  it('skips the factory itself, fails without the scripts, and warns about what only the owner can answer', async () => {
+    expect((await runChecks(ctx(root), layoutRow))[0].status).toBe('skip');
+    const bare = project();
+    put(bare, 'src/a.svelte', '<p></p>');
+    expect((await runChecks(ctx(bare), layoutRow))[0]).toMatchObject({ status: 'fail', detail: expect.stringContaining('layout-guard.cjs') });
+    const dir = withScripts();
+    const [row] = await runChecks(ctx(dir), layoutRow);
+    expect(row.status).toBe('warn');
+    expect(row.extra).toContain('browser_targets is not set');
+    expect(row.extra).toContain('git_identity is not set');
+    expect(row.detail).toMatch(/11 UI rules \(factory\), 1 row\(s\) marked/);
+  });
+  it('passes once the owner has answered, and says when a config tries to lower a limit', async () => {
+    const dir = withScripts();
+    put(dir, 'project.config.json', JSON.stringify({ browser_targets: { safari: 16.4 }, git_identity: { name: 'Owner', email: 'o@example.com' } }));
+    expect((await runChecks(ctx(dir), layoutRow))[0].status).toBe('pass');
+    put(dir, 'layout-guard.config.json', JSON.stringify({ limits: { touch: 30 } }));
+    const [row] = await runChecks(ctx(dir), layoutRow);
+    expect(row.status).toBe('warn');
+    expect(row.extra).toContain('limits can only be tightened');
+  });
+  it('fails when the project UI-RULES.md cannot be read, and warns when no row is marked', async () => {
+    const dir = withScripts();
+    put(dir, 'project.config.json', JSON.stringify({ browser_targets: { safari: 16.4 }, git_identity: { name: 'O', email: 'o@example.com' } }));
+    put(dir, 'UI-RULES.md', '# nothing useful');
+    expect((await runChecks(ctx(dir), layoutRow))[0].status).toBe('fail');
+    fs.rmSync(path.join(dir, 'UI-RULES.md'));
+    fs.writeFileSync(path.join(dir, 'src', 'routes', '+page.svelte'), '<p></p>');
+    expect((await runChecks(ctx(dir), layoutRow))[0].extra).toContain('no row of controls is marked');
+  });
+});

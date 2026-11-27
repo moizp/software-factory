@@ -4,6 +4,7 @@ import { checkDependencies } from '../../deps';
 import { checkDevEx } from '../../devex';
 import { addCommand, checkMcp, serversFor } from '../../mcp';
 import { loadStack } from '../../stack';
+import { loadUiRules } from '../../uirules';
 import { Check, Ctx, fail, pass, skip, warn } from '../types';
 
 const budgetScript = (ctx: Ctx): string => path.join(ctx.factoryRoot, 'templates', 'web-app', 'scripts', 'css-budget.cjs');
@@ -64,6 +65,36 @@ export const webAppChecks: Check[] = [
       const script = require(budgetScript(ctx)) as { check(root: string, c: Record<string, unknown>): { violations: Array<{ message: string; file?: string }> }; render(r: unknown): string };
       const r = script.check(ctx.projectDir, config);
       return r.violations.length === 0 ? pass(script.render(r)) : fail(`${r.violations.length} problem(s)`, script.render(r), 'Use Tailwind utilities or a shared component; never raise a budget to pass (.claude/skills/styling.md)');
+    }
+  },
+  {
+    id: 'project.layout',
+    tier: 'offline',
+    title: 'Crowding and overlap: UI rules, layout guard, compatibility gate, and the settings only the owner can give',
+    run: ctx => {
+      const src = path.join(ctx.projectDir, 'src');
+      if (!fs.existsSync(src)) return skip('no src directory: nothing to guard yet');
+      const missing = ['scripts/layout-guard.cjs', 'scripts/css-compat.cjs'].filter(f => !fs.existsSync(path.join(ctx.projectDir, f)));
+      if (missing.length) return fail(`missing: ${missing.join(', ')}`, undefined, 'Copy scripts/ from templates/web-app/ (templates/web-app/README.md)');
+      const rules = loadUiRules(ctx.projectDir);
+      if ('error' in rules) return fail(rules.error, undefined, 'Fix UI-RULES.md: each rule is a line like "- R1: text" (templates/web-app/UI-RULES.md)');
+      const notes: string[] = [];
+      let cfg: Record<string, unknown> = {};
+      try { cfg = JSON.parse(fs.readFileSync(path.join(ctx.projectDir, 'project.config.json'), 'utf-8')); } catch { /* none */ }
+      if (!cfg.browser_targets) notes.push('browser_targets is not set (the oldest browsers the app must work in): ask the owner, because compat:check fails without it');
+      if (!cfg.git_identity) notes.push('git_identity is not set (name and email for author and committer): ask the owner; the identity gate checks nothing until it is');
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(ctx.projectDir, 'layout-guard.config.json'), 'utf-8'));
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const guard = require(path.join(ctx.factoryRoot, 'templates', 'web-app', 'scripts', 'layout-guard.cjs')) as { resolveConfig(r: unknown): { ignored: string[] } };
+        notes.push(...guard.resolveConfig(raw).ignored.map(n => `layout-guard.config.json: ${n}`));
+      } catch { /* no config: the stated minimums apply */ }
+      const rows = (function count(dir: string): number {
+        return fs.readdirSync(dir, { withFileTypes: true }).reduce((n, e) => e.isDirectory() ? n + count(path.join(dir, e.name)) : /\.(svelte|html|ts|js)$/.test(e.name) ? n + (fs.readFileSync(path.join(dir, e.name), 'utf-8').match(/data-layout-row/g) ?? []).length : n, 0);
+      })(src);
+      if (rows === 0) notes.push('no row of controls is marked data-layout-row yet (the guard fails on a page with none)');
+      const head = `${rules.rules.rules.length} UI rules (${rules.rules.source}), ${rows} row(s) marked`;
+      return notes.length ? warn(head, notes.map(n => `- ${n}`).join('\n'), 'Answer the owner questions in .claude/skills/layout-guard.md') : pass(head);
     }
   }
 ];

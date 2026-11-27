@@ -216,6 +216,19 @@ Hand-written CSS is capped so it cannot grow forever (`npm run css:check`, `.cla
 
 Never raise a number to pass the check; restructure, or ask a person.
 
+### Browser targets, identity and the layout guard
+
+Set by the owner; nothing is assumed. `npm run compat:check` fails without `browser_targets`, and the identity gate checks nothing without `git_identity` (or `FACTORY_GIT_IDENTITY="Name <email>"`).
+
+```json
+{
+  "browser_targets": { "chrome": 100, "safari": 15, "firefox": 100, "ios_saf": 15 },
+  "git_identity": { "name": "Your Name", "email": "you@example.com" }
+}
+```
+
+`layout-guard.config.json` in the app (optional) adds `pages`, `widths`, `themes`, `textSizes`, `themeAttribute`, `readySelector`, and may raise `limits` (`controlGap` 6, `labelGap` 8, `labelPadding` 4, `touch` 44). A lower limit or a dropped width, theme or text size is ignored and reported. See `.claude/skills/layout-guard.md`.
+
 ### MCP servers by stack
 
 `mcp_servers` also takes `stdio` servers (`command`, `args`) with `applies_when` (a stack value that selects them). A Svelte or SvelteKit front-end gets the official Svelte MCP, pinned (`@sveltejs/mcp@0.1.31`), registered with `claude mcp add -t stdio -s project svelte -- npx -y @sveltejs/mcp@0.1.31` or by copying `templates/web-app/.mcp.json`. See `.claude/skills/mcp-setup.md`.

@@ -18,4 +18,6 @@ npm run check:all
 
 `.github/` holds CI (`check:all`), a weekly Dependabot configuration and a weekly dependency review; copy it with the rest. `.mcp.json` registers the official Svelte MCP (pinned), so Claude Code sessions in the app look Svelte APIs up in the current docs and run `svelte-autofixer`; see `.claude/skills/mcp-setup.md`. Add `.env` to `.gitignore`, and a `css_budget` object to `project.config.json` if the defaults (20 KB hand-written, 30-line `<style>` blocks, 50 KB built and gzipped) do not suit.
 
-`npm run verify` in the factory checks a project against this template (`project.devex`, `project.css`). Keep `typescript` at `~6.0` until typescript-eslint supports TypeScript 7.
+`UI-RULES.md` holds the standing rules for crowding and overlap, `scripts/layout-guard.cjs` checks them on the real page (`npm run layout:guard`, and `layout:prove -- --base origin/main` for a fix), `scripts/css-compat.cjs` checks CSS against `browser_targets`, and `demo/layout/` has a good and a crowded reader row to try them on (`node scripts/layout-guard.cjs --file demo/layout/reader-crowded.html`). The guard needs `playwright` (a dev dependency; `npx playwright install chromium`) and `document.body.dataset.hydrated = 'true'` set in `onMount`. See `.claude/skills/layout-guard.md`.
+
+`npm run verify` in the factory checks a project against this template (`project.devex`, `project.css`, `project.layout`). Keep `typescript` at `~6.0` until typescript-eslint supports TypeScript 7.

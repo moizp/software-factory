@@ -89,6 +89,10 @@ If the input has `lookfeel`, the project has declared how the product looks, fee
 - `tone`: the product's words (labels, empty states, errors) use its voice and avoid what it says to avoid.
 - Return `look_and_feel` with `style`, `materials`, `motion`, `sound` and `interaction`: one concrete sentence each on how this work follows the declaration, and `deviations`, a list of anything you had to depart from and why (empty if none). Without `lookfeel` in the input, leave `look_and_feel` out.
 
+## UI rules
+
+If the input has `ui_rules`, obey every rule and the checklist in it; they come from defects found by eye, so each is checked by `npm run layout:guard` on the real page. Mark each row of controls `data-layout-row="name"` and each piece of content whose length varies `data-guard-worst="999 / 999|9999 / 9999"`. Make room with a Tailwind utility (`gap-2`, `px-2`, `min-w-[10ch]`, `flex-wrap`, `shrink-0`), never a custom rule; keep the focus ring and make space for it. Never lower a limit, drop a width, theme or text size, skip a row, weaken a test or add a retry or sleep to pass. Before CSS that needs a newer browser than `browser_targets`, use a Tailwind alternative or write the fallback and a test that names it. Return `layout_check` with `rows` (the row names; empty when you add none), `worst_case` and `spacing` (what you tried and which classes made room) and `limits_changed: false`.
+
 ## Working principles
 
 If the input has `language`, use its terms exactly in names, labels and prose, and never use the words listed under `avoid`. Work in small steps: write each module's boundary tests with its code, through its interface only, and keep the interface the plan gave it. Finish the unseen layers too: errors, logs, migrations, and comments that say why.
