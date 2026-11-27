@@ -255,21 +255,21 @@ async function runGuard({ baseUrl, config: cfg }) {
 
 // ---------- serving, proof and CLI ----------
 
-async function waitForHttp(url, timeoutMs) {
-  const end = Date.now() + timeoutMs;
-  for (;;) {
-    try { const r = await fetch(url); if (r.status < 500) return; } catch { /* not up yet */ }
-    if (Date.now() > end) throw new Error(`nothing answered at ${url} within ${timeoutMs} ms`);
-    await new Promise(r => setTimeout(r, 200)); // polling for a server to come up: waits on state, not a fixed pause
-  }
+/** Resolves when the preview server says it is listening (its own output is the state), rejects if it exits or takes too long. */
+function waitForServer(child, ms) {
+  return new Promise((resolve, reject) => {
+    const limit = AbortSignal.timeout(ms);
+    limit.addEventListener('abort', () => reject(new Error(`the preview server did not start within ${ms} ms`)));
+    child.stdout.on('data', d => { if (/localhost:\d+|Local:/.test(String(d))) resolve(); });
+    child.on('exit', code => reject(new Error(`the preview server exited with code ${code} before it was ready. Run \`npm run build\` first`)));
+  });
 }
 
 async function withServer(cwd, port, fn) {
-  const child = spawn('npm', ['run', 'preview', '--', '--port', String(port), '--strictPort'], { cwd, stdio: 'ignore', detached: true });
+  const child = spawn('npm', ['run', 'preview', '--', '--port', String(port), '--strictPort'], { cwd, stdio: ['ignore', 'pipe', 'ignore'], detached: true });
   try {
-    const url = `http://localhost:${port}/`;
-    await waitForHttp(url, 60000);
-    return await fn(url);
+    await waitForServer(child, 60000);
+    return await fn(`http://localhost:${port}/`);
   } finally {
     try { process.kill(-child.pid); } catch { /* already gone */ }
   }

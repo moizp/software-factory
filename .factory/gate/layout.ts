@@ -77,6 +77,13 @@ const listFor = (lines: string[], key: string): number | undefined => {
   for (const l of lines) { const m = new RegExp(`["']?\\b${key}\\b["']?\\s*[:=]\\s*\\[([^\\]]*)\\]`).exec(l); if (m) return m[1].split(',').filter(s => s.trim()).length; }
   return undefined;
 };
+/** True when the pattern matches in code, not inside a string literal (a line that only quotes it, as a test of this gate does). */
+const inCode = (line: string, re: RegExp): boolean => {
+  const m = re.exec(line);
+  if (!m) return false;
+  const before = line.slice(0, m.index).replace(/\\./g, '');
+  return !['\'', '"', '`'].some(q => (before.split(q).length - 1) % 2 === 1);
+};
 const count = (lines: string[], re: RegExp): number => lines.filter(l => re.test(l)).length;
 
 /** Reads a diff (`git diff --unified=0 base...head`) for the ways a fix gets green by weakening the check instead of the page. */
@@ -100,8 +107,8 @@ export function reviewLayoutDiff(diff: string): LayoutIssue[] {
       if (h.added.some(l => /readySelector["']?\s*:\s*false/.test(l))) add('guard-weakened', `${where}: "readySelector": false makes the guard measure before the page hydrates; wait on state instead`);
     }
     if (GUARD_FILE.test(where) || TEST_FILE.test(where)) {
-      if (h.added.some(l => /\.(skip|fixme)\(|\bxit\(|\bxdescribe\(|\btest\.only\(|\bit\.only\(|\bdescribe\.only\(/.test(l))) add('test-skipped', `${where}: a test or row is skipped or focused (skip, fixme, only)`);
-      if (h.added.some(l => /\bretries\s*:|\bwaitForTimeout\(|\bsleep\(|new Promise\([^)]*setTimeout/.test(l))) add('blind-retry', `${where}: a retry or a fixed sleep was added; wait on state (hydration, fonts, a rendered element) instead`);
+      if (h.added.some(l => inCode(l, /\.(skip|fixme)\(|\bxit\(|\bxdescribe\(|\btest\.only\(|\bit\.only\(|\bdescribe\.only\(/))) add('test-skipped', `${where}: a test or row is skipped or focused (skip, fixme, only)`);
+      if (h.added.some(l => inCode(l, /\bretries\s*:|\bwaitForTimeout\(|\bsleep\(|new Promise\([^)]*setTimeout/))) add('blind-retry', `${where}: a retry or a fixed sleep was added; wait on state (hydration, fonts, a rendered element) instead`);
     }
   }
 

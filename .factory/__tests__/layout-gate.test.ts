@@ -61,6 +61,11 @@ describe('relaxation review (the gate side of "the reviewer rejects a fix that r
     expect(rules(diff('playwright.config.ts', [], ['  retries: 3,']))).toEqual([]); // not a guard or test file: left to the reviewer's reading
     expect(rules(diff('tests/layout.test.ts', [], ['  retries: 3,']))).toEqual(['blind-retry']);
   });
+  it('flags a skip or a sleep written as code, not one that is only quoted (as the tests of this gate do)', () => {
+    expect(rules(diff('tests/a.spec.ts', [], ["  it.skip('x', () => {});"]))).toEqual(['test-skipped']);
+    expect(rules(diff('tests/a.spec.ts', [], ["  expect(rules(diff('a', [], [\"test.skip('x')\"]))).toEqual([]);"]))).toEqual([]);
+    expect(rules(diff('tests/a.test.ts', [], ["  const wait = new Promise(r => setTimeout(r, 500));"]))).toEqual(['blind-retry']);
+  });
   it('rejects a weakened test, dropped rows and dropped worst-case marks', () => {
     expect(rules(diff('tests/reader.test.ts', ['  expect(a).toBe(1);', '  expect(b).toBe(2);'], ['  expect(a).toBe(1);']))).toEqual(['test-weakened']);
     expect(rules(diff('src/Reader.svelte', ['<div data-layout-row="reader" class="flex">'], ['<div class="flex">']))).toEqual(['row-skipped']);
