@@ -174,3 +174,33 @@ A job waiting in the queue for a long time counts as dead after 30 minutes witho
 - Slice 4 has never run on Buddy. Unknown: the exact JSON the webhook accepts for variables (`burst.sh` has a fallback that finds the issue by labels), whether the Free plan's runner image has `gh` and Node 24, the maximum run time of a free pipeline, and what a GB-minute costs on the runner you get.
 - Slice 3 has never run on a VM: the scripts are tested with stubbed `gh`, `systemctl` and `claude`, and the installer only in dry-run mode. The checksum is read from the runner release notes; if their format differs the installer stops and asks for `--sha256`.
 - Slice 2 has never run in Actions. In particular: that a reusable workflow with `secrets: inherit` hands secrets only to the job that references them (the Oracle job references none), that `secrets[fromJSON(...)[inputs.author]]` resolves to empty for an unmapped login, and that a background heartbeat in a composite action survives until the step ends.
+
+## 7. Option: Railway sandboxes (not built)
+
+Source: Railway's guide [Use Agents in Railway Sandboxes](https://railway.com/guides/agents-in-sandboxes), updated 24 November 2026, read once on 27 November 2026. Its linked reference pages (`docs.railway.com/sandboxes`, `docs.railway.com/cli/sandbox`) were not readable from here, so everything below is the guide's own account and nothing was run.
+
+**What it is.** A sandbox is "a short-lived, isolated Linux environment you provision on demand, run commands in, and destroy". It is available on every plan, Free and Trial included. The default image has git, Node, npm and the agent harnesses (Claude Code, Codex, OpenCode, Pi).
+
+| Need | What the guide shows |
+|---|---|
+| Create and run | `railway sandbox create`, `railway sandbox exec [--detach] -- bash -lc '...'`, `railway sandbox destroy`; a TypeScript SDK (`bun add railway`, Node 22 or newer) returns `exitCode`, `stdout`, `stderr`, `timedOut` and does not throw on a non-zero exit |
+| Code in | `git clone` inside the sandbox through `exec`; `base.files.write(path, content)` in the SDK |
+| Snapshot and branch | `railway sandbox checkpoint create <name>` (a named disk snapshot that outlives its sandbox) and `railway sandbox fork` (a new independent sandbox from a running one; files are kept, processes are not); templates are cached build steps |
+| Credentials | sign in once inside (`claude auth login`) and checkpoint, or pass `--variable KEY=value` at create time |
+| Network | `--private-network` (`networkIsolation: "PRIVATE"`) reaches the project's other services; the guide says to point it at a development environment, never production |
+| Long jobs | commands keep running after the client detaches; reattach with `Sandbox.connect(id)`; a short idle timeout (the example sets 30 minutes) destroys a forgotten sandbox |
+| Parallel | one sandbox per agent with `Promise.all`, up to an "environment's sandbox limit" (number not given) |
+| Billing | per second for CPU in use, memory and outbound traffic; idle sandboxes still bill (from search summaries of the guide; the guide page itself gives no rates) |
+
+**Where it fits.** It is a place to run code, not a free pool for the pipeline, so it is not a fourth lane beside Actions, Oracle and Buddy: nothing in the guide makes it a GitHub Actions runner or mentions CI. It fits the gap in `docs/NEXT-CAPABILITIES.md` (F6, T1): the factory's agents have no tools, so nothing runs tests, `check:all`, `layout:guard` or `evidence:capture` before review. A sandbox could be that place, one per builder run, with a checkpoint after dependencies are installed and a fork per retry or parallel phase.
+
+**How to keep it an option.** F6 should define the interface it needs, small and its own: `create(repo, ref)`, `exec(command)` returning exit code and output, `checkpoint`, `fork`, `destroy`. A git worktree on the Oracle runner, an Actions job and a Railway sandbox are then three backends of that interface, chosen by a setting, and no code outside the backend names Railway. Credentials stay as in section 3: a lane-scoped GitHub token (contents, pull requests, issues, no admin) and the writer's Claude token passed at create time, never a checkpoint with a login baked in that others can fork.
+
+**Not known, and to be measured before adopting**
+- Price of one R1-slice run (per-second rates, any free allowance, idle billing), against the free pools.
+- CPU, memory, disk and maximum duration; the default idle timeout; the sandboxes-per-environment limit.
+- Public internet egress rules, and how secrets are stored. The guide gives neither; an agent run needs the Claude API and GitHub, and must not reach a production network.
+- Whether a Railway project and token are needed per repository, and whether the CLI works unattended from an Actions job.
+- Whether Claude Code in the default image runs with a personal-plan token without an interactive login.
+
+**Decision rule.** Do not build this until T1's first version exists on a local worktree. Then run one real R1 slice in a sandbox, record the cost and every item above, and adopt it only if it beats the Oracle worktree on cost or isolation.
