@@ -18,7 +18,7 @@ export interface DevExReport {
   issues: DevExIssue[];
 }
 
-export const REQUIRED_SCRIPTS = ['dev', 'build', 'check', 'format', 'format:check', 'lint', 'test', 'check:all', 'css:check', 'doctor'];
+export const REQUIRED_SCRIPTS = ['dev', 'build', 'check', 'format', 'format:check', 'lint', 'test', 'check:all', 'css:check', 'compat:check', 'layout:guard', 'layout:prove', 'doctor'];
 const TAILWIND = 'prettier-plugin-tailwindcss';
 const SVELTE = 'prettier-plugin-svelte';
 

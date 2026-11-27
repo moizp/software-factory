@@ -112,10 +112,12 @@ describe('the orchestrator uses the pack', () => {
     }) as any;
     await new FactoryOrchestrator(invoker, false, undefined, retryConfig).executeWorkflow('Build', 1, {}, undefined, { until: 'reviewer' });
     expect(seen['backend-engineer']).toEqual(['stack', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
-    expect(seen['backend-engineer']).toEqual(seen['frontend-engineer']);
+    // the frontend engineer also gets the standing UI rules, right after the stack
+    expect(seen['backend-engineer']).toEqual(seen['frontend-engineer'].filter((k: string) => k !== 'ui_rules'));
+    expect(seen['frontend-engineer']).toEqual(['stack', 'ui_rules', 'productManagerOutput', 'analyzerOutput', 'architectOutput']);
     expect(seen['backend-engineer']).toEqual(seen['infrastructure-engineer']);
     expect(seen['software-architect']).toEqual(['brief', 'stack', 'productManagerOutput', 'analyzerOutput']);
-    expect(seen['reviewer']).toEqual(['allArtifacts', 'planCheck']);
+    expect(seen['reviewer']).toEqual(['ui_rules', 'allArtifacts', 'planCheck']);
   });
 
   it('notes in the workflow when an input had to be shortened', async () => {

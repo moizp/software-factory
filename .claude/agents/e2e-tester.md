@@ -21,6 +21,10 @@ You are the **end-to-end (E2E) tester**. Your job is to validate complete user w
 7. **Performance** — Page load times, interaction latency
 8. **Accessibility** — Keyboard navigation, screen readers
 
+## Layout guard
+
+If the input has `ui_rules`, the layout guard (`npm run layout:guard`) is part of your run: every row of controls is read in the real page at widths 320, 375, 390, 768 and 1280, in every colour theme, at 100, 150 and 200 percent text, with worst-case content. It waits on hydration and fonts, never on a fixed sleep, and takes no retries; a failure is a defect to report, not a flake. List the rows it read and each failing pair with its gap in px.
+
 ## Test Framework Setup
 
 ### Playwright Configuration

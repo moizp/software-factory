@@ -2,6 +2,7 @@ import Ajv, { ValidateFunction } from 'ajv';
 import envelopeSchema from './contracts/envelope.schema.json';
 import { AGENT_CONTRACTS, isAgentName } from './pipeline';
 import { conformanceProblems, LookFeel } from './lookfeel';
+import { layoutCheckProblems } from './uirules';
 import { Character, characterConformanceProblems } from './character';
 import { alignmentProblems, Declaration, Mission } from './mission';
 import { parsePlan, stubPlan } from './plan';
@@ -61,6 +62,8 @@ export interface ContractContext {
   lookfeel?: LookFeel;
   /** The project's declared character; when present, the frontend engineer must say how its work follows it. */
   character?: Character;
+  /** True when standing UI rules are in force; the frontend engineer must then return layout_check. */
+  uiRules?: boolean;
 }
 
 /** Checks of a payload's content, beyond the presence of its keys. Only for a valid reply. */
@@ -78,7 +81,8 @@ function payloadProblems(response: unknown, agentName: string, context: Contract
   if (agentName === 'frontend-engineer') {
     return [
       ...(context.lookfeel ? conformanceProblems(r) : []),
-      ...(context.character ? characterConformanceProblems(r) : [])
+      ...(context.character ? characterConformanceProblems(r) : []),
+      ...(context.uiRules ? layoutCheckProblems(r) : [])
     ];
   }
   return [];
@@ -136,6 +140,8 @@ export function stubPayload(agentName: string, data: unknown = {}): Record<strin
         : key === 'review' ? { agent: agentName, data, challenges: ['Looked for failure paths, duplication and hidden complexity in the stub'] }
         : { agent: agentName, data };
     }
+    // a reply that has no rows of controls still says it left the limits alone (see layoutCheckProblems)
+    if (agentName === 'frontend-engineer') payload.layout_check = { rows: [], limits_changed: false };
   }
   return payload;
 }
